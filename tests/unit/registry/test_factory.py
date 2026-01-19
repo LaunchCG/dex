@@ -7,10 +7,16 @@ import pytest
 from dex.registry.factory import (
     UnsupportedProtocolError,
     create_registry_client,
+    is_git_source,
+    is_https_source,
     is_local_source,
+    is_s3_source,
     normalize_source,
 )
+from dex.registry.git import GitRegistryClient
+from dex.registry.https import HttpsRegistryClient
 from dex.registry.local import LocalRegistryClient
+from dex.registry.s3 import S3RegistryClient
 
 
 class TestCreateRegistryClient:
@@ -31,25 +37,32 @@ class TestCreateRegistryClient:
         client = create_registry_client(str(temp_dir))
         assert isinstance(client, LocalRegistryClient)
 
-    def test_raises_for_https(self):
-        """Raises UnsupportedProtocolError for HTTPS."""
-        with pytest.raises(UnsupportedProtocolError) as exc_info:
-            create_registry_client("https://example.com/registry")
-        assert exc_info.value.protocol == "https"
+    def test_creates_https_client_for_https_url(self, temp_dir: Path):
+        """Creates HttpsRegistryClient for https:// URL."""
+        client = create_registry_client(
+            "https://example.com/registry/", cache_dir=temp_dir / "cache"
+        )
+        assert isinstance(client, HttpsRegistryClient)
 
     def test_raises_for_http(self):
         """Raises UnsupportedProtocolError for HTTP."""
         with pytest.raises(UnsupportedProtocolError):
             create_registry_client("http://example.com/registry")
 
-    def test_raises_for_s3(self):
-        """Raises UnsupportedProtocolError for S3."""
-        with pytest.raises(UnsupportedProtocolError) as exc_info:
-            create_registry_client("s3://bucket/registry")
-        assert exc_info.value.protocol == "s3"
+    def test_creates_s3_client_for_s3_url(self, temp_dir: Path):
+        """Creates S3RegistryClient for s3:// URL."""
+        client = create_registry_client("s3://bucket/registry", cache_dir=temp_dir / "cache")
+        assert isinstance(client, S3RegistryClient)
 
-    def test_raises_for_git(self):
-        """Raises UnsupportedProtocolError for Git."""
+    def test_creates_git_client_for_git_url(self, temp_dir: Path):
+        """Creates GitRegistryClient for git+ URL."""
+        client = create_registry_client(
+            "git+https://github.com/user/repo.git", cache_dir=temp_dir / "cache"
+        )
+        assert isinstance(client, GitRegistryClient)
+
+    def test_raises_for_plain_git(self):
+        """Raises UnsupportedProtocolError for plain git:// (not git+)."""
         with pytest.raises(UnsupportedProtocolError):
             create_registry_client("git://github.com/repo")
 
@@ -126,6 +139,74 @@ class TestNormalizeSource:
         """Other URLs are unchanged."""
         assert normalize_source("https://example.com") == "https://example.com"
         assert normalize_source("s3://bucket/path") == "s3://bucket/path"
+
+
+class TestIsGitSource:
+    """Tests for is_git_source function."""
+
+    def test_git_https_is_git(self):
+        """git+https:// URL is git source."""
+        assert is_git_source("git+https://github.com/user/repo.git") is True
+
+    def test_git_ssh_is_git(self):
+        """git+ssh:// URL is git source."""
+        assert is_git_source("git+ssh://git@github.com/user/repo.git") is True
+
+    def test_plain_git_is_not_git(self):
+        """Plain git:// URL is not a git source (needs git+ prefix)."""
+        assert is_git_source("git://github.com/repo") is False
+
+    def test_https_is_not_git(self):
+        """Plain https:// URL is not git source."""
+        assert is_git_source("https://github.com/user/repo.git") is False
+
+    def test_file_is_not_git(self):
+        """File URL is not git source."""
+        assert is_git_source("file:///path/to/repo") is False
+
+
+class TestIsS3Source:
+    """Tests for is_s3_source function."""
+
+    def test_s3_url_is_s3(self):
+        """s3:// URL is S3 source."""
+        assert is_s3_source("s3://bucket/path") is True
+
+    def test_s3_bucket_only_is_s3(self):
+        """s3://bucket is S3 source."""
+        assert is_s3_source("s3://bucket") is True
+
+    def test_https_is_not_s3(self):
+        """https:// URL is not S3 source."""
+        assert is_s3_source("https://bucket.s3.amazonaws.com") is False
+
+    def test_file_is_not_s3(self):
+        """File URL is not S3 source."""
+        assert is_s3_source("file:///path/to/dir") is False
+
+
+class TestIsHttpsSource:
+    """Tests for is_https_source function."""
+
+    def test_https_url_is_https(self):
+        """https:// URL is HTTPS source."""
+        assert is_https_source("https://example.com/registry") is True
+
+    def test_https_tarball_is_https(self):
+        """https:// tarball URL is HTTPS source."""
+        assert is_https_source("https://example.com/plugin-1.0.0.tar.gz") is True
+
+    def test_http_is_not_https(self):
+        """http:// URL is not HTTPS source."""
+        assert is_https_source("http://example.com/registry") is False
+
+    def test_s3_is_not_https(self):
+        """s3:// URL is not HTTPS source."""
+        assert is_https_source("s3://bucket/path") is False
+
+    def test_file_is_not_https(self):
+        """File URL is not HTTPS source."""
+        assert is_https_source("file:///path/to/dir") is False
 
 
 class TestUnsupportedProtocolError:

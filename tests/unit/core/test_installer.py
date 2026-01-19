@@ -143,25 +143,33 @@ class TestPluginInstallerInstall:
 class TestPluginInstallerResolvePlugin:
     """Tests for PluginInstaller._resolve_plugin() method."""
 
-    def test_uses_locked_version(self, initialized_project: Project, temp_plugin_dir: Path):
+    def test_uses_locked_version(self, initialized_project: Project, temp_registry: Path):
         """Uses locked version when available."""
+        import tarfile
+
+        # Create tarball for the locked version in the registry
+        tarball_path = temp_registry / "test-plugin-1.0.0.tar.gz"
+        with tarfile.open(tarball_path, "w:gz"):
+            pass  # Empty tarball for test
+
         installer = PluginInstaller(initialized_project)
         installer.lockfile_manager.load()
         installer.lockfile_manager.lock_plugin(
             "test-plugin",
             "1.0.0",
-            f"file://{temp_plugin_dir}",
+            f"file://{temp_registry}/test-plugin-1.0.0.tar.gz",
         )
 
-        # Configure registry
-        initialized_project._config.registries["local"] = f"file://{temp_plugin_dir.parent}"
+        # Configure registry with proper registry that has registry.json
+        initialized_project._config.registries["local"] = f"file://{temp_registry}"
         initialized_project._config.default_registry = "local"
 
-        spec = PluginSpec(version="^1.0.0")
-        installer._resolve_plugin("test-plugin", spec, use_lockfile=True)
+        # When using lockfile with exact locked version, that version should be used
+        spec = PluginSpec(version="1.0.0")  # Exact locked version
+        resolved = installer._resolve_plugin("test-plugin", spec, use_lockfile=True)
 
-        # Would need proper registry setup to fully test
-        # This tests the lockfile lookup path
+        assert resolved is not None
+        assert resolved.version == "1.0.0"  # Should use locked version
 
     def test_resolves_from_direct_source(self, initialized_project: Project, temp_plugin_dir: Path):
         """Resolves from direct source."""

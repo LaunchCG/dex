@@ -34,7 +34,7 @@ from dex.core.lockfile import LockFileManager
 from dex.core.manifest import ManifestManager
 from dex.core.project import Project
 from dex.registry.base import ResolvedPackage
-from dex.registry.factory import create_registry_client, is_local_source, normalize_source
+from dex.registry.factory import create_registry_client, normalize_source
 from dex.template.context import build_context
 from dex.template.context_resolver import resolve_context_spec
 from dex.template.engine import TemplateRenderError, render_file
@@ -243,32 +243,37 @@ class PluginInstaller:
         use_lockfile: bool,
     ) -> ResolvedPackage | None:
         """Resolve a plugin specification to a downloadable package."""
-        # Check for locked version
-        if use_lockfile and spec.version:
+        # Check for locked version - only applies to registry-based resolution (not source)
+        # Only use locked version if:
+        # 1. No explicit version specified (use locked)
+        # 2. Explicit version matches locked version (use locked for stability)
+        # If user specifies a different version, they want to upgrade/downgrade
+        if use_lockfile and not spec.source:
             locked_version = self.lockfile_manager.get_locked_version(name)
-            if locked_version:
-                # Use locked version
-                spec = PluginSpec(version=locked_version)
+            if locked_version and (not spec.version or spec.version == locked_version):
+                spec = PluginSpec(
+                    version=locked_version,
+                    registry=spec.registry,
+                )
 
-        # Handle direct source
+        # Handle direct source - use "package" mode since source points to a single package
         if spec.source:
             source = normalize_source(spec.source)
-            if is_local_source(source):
-                client = create_registry_client(source)
-                return client.resolve_package(name, "latest")
-            else:
-                # Non-local sources not yet implemented
-                return None
+            client = create_registry_client(source, mode="package")
+            return client.resolve_package(name, spec.version or "latest")
 
         # Handle registry-based resolution
         version = spec.version or "latest"
         registry_url: str | None = None
 
-        # Check if spec.registry is a direct URL (starts with file://, http://, etc.)
+        # Check if spec.registry is a direct URL (starts with file://, http://, s3://, az://, git+, etc.)
         if spec.registry and (
             spec.registry.startswith("file://")
             or spec.registry.startswith("http://")
             or spec.registry.startswith("https://")
+            or spec.registry.startswith("s3://")
+            or spec.registry.startswith("az://")
+            or spec.registry.startswith("git+")
         ):
             registry_url = spec.registry
             logger.debug("Using direct registry URL: %s", registry_url)
@@ -306,7 +311,21 @@ class PluginInstaller:
             except Exception:
                 return None
 
-        # No local path - can't fetch
+        if resolved.resolved_url:
+            # Fetch from remote
+            import tempfile
+
+            temp_dir = Path(tempfile.mkdtemp(prefix="dex_"))
+            self._temp_dirs.append(temp_dir)
+
+            try:
+                client = create_registry_client(resolved.resolved_url)
+                plugin_dir = client.fetch_package(resolved, temp_dir)
+                return load_plugin_manifest(plugin_dir)
+            except Exception:
+                return None
+
+        # No local path or URL - can't fetch
         return None
 
     def _install_single_plugin(
@@ -336,10 +355,21 @@ class PluginInstaller:
                 self._temp_dirs.append(temp_dir)
 
                 source_dir = extract_tarball(resolved.local_path, temp_dir)
+            elif resolved.resolved_url:
+                # Fetch from remote
+                import tempfile
+
+                from dex.utils.filesystem import extract_tarball
+
+                temp_dir = Path(tempfile.mkdtemp(prefix="dex_"))
+                self._temp_dirs.append(temp_dir)
+
+                # Create a client from the resolved URL and fetch
+                client = create_registry_client(resolved.resolved_url)
+                source_dir = client.fetch_package(resolved, temp_dir)
             else:
-                # Need to fetch from remote (not yet implemented)
                 raise InstallError(
-                    f"Cannot fetch package: no local path for {name}",
+                    f"Cannot fetch package: no local path or URL for {name}",
                     plugin_name=name,
                 )
 

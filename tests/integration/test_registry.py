@@ -84,7 +84,7 @@ class TestLocalRegistryDirect:
 
     def test_resolve_from_directory(self, temp_plugin_dir: Path):
         """Resolve plugin from direct directory."""
-        client = LocalRegistryClient(str(temp_plugin_dir))
+        client = LocalRegistryClient(str(temp_plugin_dir), mode="package")
 
         resolved = client.resolve_package("test-plugin", "latest")
 
@@ -164,7 +164,7 @@ class TestRegistryPackageListing:
 
     def test_list_single_package_in_direct_mode(self, temp_plugin_dir: Path):
         """Lists single package in direct mode."""
-        client = LocalRegistryClient(str(temp_plugin_dir))
+        client = LocalRegistryClient(str(temp_plugin_dir), mode="package")
 
         packages = client.list_packages()
 

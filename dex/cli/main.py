@@ -276,11 +276,11 @@ def install(
         if plugins and len(plugins) == 1:
             plugin_name = plugins[0].split("@")[0]
         else:
-            # Load manifest to get name
+            # Load manifest to get name (use package mode since this is a direct source)
             from dex.registry.factory import create_registry_client, normalize_source
 
             normalized = normalize_source(source)
-            client = create_registry_client(normalized)
+            client = create_registry_client(normalized, mode="package")
             packages = client.list_packages()
             if not packages:
                 print_error(f"No plugin found at {source}")
