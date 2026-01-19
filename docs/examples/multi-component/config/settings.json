@@ -1,0 +1,17 @@
+{
+  "rules": {
+    "no-unused-vars": "error",
+    "no-console": "warn",
+    "prefer-const": "error",
+    "eqeqeq": "error"
+  },
+  "severity": {
+    "error": 2,
+    "warn": 1
+  },
+  "ignore": [
+    "node_modules/**",
+    "dist/**",
+    "*.min.js"
+  ]
+}

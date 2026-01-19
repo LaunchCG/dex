@@ -1,0 +1,16 @@
+{
+  "name": "templated",
+  "version": "1.0.0",
+  "description": "An example plugin demonstrating Jinja2 template features",
+  "skills": [
+    {
+      "name": "platform-aware",
+      "description": "A skill that adapts to the current platform",
+      "context": "./context/skill.md"
+    }
+  ],
+  "commands": [],
+  "sub_agents": [],
+  "mcp_servers": [],
+  "dependencies": {}
+}

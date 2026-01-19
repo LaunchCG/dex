@@ -1,0 +1,475 @@
+"""Pydantic schemas for Dex configuration files.
+
+This module defines the data models for:
+- dex.yaml (project configuration)
+- dex.lock (lockfile)
+- package.json (plugin manifest)
+"""
+
+from pathlib import Path
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+# =============================================================================
+# Common Types
+# =============================================================================
+
+AgentType = Literal["claude-code", "cursor", "codex", "antigravity", "github-copilot"]
+PlatformOS = Literal["windows", "linux", "macos", "unix"]
+MCPServerType = Literal["bundled", "remote"]
+ComponentType = Literal["skill", "command", "sub_agent", "instruction", "rule", "prompt"]
+
+
+# =============================================================================
+# File Specification Models
+# =============================================================================
+
+
+class FileTarget(BaseModel):
+    """A file with custom destination and permissions."""
+
+    src: str
+    dest: str
+    chmod: str | None = None
+
+
+class PlatformFiles(BaseModel):
+    """Platform-conditional file specification."""
+
+    common: list[str] = Field(default_factory=list)
+    platform: dict[PlatformOS, list[str]] = Field(default_factory=dict)
+
+
+# Type alias for flexible file specifications
+FileSpec = list[str] | list[FileTarget] | PlatformFiles | dict[str, Any]
+
+
+# =============================================================================
+# Context File Models
+# =============================================================================
+
+
+class ConditionalContext(BaseModel):
+    """A context file with a condition."""
+
+    path: str
+    if_: str = Field(alias="if")
+
+    model_config = {"populate_by_name": True}
+
+
+# Context can be a single path, list of paths, or list with conditions
+ContextSpec = str | list[str | ConditionalContext]
+
+
+# =============================================================================
+# Component Models (Skills, Commands, Sub-Agents)
+# =============================================================================
+
+
+class SkillConfig(BaseModel):
+    """Skill definition within a plugin."""
+
+    name: str
+    description: str
+    context: ContextSpec
+    files: FileSpec | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class CommandConfig(BaseModel):
+    """Command definition within a plugin."""
+
+    name: str
+    description: str
+    context: ContextSpec
+    skills: list[str] = Field(default_factory=list)  # Skills this command uses
+    allowed_tools: list[str] | str | None = None  # Tools this command can use (e.g., "Bash(uv:*)")
+    files: FileSpec | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class SubAgentConfig(BaseModel):
+    """Sub-agent definition within a plugin."""
+
+    name: str
+    description: str
+    context: ContextSpec
+    skills: list[str] = Field(default_factory=list)  # Skills this agent can use
+    commands: list[str] = Field(default_factory=list)  # Commands this agent can use
+    allowed_tools: list[str] | str | None = None  # Tools this agent can use
+    files: FileSpec | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+# =============================================================================
+# First-Class Platform-Specific Components
+# =============================================================================
+
+
+class InstructionConfig(BaseModel):
+    """Instruction definition (GitHub Copilot .instructions.md files).
+
+    Instructions are path-specific guidance that can be scoped to
+    specific file patterns using the applyTo field.
+    """
+
+    model_config = {"populate_by_name": True}
+
+    name: str
+    description: str
+    context: ContextSpec
+    apply_to: str | list[str] | None = Field(
+        default=None, alias="applyTo"
+    )  # File glob patterns (e.g., "**/*.py")
+    exclude_agent: str | None = Field(
+        default=None, alias="excludeAgent"
+    )  # Agent to exclude (e.g., "code-review")
+    files: FileSpec | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class RuleConfig(BaseModel):
+    """Rule definition (Cursor .cursor/rules/, Copilot copilot-instructions.md).
+
+    Rules are project-wide or scoped guidelines that inform AI behavior.
+    """
+
+    name: str
+    description: str
+    context: ContextSpec
+    glob: str | None = None  # File pattern scope (Cursor .mdc files)
+    paths: str | list[str] | None = None  # File pattern scope (Claude Code)
+    always: bool = False  # Always apply this rule (Cursor)
+    files: FileSpec | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class PromptConfig(BaseModel):
+    """Prompt definition (reusable prompts/system instructions).
+
+    Prompts are reusable text snippets that can be referenced or
+    invoked by the AI assistant.
+    """
+
+    name: str
+    description: str
+    context: ContextSpec
+    trigger: str | None = None  # Optional trigger phrase
+    files: FileSpec | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+# =============================================================================
+# MCP Server Models
+# =============================================================================
+
+
+class MCPServerConfig(BaseModel):
+    """MCP server configuration within a plugin."""
+
+    name: str
+    description: str = ""  # Optional for MCP servers since they're often external
+    type: MCPServerType
+    path: str | dict[PlatformOS, str] | None = None
+    source: str | None = None
+    version: str | None = None
+    config: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_server_type(self) -> "MCPServerConfig":
+        """Validate that bundled servers have path and remote servers have source."""
+        if self.type == "bundled" and not self.path:
+            raise ValueError("Bundled MCP servers must specify a 'path'")
+        if self.type == "remote" and not self.source:
+            raise ValueError("Remote MCP servers must specify a 'source'")
+        return self
+
+
+# =============================================================================
+# Environment Variable Models
+# =============================================================================
+
+
+class EnvVariableConfig(BaseModel):
+    """Environment variable declaration."""
+
+    description: str
+    required: bool = True
+    default: str | None = None
+
+
+# =============================================================================
+# Agent File Config
+# =============================================================================
+
+
+class AgentFileConfig(BaseModel):
+    """Content to inject into the main agent instruction file.
+
+    This configures content that should be appended to shared agent files
+    like CLAUDE.md (Claude Code) or AGENTS.md (Codex). Content is managed
+    using markers to allow multiple plugins to contribute to the same file.
+    """
+
+    context: ContextSpec  # Path(s) to markdown content to inject
+    files: FileSpec | None = None  # Optional additional files to copy
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @property
+    def name(self) -> str:
+        """Agent file config uses a fixed name for context building."""
+        return "agent_file"
+
+
+# =============================================================================
+# Plugin Manifest (package.json)
+# =============================================================================
+
+
+class PluginManifest(BaseModel):
+    """Plugin manifest (package.json) schema.
+
+    This defines the structure of a plugin's package.json file.
+    """
+
+    name: str
+    version: str
+    description: str
+
+    # Core components (Claude Code native)
+    skills: list[SkillConfig] = Field(default_factory=list)
+    commands: list[CommandConfig] = Field(default_factory=list)
+    sub_agents: list[SubAgentConfig] = Field(default_factory=list)
+
+    # First-class platform components
+    instructions: list[InstructionConfig] = Field(default_factory=list)  # GitHub Copilot
+    rules: list[RuleConfig] = Field(default_factory=list)  # Cursor, Copilot
+    prompts: list[PromptConfig] = Field(default_factory=list)  # Various platforms
+
+    # Infrastructure
+    mcp_servers: list[MCPServerConfig] = Field(default_factory=list)
+
+    # Agent file injection (for CLAUDE.md, AGENTS.md, etc.)
+    agent_file: AgentFileConfig | None = None
+
+    dependencies: dict[str, str] = Field(default_factory=dict)
+    env_variables: dict[str, EnvVariableConfig] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        """Validate plugin name format."""
+        if not v:
+            raise ValueError("Plugin name cannot be empty")
+        # Allow alphanumeric, hyphens, and underscores
+        import re
+
+        if not re.match(r"^[a-z0-9][a-z0-9_-]*$", v):
+            raise ValueError(
+                "Plugin name must start with alphanumeric and contain only "
+                "lowercase letters, numbers, hyphens, and underscores"
+            )
+        return v
+
+    @field_validator("version")
+    @classmethod
+    def validate_version(cls, v: str) -> str:
+        """Validate semver format."""
+        import re
+
+        # Basic semver pattern
+        pattern = r"^\d+\.\d+\.\d+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$"
+        if not re.match(pattern, v):
+            raise ValueError(f"Invalid semver version: {v}")
+        return v
+
+
+# =============================================================================
+# Plugin Spec (within dex.yaml)
+# =============================================================================
+
+
+class PluginSpec(BaseModel):
+    """Plugin specification in project configuration.
+
+    Can specify version, registry, or direct source.
+    """
+
+    version: str | None = None
+    registry: str | None = None
+    source: str | None = None
+
+    @model_validator(mode="after")
+    def validate_spec(self) -> "PluginSpec":
+        """Validate that either version/registry or source is specified."""
+        has_version = self.version is not None
+        has_source = self.source is not None
+        if not has_version and not has_source:
+            raise ValueError("Plugin spec must have either 'version' or 'source'")
+        if has_version and has_source:
+            raise ValueError("Plugin spec cannot have both 'version' and 'source'")
+        return self
+
+
+# =============================================================================
+# Project Configuration (dex.yaml)
+# =============================================================================
+
+
+class ProjectConfig(BaseModel):
+    """Project configuration (dex.yaml) schema."""
+
+    agent: AgentType
+    project_name: str | None = None
+    registries: dict[str, str] = Field(default_factory=dict)
+    default_registry: str | None = None
+    plugins: dict[str, str | PluginSpec] = Field(default_factory=dict)
+    config: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_default_registry(self) -> "ProjectConfig":
+        """Validate that default_registry exists in registries."""
+        if self.default_registry and self.default_registry not in self.registries:
+            raise ValueError(f"default_registry '{self.default_registry}' not found in registries")
+        return self
+
+
+# =============================================================================
+# Lock File (dex.lock)
+# =============================================================================
+
+
+class LockedPlugin(BaseModel):
+    """A locked plugin entry in the lock file."""
+
+    version: str
+    resolved: str
+    integrity: str
+    dependencies: dict[str, str] = Field(default_factory=dict)
+
+
+class LockFile(BaseModel):
+    """Lock file (dex.lock) schema."""
+
+    version: str = "1.0"
+    agent: AgentType
+    plugins: dict[str, LockedPlugin] = Field(default_factory=dict)
+
+
+# =============================================================================
+# Installation Plan Models
+# =============================================================================
+
+
+class FileToWrite(BaseModel):
+    """Represents a file to be written during installation."""
+
+    path: Path
+    content: str
+    chmod: str | None = None
+
+
+class InstallationPlan(BaseModel):
+    """Plan for installing a plugin component.
+
+    This is returned by adapters and executed by the installer.
+    """
+
+    directories_to_create: list[Path] = Field(default_factory=list)
+    files_to_write: list[FileToWrite] = Field(default_factory=list)
+    files_to_copy: dict[Path, Path] = Field(default_factory=dict)  # src -> dest
+    mcp_config_updates: dict[str, Any] = Field(default_factory=dict)
+
+    model_config = {"arbitrary_types_allowed": True}
+
+
+# =============================================================================
+# Adapter Metadata
+# =============================================================================
+
+
+class AdapterMetadata(BaseModel):
+    """Metadata about a platform adapter.
+
+    Adapters declare what they support by implementing the corresponding
+    plan_*_installation methods. The base class returns empty plans for
+    unsupported types, so adapters only override what they actually handle.
+    """
+
+    name: str
+    display_name: str
+    description: str
+    mcp_config_file: str | None = None  # e.g., ".mcp.json", None if no MCP support
+
+
+# =============================================================================
+# Dex Manifest (.dex/manifest.json)
+# =============================================================================
+
+
+class PluginFiles(BaseModel):
+    """Files managed by a single plugin."""
+
+    files: list[str] = Field(default_factory=list)  # Relative to project root
+    directories: list[str] = Field(default_factory=list)  # Relative to project root
+    mcp_servers: list[str] = Field(default_factory=list)  # Server names added to .mcp.json
+
+
+class DexManifest(BaseModel):
+    """Manifest tracking all files managed by dex.
+
+    Stored at .dex/manifest.json in the project root.
+    """
+
+    version: str = "1.0"
+    plugins: dict[str, PluginFiles] = Field(default_factory=dict)
+
+    def add_file(self, plugin_name: str, file_path: str) -> None:
+        """Record a file as managed by a plugin."""
+        if plugin_name not in self.plugins:
+            self.plugins[plugin_name] = PluginFiles()
+        if file_path not in self.plugins[plugin_name].files:
+            self.plugins[plugin_name].files.append(file_path)
+
+    def add_directory(self, plugin_name: str, dir_path: str) -> None:
+        """Record a directory as managed by a plugin."""
+        if plugin_name not in self.plugins:
+            self.plugins[plugin_name] = PluginFiles()
+        if dir_path not in self.plugins[plugin_name].directories:
+            self.plugins[plugin_name].directories.append(dir_path)
+
+    def add_mcp_server(self, plugin_name: str, server_name: str) -> None:
+        """Record an MCP server as added by a plugin."""
+        if plugin_name not in self.plugins:
+            self.plugins[plugin_name] = PluginFiles()
+        if server_name not in self.plugins[plugin_name].mcp_servers:
+            self.plugins[plugin_name].mcp_servers.append(server_name)
+
+    def get_plugin_files(self, plugin_name: str) -> PluginFiles | None:
+        """Get all files managed by a plugin."""
+        return self.plugins.get(plugin_name)
+
+    def remove_plugin(self, plugin_name: str) -> PluginFiles | None:
+        """Remove a plugin from the manifest and return its files."""
+        return self.plugins.pop(plugin_name, None)
+
+    def get_mcp_servers_to_remove(self, plugin_name: str) -> list[str]:
+        """Get MCP servers that should be removed when a plugin is uninstalled.
+
+        Only returns servers that are not used by any other plugin.
+        """
+        plugin_files = self.plugins.get(plugin_name)
+        if not plugin_files:
+            return []
+
+        # Get servers used by other plugins
+        other_servers: set[str] = set()
+        for name, files in self.plugins.items():
+            if name != plugin_name:
+                other_servers.update(files.mcp_servers)
+
+        # Return servers only used by this plugin
+        return [s for s in plugin_files.mcp_servers if s not in other_servers]

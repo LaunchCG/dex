@@ -1,0 +1,16 @@
+{
+  "name": "simple-skill",
+  "version": "1.0.0",
+  "description": "A minimal example plugin with a single skill",
+  "skills": [
+    {
+      "name": "greeting",
+      "description": "A friendly greeting skill",
+      "context": "./context/skill.md"
+    }
+  ],
+  "commands": [],
+  "sub_agents": [],
+  "mcp_servers": [],
+  "dependencies": {}
+}

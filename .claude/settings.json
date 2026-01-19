@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__github__*",
+      "mcp__context7__*",
+      "mcp__serena__*"
+    ]
+  }
+}

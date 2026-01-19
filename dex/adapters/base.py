@@ -1,0 +1,600 @@
+"""Abstract base class for platform adapters.
+
+All platform-specific logic is encapsulated within adapters that implement
+this interface. The core system delegates ALL platform decisions to adapters.
+"""
+
+import logging
+from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import Any
+
+from dex.config.schemas import (
+    AdapterMetadata,
+    AgentFileConfig,
+    CommandConfig,
+    InstallationPlan,
+    InstructionConfig,
+    MCPServerConfig,
+    PluginManifest,
+    PromptConfig,
+    RuleConfig,
+    SkillConfig,
+    SubAgentConfig,
+)
+
+logger = logging.getLogger(__name__)
+
+
+class PlatformAdapter(ABC):
+    """Abstract base class for platform adapters.
+
+    Platform adapters handle all platform-specific aspects of plugin installation:
+    - Directory structure and file locations
+    - Skill/command/subagent installation planning
+    - MCP server configuration
+    - Frontmatter generation
+    - Template variable provisioning
+
+    Subclasses must implement all abstract methods to support a new platform.
+    """
+
+    # =========================================================================
+    # Metadata
+    # =========================================================================
+
+    @property
+    @abstractmethod
+    def metadata(self) -> AdapterMetadata:
+        """Get adapter metadata.
+
+        Returns:
+            AdapterMetadata describing this adapter's capabilities
+        """
+        ...
+
+    # =========================================================================
+    # Directory Structure
+    # =========================================================================
+
+    @abstractmethod
+    def get_base_directory(self, project_root: Path) -> Path:
+        """Get the base directory for this platform's configuration.
+
+        For example:
+        - Claude Code: .claude
+        - Cursor: .cursor
+
+        Args:
+            project_root: Path to the project root
+
+        Returns:
+            Path to the platform's base configuration directory
+        """
+        ...
+
+    @abstractmethod
+    def get_skills_directory(self, project_root: Path) -> Path:
+        """Get the directory where skills are installed.
+
+        Args:
+            project_root: Path to the project root
+
+        Returns:
+            Path to the skills directory
+        """
+        ...
+
+    @abstractmethod
+    def get_mcp_config_path(self, project_root: Path) -> Path | None:
+        """Get the path to the MCP configuration file.
+
+        Args:
+            project_root: Path to the project root
+
+        Returns:
+            Path to the MCP config file (e.g., .mcp.json for Claude Code), or None if
+            the platform doesn't support MCP configuration.
+        """
+        ...
+
+    def get_commands_directory(self, project_root: Path) -> Path:
+        """Get the directory where commands are installed.
+
+        Default implementation returns the same as skills directory.
+        Override if the platform stores commands separately.
+
+        Args:
+            project_root: Path to the project root
+
+        Returns:
+            Path to the commands directory
+        """
+        return self.get_skills_directory(project_root)
+
+    def get_subagents_directory(self, project_root: Path) -> Path:
+        """Get the directory where sub-agents are installed.
+
+        Default implementation returns the same as skills directory.
+        Override if the platform stores sub-agents separately.
+
+        Args:
+            project_root: Path to the project root
+
+        Returns:
+            Path to the sub-agents directory
+        """
+        return self.get_skills_directory(project_root)
+
+    def get_instructions_directory(self, project_root: Path) -> Path:
+        """Get the directory where instructions are installed.
+
+        Default implementation returns the base directory.
+        Override if the platform supports instructions.
+
+        Args:
+            project_root: Path to the project root
+
+        Returns:
+            Path to the instructions directory
+        """
+        return self.get_base_directory(project_root)
+
+    def get_rules_directory(self, project_root: Path) -> Path:
+        """Get the directory where rules are installed.
+
+        Default implementation returns the base directory.
+        Override if the platform supports rules.
+
+        Args:
+            project_root: Path to the project root
+
+        Returns:
+            Path to the rules directory
+        """
+        return self.get_base_directory(project_root)
+
+    def get_prompts_directory(self, project_root: Path) -> Path:
+        """Get the directory where prompts are installed.
+
+        Default implementation returns the base directory.
+        Override if the platform supports prompts.
+
+        Args:
+            project_root: Path to the project root
+
+        Returns:
+            Path to the prompts directory
+        """
+        return self.get_base_directory(project_root)
+
+    def get_agent_file_path(self, project_root: Path) -> Path | None:
+        """Get the path to the main agent instruction file.
+
+        This is the file where plugin content is injected using markers
+        (e.g., CLAUDE.md for Claude Code, AGENTS.md for Codex).
+
+        Default implementation returns None (no agent file support).
+        Override if the platform supports agent file content injection.
+
+        Args:
+            project_root: Path to the project root
+
+        Returns:
+            Path to the agent file, or None if not supported
+        """
+        return None
+
+    # =========================================================================
+    # Installation Planning
+    # =========================================================================
+
+    def plan_skill_installation(
+        self,
+        skill: SkillConfig,
+        plugin: PluginManifest,
+        rendered_content: str,
+        project_root: Path,
+        source_dir: Path,
+    ) -> InstallationPlan:
+        """Plan the installation of a skill.
+
+        Default implementation returns empty plan (not supported).
+        Override in adapters that support skills.
+        """
+        logger.info(
+            "%s does not support skills - skipping '%s'",
+            self.metadata.display_name,
+            skill.name,
+        )
+        return InstallationPlan(directories_to_create=[], files_to_write=[])
+
+    def plan_command_installation(
+        self,
+        command: CommandConfig,
+        plugin: PluginManifest,
+        rendered_content: str,
+        project_root: Path,
+        source_dir: Path,
+    ) -> InstallationPlan:
+        """Plan the installation of a command.
+
+        Default implementation returns empty plan (not supported).
+        Override in adapters that support commands.
+        """
+        logger.info(
+            "%s does not support commands - skipping '%s'",
+            self.metadata.display_name,
+            command.name,
+        )
+        return InstallationPlan(directories_to_create=[], files_to_write=[])
+
+    def plan_subagent_installation(
+        self,
+        subagent: SubAgentConfig,
+        plugin: PluginManifest,
+        rendered_content: str,
+        project_root: Path,
+        source_dir: Path,
+    ) -> InstallationPlan:
+        """Plan the installation of a sub-agent.
+
+        Default implementation returns empty plan (not supported).
+        Override in adapters that support sub-agents.
+        """
+        logger.info(
+            "%s does not support sub-agents - skipping '%s'",
+            self.metadata.display_name,
+            subagent.name,
+        )
+        return InstallationPlan(directories_to_create=[], files_to_write=[])
+
+    def plan_instruction_installation(
+        self,
+        instruction: InstructionConfig,
+        plugin: PluginManifest,
+        rendered_content: str,
+        project_root: Path,
+        source_dir: Path,
+    ) -> InstallationPlan:
+        """Plan the installation of an instruction.
+
+        Default implementation returns empty plan (not supported).
+        Override in adapters that support instructions.
+        """
+        logger.info(
+            "%s does not support instructions - skipping '%s'",
+            self.metadata.display_name,
+            instruction.name,
+        )
+        return InstallationPlan(directories_to_create=[], files_to_write=[])
+
+    def plan_rule_installation(
+        self,
+        rule: RuleConfig,
+        plugin: PluginManifest,
+        rendered_content: str,
+        project_root: Path,
+        source_dir: Path,
+    ) -> InstallationPlan:
+        """Plan the installation of a rule.
+
+        Default implementation returns empty plan (not supported).
+        Override in adapters that support rules.
+        """
+        logger.info(
+            "%s does not support rules - skipping '%s'",
+            self.metadata.display_name,
+            rule.name,
+        )
+        return InstallationPlan(directories_to_create=[], files_to_write=[])
+
+    def plan_prompt_installation(
+        self,
+        prompt: PromptConfig,
+        plugin: PluginManifest,
+        rendered_content: str,
+        project_root: Path,
+        source_dir: Path,
+    ) -> InstallationPlan:
+        """Plan the installation of a prompt.
+
+        Default implementation returns empty plan (not supported).
+        Override in adapters that support prompts.
+        """
+        logger.info(
+            "%s does not support prompts - skipping '%s'",
+            self.metadata.display_name,
+            prompt.name,
+        )
+        return InstallationPlan(directories_to_create=[], files_to_write=[])
+
+    def plan_agent_file_installation(
+        self,
+        agent_file_config: AgentFileConfig,
+        plugin: PluginManifest,
+        rendered_content: str,
+        project_root: Path,
+        source_dir: Path,
+    ) -> InstallationPlan:
+        """Plan the installation of content into the agent file.
+
+        Default implementation returns empty plan (not supported).
+        Override in adapters that support agent file content injection.
+        """
+        logger.info(
+            "%s does not support agent_file - skipping for plugin '%s'",
+            self.metadata.display_name,
+            plugin.name,
+        )
+        return InstallationPlan(directories_to_create=[], files_to_write=[])
+
+    # =========================================================================
+    # MCP Configuration
+    # =========================================================================
+
+    @abstractmethod
+    def generate_mcp_config(
+        self,
+        mcp_server: MCPServerConfig,
+        plugin: PluginManifest,
+        project_root: Path,
+        source_dir: Path,
+    ) -> dict[str, Any]:
+        """Generate MCP server configuration for this platform.
+
+        Args:
+            mcp_server: MCP server configuration from the plugin manifest
+            plugin: The plugin manifest
+            project_root: Path to the project root
+            source_dir: Path to the plugin source directory
+
+        Returns:
+            Dictionary representing the MCP config entry for this server
+        """
+        ...
+
+    @abstractmethod
+    def merge_mcp_config(
+        self,
+        existing_config: dict[str, Any],
+        new_entries: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Merge new MCP entries into existing configuration.
+
+        This handles platform-specific config structure.
+
+        Args:
+            existing_config: Current MCP configuration
+            new_entries: New MCP server entries to add
+
+        Returns:
+            Merged configuration
+        """
+        ...
+
+    # =========================================================================
+    # Frontmatter Generation
+    # =========================================================================
+
+    def generate_skill_frontmatter(
+        self,
+        skill: SkillConfig,
+        plugin: PluginManifest,
+    ) -> str:
+        """Generate frontmatter/header for a skill file.
+
+        Default implementation returns empty string (no frontmatter).
+        Override in adapters that support skills with frontmatter.
+
+        Args:
+            skill: Skill configuration
+            plugin: The plugin manifest
+
+        Returns:
+            Frontmatter string to prepend to skill content
+        """
+        return ""
+
+    def generate_command_frontmatter(
+        self,
+        command: CommandConfig,
+        plugin: PluginManifest,
+    ) -> str:
+        """Generate frontmatter/header for a command file.
+
+        Default implementation uses skill frontmatter format.
+
+        Args:
+            command: Command configuration
+            plugin: The plugin manifest
+
+        Returns:
+            Frontmatter string to prepend to command content
+        """
+        # Create a skill-like config for default behavior
+        skill = SkillConfig(
+            name=command.name,
+            description=command.description,
+            context=command.context,
+            files=command.files,
+            metadata=command.metadata,
+        )
+        return self.generate_skill_frontmatter(skill, plugin)
+
+    def generate_subagent_frontmatter(
+        self,
+        subagent: SubAgentConfig,
+        plugin: PluginManifest,
+    ) -> str:
+        """Generate frontmatter/header for a sub-agent file.
+
+        Default implementation uses skill frontmatter format.
+
+        Args:
+            subagent: Sub-agent configuration
+            plugin: The plugin manifest
+
+        Returns:
+            Frontmatter string to prepend to sub-agent content
+        """
+        # Create a skill-like config for default behavior
+        skill = SkillConfig(
+            name=subagent.name,
+            description=subagent.description,
+            context=subagent.context,
+            files=subagent.files,
+            metadata=subagent.metadata,
+        )
+        return self.generate_skill_frontmatter(skill, plugin)
+
+    def generate_instruction_frontmatter(
+        self,
+        instruction: InstructionConfig,
+        plugin: PluginManifest,
+    ) -> str:
+        """Generate frontmatter/header for an instruction file.
+
+        Default implementation returns empty string.
+        Override in adapters that support instructions.
+
+        Args:
+            instruction: Instruction configuration
+            plugin: The plugin manifest
+
+        Returns:
+            Frontmatter string to prepend to instruction content
+        """
+        return ""
+
+    def generate_rule_frontmatter(
+        self,
+        rule: RuleConfig,
+        plugin: PluginManifest,
+    ) -> str:
+        """Generate frontmatter/header for a rule file.
+
+        Default implementation returns empty string.
+        Override in adapters that support rules.
+
+        Args:
+            rule: Rule configuration
+            plugin: The plugin manifest
+
+        Returns:
+            Frontmatter string to prepend to rule content
+        """
+        return ""
+
+    def generate_prompt_frontmatter(
+        self,
+        prompt: PromptConfig,
+        plugin: PluginManifest,
+    ) -> str:
+        """Generate frontmatter/header for a prompt file.
+
+        Default implementation returns empty string.
+        Override in adapters that support prompts.
+
+        Args:
+            prompt: Prompt configuration
+            plugin: The plugin manifest
+
+        Returns:
+            Frontmatter string to prepend to prompt content
+        """
+        return ""
+
+    # =========================================================================
+    # Template Variables
+    # =========================================================================
+
+    def get_template_variables(
+        self,
+        project_root: Path,
+        plugin: PluginManifest | None = None,
+    ) -> dict[str, Any]:
+        """Get template variables specific to this platform.
+
+        Override only if the adapter needs to provide platform-specific
+        variables beyond what the context builder provides.
+
+        Returns:
+            Empty dict by default
+        """
+        return {}
+
+    # =========================================================================
+    # Validation
+    # =========================================================================
+
+    @abstractmethod
+    def validate_plugin_compatibility(
+        self,
+        plugin: PluginManifest,
+    ) -> list[str]:
+        """Validate that a plugin is compatible with this platform.
+
+        Args:
+            plugin: Plugin manifest to validate
+
+        Returns:
+            List of warning messages (empty if fully compatible)
+        """
+        ...
+
+    # =========================================================================
+    # Lifecycle Hooks
+    # =========================================================================
+
+    def pre_install(  # noqa: B027
+        self,
+        project_root: Path,
+        plugins: list[PluginManifest],
+    ) -> None:
+        """Hook called before any plugins are installed.
+
+        Override to perform platform-specific setup.
+
+        Args:
+            project_root: Path to the project root
+            plugins: List of plugins about to be installed
+        """
+
+    def post_install(  # noqa: B027
+        self,
+        project_root: Path,
+        installed: list[PluginManifest],
+    ) -> None:
+        """Hook called after all plugins are installed.
+
+        Override to perform platform-specific cleanup or finalization.
+
+        Args:
+            project_root: Path to the project root
+            installed: List of successfully installed plugins
+        """
+
+    def pre_uninstall(  # noqa: B027
+        self,
+        project_root: Path,
+        plugins: list[str],
+    ) -> None:
+        """Hook called before plugins are uninstalled.
+
+        Args:
+            project_root: Path to the project root
+            plugins: List of plugin names to be uninstalled
+        """
+
+    def post_uninstall(  # noqa: B027
+        self,
+        project_root: Path,
+        removed: list[str],
+    ) -> None:
+        """Hook called after plugins are uninstalled.
+
+        Args:
+            project_root: Path to the project root
+            removed: List of successfully removed plugin names
+        """
