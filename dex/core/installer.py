@@ -505,8 +505,7 @@ class PluginInstaller:
     ) -> None:
         """Install a single skill."""
         # Get the context root directory from adapter
-        skills_dir = self.adapter.get_skills_directory(self.project.root)
-        skill_dir = skills_dir / manifest.name / skill.name
+        skill_dir = self.adapter.get_skill_install_directory(skill, manifest, self.project.root)
         try:
             context_root = str(skill_dir.relative_to(self.project.root)) + "/"
         except ValueError:

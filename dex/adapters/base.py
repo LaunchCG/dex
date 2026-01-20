@@ -85,6 +85,30 @@ class PlatformAdapter(ABC):
         """
         ...
 
+    def get_skill_install_directory(
+        self,
+        skill: SkillConfig,
+        plugin: PluginManifest,
+        project_root: Path,
+    ) -> Path:
+        """Get the directory where a specific skill will be installed.
+
+        This method returns the actual directory path used for installation,
+        which is used to compute the context_root template variable.
+
+        Default implementation uses: skills_dir / skill.name
+        Override if the platform uses a different naming convention.
+
+        Args:
+            skill: The skill configuration
+            plugin: The plugin manifest
+            project_root: Path to the project root
+
+        Returns:
+            Path to the skill's installation directory
+        """
+        return self.get_skills_directory(project_root) / skill.name
+
     @abstractmethod
     def get_mcp_config_path(self, project_root: Path) -> Path | None:
         """Get the path to the MCP configuration file.

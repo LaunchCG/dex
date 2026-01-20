@@ -34,32 +34,44 @@ agent platforms.
 See [docs/plugins.md](docs/plugins.md) for detailed platform mapping and file locations
 
 
+### Installation
+
+Run dex directly using `uv` without installing:
+
+```bash
+uv run --from git+https://github.com/launchcg/dex dex <command>
+```
+
+Or install globally:
+
+```bash
+uv tool install git+https://github.com/launchcg/dex
+```
+
+
 ### Quick Start
 
 ```bash
 # Initialize a project for a specific AI agent
-dex init --agent claude-code
+uv run --from git+https://github.com/launchcg/dex dex init --agent claude-code
 
-# Install a plugin from a registry
-dex install my-plugin
-
-# Install a specific version
-dex install my-plugin@1.0.0
+# Install a plugin from GitHub
+uv run --from git+https://github.com/launchcg/dex dex install --source git+https://github.com/owner/my-plugin.git
 
 # Install from a local directory (for development)
-dex install --source file:./path/to/my-plugin
+uv run --from git+https://github.com/launchcg/dex dex install --source /path/to/my-plugin
 
 # Install and save to dex.yaml
-dex install my-plugin --save
+uv run --from git+https://github.com/launchcg/dex dex install --source git+https://github.com/owner/my-plugin.git --save
 
 # Remove a plugin
-dex uninstall my-plugin
+uv run --from git+https://github.com/launchcg/dex dex uninstall my-plugin
 
 # Remove and delete from dex.yaml
-dex uninstall my-plugin --remove
+uv run --from git+https://github.com/launchcg/dex dex uninstall my-plugin --remove
 
 # List installed plugins
-dex list
+uv run --from git+https://github.com/launchcg/dex dex list
 ```
 
 

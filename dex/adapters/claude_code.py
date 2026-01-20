@@ -67,6 +67,18 @@ class ClaudeCodeAdapter(PlatformAdapter):
     def get_skills_directory(self, project_root: Path) -> Path:
         return self.get_base_directory(project_root) / "skills"
 
+    def get_skill_install_directory(
+        self,
+        skill: SkillConfig,
+        plugin: PluginManifest,
+        project_root: Path,
+    ) -> Path:
+        """Get the skill install directory using Claude Code's naming convention.
+
+        Claude Code uses: .claude/skills/{plugin-name}-{skill-name}/
+        """
+        return self.get_skills_directory(project_root) / f"{plugin.name}-{skill.name}"
+
     def get_commands_directory(self, project_root: Path) -> Path:
         """Commands are flat .md files in .claude/commands/."""
         return self.get_base_directory(project_root) / "commands"
