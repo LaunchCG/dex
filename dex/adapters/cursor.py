@@ -18,11 +18,9 @@ from dex.config.schemas import (
     FileToWrite,
     InstallationPlan,
     MCPServerConfig,
-    PlatformFiles,
     PluginManifest,
     RuleConfig,
 )
-from dex.template.context_resolver import find_platform_specific_file
 from dex.utils.platform import get_os, is_unix
 
 
@@ -112,6 +110,7 @@ class CursorAdapter(PlatformAdapter):
 
         # Add associated files to rules directory
         self._add_files_to_plan(plan, rule.files, source_dir, rules_dir)
+        self._add_files_to_plan(plan, rule.template_files, source_dir, rules_dir, render_as_template=True)
 
         return plan
 
@@ -139,54 +138,10 @@ class CursorAdapter(PlatformAdapter):
         )
 
         self._add_files_to_plan(plan, command.files, source_dir, commands_dir)
+        self._add_files_to_plan(plan, command.template_files, source_dir, commands_dir, render_as_template=True)
         return plan
 
-    def _add_files_to_plan(
-        self,
-        plan: InstallationPlan,
-        files: Any,
-        source_dir: Path,
-        dest_dir: Path,
-    ) -> None:
-        """Add file copy operations to an installation plan."""
-        if files is None:
-            return
-
-        current_os = get_os()
-        files_to_copy: list[str] = []
-
-        if isinstance(files, list):
-            files_to_copy = [str(f) for f in files]
-        elif isinstance(files, PlatformFiles):
-            files_to_copy.extend(files.common)
-            platform_files = files.platform
-            if current_os in platform_files:
-                files_to_copy.extend(platform_files[current_os])
-            if is_unix() and "unix" in platform_files:
-                files_to_copy.extend(platform_files["unix"])
-        elif isinstance(files, dict):
-            if "common" in files or "platform" in files:
-                files_to_copy.extend(files.get("common", []))
-                platform_files = files.get("platform", {})
-                if current_os in platform_files:
-                    files_to_copy.extend(platform_files[current_os])
-                if is_unix() and "unix" in platform_files:
-                    files_to_copy.extend(platform_files["unix"])
-            else:
-                files_to_copy = list(files.keys()) if files else []
-
-        for file_path in files_to_copy:
-            if file_path.startswith("./"):
-                file_path = file_path[2:]
-            # Resolve platform-specific file override
-            resolved_path = find_platform_specific_file(source_dir, file_path, self.metadata.name)
-            src = source_dir / resolved_path
-            # Preserve directory structure within dest (use original path for dest)
-            dest = dest_dir / file_path
-            if src.exists():
-                plan.files_to_copy[src] = dest
-                if dest.parent not in plan.directories_to_create:
-                    plan.directories_to_create.append(dest.parent)
+    # Note: _add_files_to_plan is inherited from PlatformAdapter base class
 
     # =========================================================================
     # MCP Configuration

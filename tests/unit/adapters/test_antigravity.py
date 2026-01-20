@@ -7,6 +7,7 @@ import pytest
 from dex.adapters.antigravity import AntigravityAdapter
 from dex.config.schemas import (
     CommandConfig,
+    FileTarget,
     PluginManifest,
     RuleConfig,
     SkillConfig,
@@ -301,7 +302,7 @@ class TestAntigravityAdapterFilesHandling:
             name="test-skill",
             description="Skill with files",
             context="./context.md",
-            files=["./scripts/helper.sh"],
+            files=[FileTarget(src="scripts/helper.sh")],
         )
         source_dir = temp_dir / "plugin"
         source_dir.mkdir()

@@ -27,22 +27,33 @@ ComponentType = Literal["skill", "command", "sub_agent", "instruction", "rule", 
 
 
 class FileTarget(BaseModel):
-    """A file with custom destination and permissions."""
+    """A file with source path and optional destination.
+
+    - src: Path relative to plugin root (required)
+    - dest: Destination filename (optional, defaults to basename of src)
+    - chmod: File permissions (optional, e.g., "755")
+    """
 
     src: str
-    dest: str
+    dest: str | None = None
     chmod: str | None = None
 
+    @model_validator(mode="after")
+    def set_default_dest(self) -> "FileTarget":
+        """Default dest to basename of src if not specified."""
+        if self.dest is None:
+            # Use Path to get just the filename
+            from pathlib import PurePosixPath
 
-class PlatformFiles(BaseModel):
-    """Platform-conditional file specification."""
-
-    common: list[str] = Field(default_factory=list)
-    platform: dict[PlatformOS, list[str]] = Field(default_factory=dict)
+            self.dest = PurePosixPath(self.src).name
+        return self
 
 
-# Type alias for flexible file specifications
-FileSpec = list[str] | list[FileTarget] | PlatformFiles | dict[str, Any]
+# Type alias for file specifications - always a list of FileTarget
+FileSpec = list[FileTarget]
+
+# Template files use the same spec - they're rendered through Jinja2 before writing
+TemplateFileSpec = list[FileTarget]
 
 
 # =============================================================================
@@ -75,6 +86,7 @@ class SkillConfig(BaseModel):
     description: str
     context: ContextSpec
     files: FileSpec | None = None
+    template_files: TemplateFileSpec | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -87,6 +99,7 @@ class CommandConfig(BaseModel):
     skills: list[str] = Field(default_factory=list)  # Skills this command uses
     allowed_tools: list[str] | str | None = None  # Tools this command can use (e.g., "Bash(uv:*)")
     files: FileSpec | None = None
+    template_files: TemplateFileSpec | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -100,6 +113,7 @@ class SubAgentConfig(BaseModel):
     commands: list[str] = Field(default_factory=list)  # Commands this agent can use
     allowed_tools: list[str] | str | None = None  # Tools this agent can use
     files: FileSpec | None = None
+    template_files: TemplateFileSpec | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -127,6 +141,7 @@ class InstructionConfig(BaseModel):
         default=None, alias="excludeAgent"
     )  # Agent to exclude (e.g., "code-review")
     files: FileSpec | None = None
+    template_files: TemplateFileSpec | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -143,6 +158,7 @@ class RuleConfig(BaseModel):
     paths: str | list[str] | None = None  # File pattern scope (Claude Code)
     always: bool = False  # Always apply this rule (Cursor)
     files: FileSpec | None = None
+    template_files: TemplateFileSpec | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -158,6 +174,7 @@ class PromptConfig(BaseModel):
     context: ContextSpec
     trigger: str | None = None  # Optional trigger phrase
     files: FileSpec | None = None
+    template_files: TemplateFileSpec | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -215,6 +232,7 @@ class AgentFileConfig(BaseModel):
 
     context: ContextSpec  # Path(s) to markdown content to inject
     files: FileSpec | None = None  # Optional additional files to copy
+    template_files: TemplateFileSpec | None = None  # Optional files to render with Jinja2
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @property
@@ -253,6 +271,11 @@ class PluginManifest(BaseModel):
 
     # Agent file injection (for CLAUDE.md, AGENTS.md, etc.)
     agent_file: AgentFileConfig | None = None
+
+    # First-class file resources (copied to plugin directory)
+    files: FileSpec = Field(default_factory=list)
+    # First-class template files (rendered with Jinja2 before writing)
+    template_files: TemplateFileSpec = Field(default_factory=list)
 
     dependencies: dict[str, str] = Field(default_factory=dict)
     env_variables: dict[str, EnvVariableConfig] = Field(default_factory=dict)
@@ -381,6 +404,7 @@ class InstallationPlan(BaseModel):
     directories_to_create: list[Path] = Field(default_factory=list)
     files_to_write: list[FileToWrite] = Field(default_factory=list)
     files_to_copy: dict[Path, Path] = Field(default_factory=dict)  # src -> dest
+    template_files_to_render: dict[Path, Path] = Field(default_factory=dict)  # src -> dest
     mcp_config_updates: dict[str, Any] = Field(default_factory=dict)
 
     model_config = {"arbitrary_types_allowed": True}

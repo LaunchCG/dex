@@ -7,6 +7,7 @@ import pytest
 from dex.adapters.claude_code import ClaudeCodeAdapter
 from dex.config.schemas import (
     CommandConfig,
+    FileTarget,
     MCPServerConfig,
     PluginManifest,
     RuleConfig,
@@ -623,7 +624,7 @@ class TestClaudeCodeAdapterFilesHandling:
             name="test-skill",
             description="Skill with files",
             context="./context.md",
-            files=["./config.json"],
+            files=[FileTarget(src="config.json")],
         )
         source_dir = temp_dir / "plugin"
         source_dir.mkdir()
@@ -639,23 +640,22 @@ class TestClaudeCodeAdapterFilesHandling:
 
         assert len(plan.files_to_copy) > 0
 
-    def test_handles_platform_specific_files(
+    def test_adds_template_files_to_plan(
         self,
         adapter: ClaudeCodeAdapter,
         temp_dir: Path,
         sample_manifest: PluginManifest,
     ):
-        """Handles platform-specific file configuration."""
+        """Adds template files to installation plan for rendering."""
         skill = SkillConfig(
             name="test-skill",
-            description="Skill with platform files",
+            description="Skill with template files",
             context="./context.md",
-            files={"common": ["./common.txt"], "platform": {"linux": ["./linux.txt"]}},
+            template_files=[FileTarget(src="config.py.j2")],
         )
         source_dir = temp_dir / "plugin"
         source_dir.mkdir()
-        (source_dir / "common.txt").write_text("common")
-        (source_dir / "linux.txt").write_text("linux")
+        (source_dir / "config.py.j2").write_text("# {{ plugin.name }}")
 
         plan = adapter.plan_skill_installation(
             skill=skill,
@@ -665,8 +665,76 @@ class TestClaudeCodeAdapterFilesHandling:
             source_dir=source_dir,
         )
 
-        # Should have at least common file
-        assert any("common.txt" in str(src) for src in plan.files_to_copy)
+        assert len(plan.template_files_to_render) == 1
+        src_path = list(plan.template_files_to_render.keys())[0]
+        dest_path = list(plan.template_files_to_render.values())[0]
+        assert "config.py.j2" in str(src_path)
+        assert "config.py.j2" in str(dest_path)  # dest keeps same name
+
+    def test_adds_template_files_with_custom_dest(
+        self,
+        adapter: ClaudeCodeAdapter,
+        temp_dir: Path,
+        sample_manifest: PluginManifest,
+    ):
+        """Adds template files with custom destination to plan."""
+        skill = SkillConfig(
+            name="test-skill",
+            description="Skill with template files",
+            context="./context.md",
+            template_files=[{"src": "./config.py.j2", "dest": "config.py"}],
+        )
+        source_dir = temp_dir / "plugin"
+        source_dir.mkdir()
+        (source_dir / "config.py.j2").write_text("# {{ plugin.name }}")
+
+        plan = adapter.plan_skill_installation(
+            skill=skill,
+            plugin=sample_manifest,
+            rendered_content="# Test",
+            project_root=temp_dir,
+            source_dir=source_dir,
+        )
+
+        assert len(plan.template_files_to_render) == 1
+        src_path = list(plan.template_files_to_render.keys())[0]
+        dest_path = list(plan.template_files_to_render.values())[0]
+        assert "config.py.j2" in str(src_path)
+        assert str(dest_path).endswith("config.py")
+        assert "j2" not in str(dest_path)
+
+    def test_handles_both_files_and_template_files(
+        self,
+        adapter: ClaudeCodeAdapter,
+        temp_dir: Path,
+        sample_manifest: PluginManifest,
+    ):
+        """Handles both files and template_files in same skill."""
+        skill = SkillConfig(
+            name="test-skill",
+            description="Skill with both file types",
+            context="./context.md",
+            files=[FileTarget(src="static.txt")],
+            template_files=[FileTarget(src="config.py.j2")],
+        )
+        source_dir = temp_dir / "plugin"
+        source_dir.mkdir()
+        (source_dir / "static.txt").write_text("static content")
+        (source_dir / "config.py.j2").write_text("# {{ plugin.name }}")
+
+        plan = adapter.plan_skill_installation(
+            skill=skill,
+            plugin=sample_manifest,
+            rendered_content="# Test",
+            project_root=temp_dir,
+            source_dir=source_dir,
+        )
+
+        # Should have both files_to_copy and template_files_to_render
+        assert len(plan.files_to_copy) == 1
+        assert len(plan.template_files_to_render) == 1
+        assert any("static.txt" in str(src) for src in plan.files_to_copy)
+        assert any("config.py.j2" in str(src) for src in plan.template_files_to_render)
 
 
 class TestClaudeCodeAdapterGenerateRuleFrontmatter:
@@ -805,7 +873,7 @@ class TestClaudeCodeAdapterPlatformSpecificFiles:
             name="test-skill",
             description="Test skill with platform file",
             context="./context.md",
-            files=["./scripts/setup.sh"],
+            files=[FileTarget(src="scripts/setup.sh")],
         )
 
         plan = adapter.plan_skill_installation(
@@ -847,7 +915,7 @@ class TestClaudeCodeAdapterPlatformSpecificFiles:
             name="test-skill",
             description="Test skill with multi-platform file",
             context="./context.md",
-            files=["./configs/settings.json"],
+            files=[FileTarget(src="configs/settings.json")],
         )
 
         plan = adapter.plan_skill_installation(
@@ -881,7 +949,7 @@ class TestClaudeCodeAdapterPlatformSpecificFiles:
             name="test-skill",
             description="Test skill with default file",
             context="./context.md",
-            files=["./data/config.yaml"],
+            files=[FileTarget(src="data/config.yaml")],
         )
 
         plan = adapter.plan_skill_installation(
@@ -918,7 +986,7 @@ class TestClaudeCodeAdapterPlatformSpecificFiles:
             name="test-skill",
             description="Test skill",
             context="./context.md",
-            files=["./scripts/run.sh"],
+            files=[FileTarget(src="scripts/run.sh")],
         )
 
         plan = adapter.plan_skill_installation(

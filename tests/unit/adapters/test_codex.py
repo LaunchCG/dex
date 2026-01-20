@@ -7,6 +7,7 @@ import pytest
 from dex.adapters.codex import CodexAdapter
 from dex.config.schemas import (
     CommandConfig,
+    FileTarget,
     PluginManifest,
     RuleConfig,
     SkillConfig,
@@ -299,7 +300,10 @@ class TestCodexAdapterFilesHandling:
             name="test-skill",
             description="Skill with files",
             context="./context.md",
-            files=["./scripts/helper.sh", "./references/guide.md"],
+            files=[
+                FileTarget(src="scripts/helper.sh"),
+                FileTarget(src="references/guide.md"),
+            ],
         )
         source_dir = temp_dir / "plugin"
         source_dir.mkdir()

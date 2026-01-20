@@ -37,7 +37,7 @@ def comprehensive_plugin(temp_dir: Path) -> Path:
                 "name": "code-review",
                 "description": "Automated code review skill",
                 "context": "./skills/code-review.md",
-                "files": ["./skills/config.json"],
+                "files": [{"src": "skills/config.json"}],
             },
             {
                 "name": "testing",
@@ -192,13 +192,12 @@ class TestClaudeCodeAdapterIntegration:
             use_lockfile=False,
         )
 
-        # Verify config file copied to skill directory
+        # Verify config file copied to skill directory (dest defaults to basename)
         config = (
             temp_project
             / ".claude"
             / "skills"
             / "comprehensive-plugin-code-review"
-            / "skills"
             / "config.json"
         )
         assert config.exists()

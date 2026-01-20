@@ -19,14 +19,12 @@ from dex.config.schemas import (  # First-class types this adapter supports; Cor
     InstallationPlan,
     InstructionConfig,
     MCPServerConfig,
-    PlatformFiles,
     PluginManifest,
     PromptConfig,
     RuleConfig,
     SkillConfig,
     SubAgentConfig,
 )
-from dex.template.context_resolver import find_platform_specific_file
 from dex.utils.platform import get_os, is_unix
 
 
@@ -138,6 +136,7 @@ class GitHubCopilotAdapter(PlatformAdapter):
 
         # Add associated files
         self._add_files_to_plan(plan, skill.files, source_dir, skill_dir)
+        self._add_files_to_plan(plan, skill.template_files, source_dir, skill_dir, render_as_template=True)
 
         return plan
 
@@ -168,6 +167,7 @@ class GitHubCopilotAdapter(PlatformAdapter):
 
         # Add associated files
         self._add_files_to_plan(plan, instruction.files, source_dir, instructions_dir)
+        self._add_files_to_plan(plan, instruction.template_files, source_dir, instructions_dir, render_as_template=True)
 
         return plan
 
@@ -191,57 +191,18 @@ class GitHubCopilotAdapter(PlatformAdapter):
         frontmatter = self.generate_subagent_frontmatter(subagent, plugin)
         full_content = frontmatter + rendered_content
 
-        return InstallationPlan(
+        plan = InstallationPlan(
             directories_to_create=[agents_dir],
             files_to_write=[FileToWrite(path=agent_file, content=full_content)],
         )
 
-    def _add_files_to_plan(
-        self,
-        plan: InstallationPlan,
-        files: Any,
-        source_dir: Path,
-        dest_dir: Path,
-    ) -> None:
-        """Add file copy operations to an installation plan."""
-        if files is None:
-            return
+        # Add associated files
+        self._add_files_to_plan(plan, subagent.files, source_dir, agents_dir)
+        self._add_files_to_plan(plan, subagent.template_files, source_dir, agents_dir, render_as_template=True)
 
-        current_os = get_os()
-        files_to_copy: list[str] = []
+        return plan
 
-        if isinstance(files, list):
-            files_to_copy = [str(f) for f in files]
-        elif isinstance(files, PlatformFiles):
-            files_to_copy.extend(files.common)
-            platform_files = files.platform
-            if current_os in platform_files:
-                files_to_copy.extend(platform_files[current_os])
-            if is_unix() and "unix" in platform_files:
-                files_to_copy.extend(platform_files["unix"])
-        elif isinstance(files, dict):
-            if "common" in files or "platform" in files:
-                files_to_copy.extend(files.get("common", []))
-                platform_files = files.get("platform", {})
-                if current_os in platform_files:
-                    files_to_copy.extend(platform_files[current_os])
-                if is_unix() and "unix" in platform_files:
-                    files_to_copy.extend(platform_files["unix"])
-            else:
-                files_to_copy = list(files.keys()) if files else []
-
-        for file_path in files_to_copy:
-            if file_path.startswith("./"):
-                file_path = file_path[2:]
-            # Resolve platform-specific file override
-            resolved_path = find_platform_specific_file(source_dir, file_path, self.metadata.name)
-            src = source_dir / resolved_path
-            # Preserve directory structure within dest (use original path for dest)
-            dest = dest_dir / file_path
-            if src.exists():
-                plan.files_to_copy[src] = dest
-                if dest.parent not in plan.directories_to_create:
-                    plan.directories_to_create.append(dest.parent)
+    # Note: _add_files_to_plan is inherited from PlatformAdapter base class
 
     def plan_rule_installation(
         self,
@@ -294,6 +255,7 @@ class GitHubCopilotAdapter(PlatformAdapter):
 
         # Add associated files
         self._add_files_to_plan(plan, prompt.files, source_dir, prompts_dir)
+        self._add_files_to_plan(plan, prompt.template_files, source_dir, prompts_dir, render_as_template=True)
 
         return plan
 

@@ -16,7 +16,6 @@ from dex.config.schemas import (
     LockedPlugin,
     LockFile,
     MCPServerConfig,
-    PlatformFiles,
     PluginManifest,
     PluginSpec,
     ProjectConfig,
@@ -48,9 +47,14 @@ class TestSkillConfig:
             name="test-skill",
             description="Skill with files",
             context="./context.md",
-            files=["./file1.txt", "./file2.txt"],
+            files=[
+                FileTarget(src="tools/file1.txt"),
+                FileTarget(src="tools/file2.txt"),
+            ],
         )
-        assert skill.files == ["./file1.txt", "./file2.txt"]
+        assert len(skill.files) == 2
+        assert skill.files[0].src == "tools/file1.txt"
+        assert skill.files[0].dest == "file1.txt"  # Defaults to basename
 
     def test_skill_with_metadata(self):
         """Create skill with metadata."""
@@ -61,6 +65,35 @@ class TestSkillConfig:
             metadata={"author": "test", "tags": ["utility"]},
         )
         assert skill.metadata["author"] == "test"
+
+    def test_skill_with_template_files(self):
+        """Create skill with template_files."""
+        skill = SkillConfig(
+            name="test-skill",
+            description="Skill with template files",
+            context="./context.md",
+            template_files=[
+                FileTarget(src="templates/config.py.j2", dest="config.py"),
+                FileTarget(src="templates/settings.yaml.j2", dest="settings.yaml"),
+            ],
+        )
+        assert len(skill.template_files) == 2
+        assert skill.template_files[0].src == "templates/config.py.j2"
+        assert skill.template_files[0].dest == "config.py"
+
+    def test_skill_with_files_and_template_files(self):
+        """Create skill with both files and template_files."""
+        skill = SkillConfig(
+            name="test-skill",
+            description="Skill with both file types",
+            context="./context.md",
+            files=[FileTarget(src="static.txt")],
+            template_files=[FileTarget(src="config.py.j2")],
+        )
+        assert len(skill.files) == 1
+        assert skill.files[0].src == "static.txt"
+        assert len(skill.template_files) == 1
+        assert skill.template_files[0].src == "config.py.j2"
 
 
 class TestCommandConfig:
@@ -391,6 +424,18 @@ class TestInstallationPlan:
         assert plan.directories_to_create == []
         assert plan.files_to_write == []
         assert plan.files_to_copy == {}
+        assert plan.template_files_to_render == {}
+
+    def test_plan_with_template_files_to_render(self):
+        """Plan with template files to render."""
+        plan = InstallationPlan(
+            template_files_to_render={
+                Path("/tmp/config.py.j2"): Path("/tmp/output/config.py"),
+                Path("/tmp/settings.yaml.j2"): Path("/tmp/output/settings.yaml"),
+            }
+        )
+        assert len(plan.template_files_to_render) == 2
+        assert plan.template_files_to_render[Path("/tmp/config.py.j2")] == Path("/tmp/output/config.py")
 
     def test_plan_with_directories(self):
         """Plan with directories to create."""
@@ -480,27 +525,26 @@ class TestEnvVariableConfig:
 class TestFileTarget:
     """Tests for FileTarget model."""
 
-    def test_file_target(self):
-        """Create a file target."""
-        target = FileTarget(src="./src/file.txt", dest="./dest/file.txt")
-        assert target.src == "./src/file.txt"
-        assert target.dest == "./dest/file.txt"
+    def test_file_target_with_explicit_dest(self):
+        """Create a file target with explicit dest."""
+        target = FileTarget(src="tools/file.txt", dest="renamed.txt")
+        assert target.src == "tools/file.txt"
+        assert target.dest == "renamed.txt"
         assert target.chmod is None
+
+    def test_file_target_dest_defaults_to_basename(self):
+        """Dest defaults to basename of src when not specified."""
+        target = FileTarget(src="tools/nested/calculator.py")
+        assert target.src == "tools/nested/calculator.py"
+        assert target.dest == "calculator.py"  # Basename of src
 
     def test_file_target_with_chmod(self):
         """Create file target with chmod."""
-        target = FileTarget(src="./script.sh", dest="./bin/script.sh", chmod="755")
+        target = FileTarget(src="scripts/run.sh", dest="run.sh", chmod="755")
         assert target.chmod == "755"
 
-
-class TestPlatformFiles:
-    """Tests for PlatformFiles model."""
-
-    def test_platform_files(self):
-        """Create platform files."""
-        pf = PlatformFiles(
-            common=["./common.txt"],
-            platform={"windows": ["./win.txt"], "linux": ["./linux.txt"]},
-        )
-        assert pf.common == ["./common.txt"]
-        assert "windows" in pf.platform
+    def test_file_target_from_dict(self):
+        """FileTarget can be created from dict (for JSON parsing)."""
+        target = FileTarget(**{"src": "schemas/dora.json", "dest": "schema.json"})
+        assert target.src == "schemas/dora.json"
+        assert target.dest == "schema.json"

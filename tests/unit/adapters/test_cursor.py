@@ -7,6 +7,7 @@ import pytest
 from dex.adapters.cursor import CursorAdapter
 from dex.config.schemas import (
     CommandConfig,
+    FileTarget,
     PluginManifest,
     RuleConfig,
     SkillConfig,
@@ -523,7 +524,7 @@ class TestCursorAdapterPlanCommandInstallation:
             name="test-command",
             description="A test command",
             context="./context/command.md",
-            files=["helper.py"],
+            files=[FileTarget(src="helper.py")],
         )
 
         plan = adapter.plan_command_installation(

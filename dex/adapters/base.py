@@ -13,6 +13,7 @@ from dex.config.schemas import (
     AdapterMetadata,
     AgentFileConfig,
     CommandConfig,
+    FileTarget,
     InstallationPlan,
     InstructionConfig,
     MCPServerConfig,
@@ -22,6 +23,7 @@ from dex.config.schemas import (
     SkillConfig,
     SubAgentConfig,
 )
+from dex.template.context_resolver import find_platform_specific_file
 
 logger = logging.getLogger(__name__)
 
@@ -192,6 +194,22 @@ class PlatformAdapter(ABC):
         """
         return self.get_base_directory(project_root)
 
+    def get_files_directory(self, project_root: Path, plugin_name: str) -> Path:
+        """Get the directory where manifest-level files are installed.
+
+        Default implementation returns a plugin-specific subdirectory under files/.
+        These are files declared at the manifest level, not associated with
+        any specific component (skill, command, etc.).
+
+        Args:
+            project_root: Path to the project root
+            plugin_name: Name of the plugin
+
+        Returns:
+            Path to the plugin's files directory
+        """
+        return self.get_base_directory(project_root) / "files" / plugin_name
+
     def get_agent_file_path(self, project_root: Path) -> Path | None:
         """Get the path to the main agent instruction file.
 
@@ -352,6 +370,55 @@ class PlatformAdapter(ABC):
             plugin.name,
         )
         return InstallationPlan(directories_to_create=[], files_to_write=[])
+
+    # =========================================================================
+    # File Handling
+    # =========================================================================
+
+    def _add_files_to_plan(
+        self,
+        plan: InstallationPlan,
+        files: list[FileTarget] | None,
+        source_dir: Path,
+        dest_dir: Path,
+        render_as_template: bool = False,
+    ) -> None:
+        """Add file copy/render operations to an installation plan.
+
+        Args:
+            plan: The installation plan to update
+            files: List of FileTarget objects (src required, dest defaults to basename)
+            source_dir: Plugin root directory (src paths are relative to this)
+            dest_dir: Destination directory for files
+            render_as_template: If True, add to template_files_to_render instead of files_to_copy
+        """
+        if not files:
+            return
+
+        # Add to appropriate plan field
+        target_dict = plan.template_files_to_render if render_as_template else plan.files_to_copy
+
+        for file_target in files:
+            src_path = file_target.src
+            dest_path = file_target.dest  # Guaranteed non-None by validator
+
+            # Strip leading ./ if present
+            if src_path.startswith("./"):
+                src_path = src_path[2:]
+            if dest_path and dest_path.startswith("./"):
+                dest_path = dest_path[2:]
+
+            # Resolve platform-specific file override
+            resolved_path = find_platform_specific_file(source_dir, src_path, self.metadata.name)
+            src = source_dir / resolved_path
+            # Use dest_path for destination (allows renaming)
+            dest = dest_dir / dest_path
+
+            if src.exists():
+                target_dict[src] = dest
+                # Ensure parent directory is created
+                if dest.parent not in plan.directories_to_create:
+                    plan.directories_to_create.append(dest.parent)
 
     # =========================================================================
     # MCP Configuration

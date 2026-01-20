@@ -7,7 +7,7 @@
       "name": "lint",
       "description": "Provides linting guidance for the project",
       "context": "./context/lint-skill.md",
-      "files": ["./config/settings.json"]
+      "files": [{"src": "config/settings.json"}]
     }
   ],
   "commands": [

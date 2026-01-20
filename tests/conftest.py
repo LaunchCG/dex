@@ -10,6 +10,7 @@ import pytest
 
 from dex.config.schemas import (
     CommandConfig,
+    FileTarget,
     MCPServerConfig,
     PluginManifest,
     PluginSpec,
@@ -44,7 +45,7 @@ def sample_skill_config() -> SkillConfig:
         name="test-skill",
         description="A test skill for unit tests",
         context="./context/skill.md",
-        files=["./files/config.json"],
+        files=[FileTarget(src="files/config.json")],
         metadata={"author": "test"},
     )
 

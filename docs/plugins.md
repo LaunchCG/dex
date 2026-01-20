@@ -111,6 +111,20 @@ my-plugin/
     └── server.js
 ```
 
+## Component Feature Matrix
+
+All component types support `files` and `template_files` for bundling associated resources:
+
+| Component | `files` | `template_files` | Notes |
+|-----------|---------|------------------|-------|
+| `skills` | ✓ | ✓ | Installed to skill directory |
+| `commands` | ✓ | ✓ | Installed to command directory |
+| `sub_agents` | ✓ | ✓ | Installed to agent directory |
+| `instructions` | ✓ | ✓ | Installed to instructions directory |
+| `rules` | ✓ | ✓ | Installed to rules directory |
+| `prompts` | ✓ | ✓ | Installed to prompts directory |
+| Manifest-level | ✓ | ✓ | Installed to `.claude/files/{plugin}/` |
+
 ## package.json Manifest
 
 ```json
@@ -121,13 +135,21 @@ my-plugin/
   "skills": [
     {
       "name": "my-skill",
+      "description": "A useful skill",
       "context": "./context/skill.md",
-      "files": ["./files/config.json"]
+      "files": [
+        {"src": "tools/calculator.py"},
+        {"src": "schemas/config.json", "dest": "schema.json"}
+      ],
+      "template_files": [
+        {"src": "templates/settings.py.j2", "dest": "settings.py"}
+      ]
     }
   ],
   "commands": [
     {
       "name": "my-command",
+      "description": "A useful command",
       "context": "./context/command.md"
     }
   ],
@@ -138,6 +160,12 @@ my-plugin/
       "type": "bundled",
       "path": "./servers/server.js"
     }
+  ],
+  "files": [
+    {"src": "shared/utils.py"}
+  ],
+  "template_files": [
+    {"src": "templates/shared-config.py.j2", "dest": "config.py"}
   ],
   "dependencies": {
     "other-plugin": "^1.0.0"
@@ -168,8 +196,15 @@ Arrays of component configurations:
 ```json
 {
   "name": "component-name",
+  "description": "What this component does",
   "context": "./path/to/context.md",
-  "files": ["./optional/files.json"],
+  "files": [
+    {"src": "tools/helper.py"},
+    {"src": "schemas/config.json", "dest": "schema.json"}
+  ],
+  "template_files": [
+    {"src": "templates/config.py.j2", "dest": "config.py"}
+  ],
   "metadata": {
     "author": "Your Name"
   }
@@ -303,23 +338,55 @@ This works on Linux and macOS.
 {% endif %}
 ```
 
-## Platform-Specific Files
+## Files and Template Files
 
-Specify different files for different platforms:
+Components can include additional files beyond the main context file:
+
+### File Format
+
+Both `files` and `template_files` are arrays of file targets:
 
 ```json
 {
-  "name": "my-skill",
-  "context": "./context/skill.md",
-  "files": {
-    "common": ["./files/common.json"],
-    "platform": {
-      "windows": ["./files/windows-config.json"],
-      "unix": ["./files/unix-config.json"]
-    }
-  }
+  "files": [
+    {"src": "tools/calculator.py"},
+    {"src": "schemas/input.json", "dest": "schema.json"}
+  ],
+  "template_files": [
+    {"src": "templates/config.py.j2", "dest": "config.py"}
+  ]
 }
 ```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `src` | Yes | Path relative to plugin root |
+| `dest` | No | Destination filename (defaults to basename of `src`) |
+
+### Files vs Template Files
+
+| Type | Rendering | Use Case |
+|------|-----------|----------|
+| `files` | Direct copy | Static files (scripts, schemas, data) |
+| `template_files` | Jinja2 rendered | Dynamic files that need platform/plugin info |
+
+### Template File Context
+
+Template files have access to all template variables:
+
+```python
+# templates/config.py.j2
+"""Config for {{ component.name if component else 'shared' }}."""
+
+CONFIG = {
+    "plugin": "{{ plugin.name }}",
+    "version": "{{ plugin.version }}",
+    "platform": "{{ platform.os }}",
+    "agent": "{{ agent.name }}",
+}
+```
+
+**Note:** Manifest-level template files don't have a `component`, so use conditionals like `{{ component.name if component else 'fallback' }}`.
 
 ## Platform-Specific File Overrides
 
@@ -393,6 +460,75 @@ Reference the default file path in your `package.json`:
 ```
 
 Dex automatically resolves to the platform-specific version during installation. You don't need to modify the manifest.
+
+## Files and Template Files
+
+Components can include additional files beyond the main context file:
+
+| Field | Rendering | Description |
+|-------|-----------|-------------|
+| `files` | Direct copy | Copies files as-is to the installation directory |
+| `template_files` | Jinja2 rendered | Renders files through the template engine before writing |
+
+### Simple File List
+
+Copy files directly without any template processing:
+
+```json
+{
+  "files": ["calculator.py", "requirements.txt"]
+}
+```
+
+### Files with Custom Destination
+
+Use src/dest format to rename files during installation:
+
+```json
+{
+  "files": [
+    {"src": "../../schemas/dora-analyst.schema.json", "dest": "schema.json"}
+  ]
+}
+```
+
+### Template Files
+
+Files declared in `template_files` are rendered through Jinja2 before writing. They have access to all template variables: `platform`, `agent`, `env`, `plugin`, `component`, and `context`.
+
+```json
+{
+  "template_files": [
+    "config.py.j2",
+    {"src": "settings.yaml.j2", "dest": "settings.yaml"}
+  ]
+}
+```
+
+### Combining Files and Template Files
+
+You can use both `files` and `template_files` in the same component:
+
+```json
+{
+  "name": "dora-metrics-calculator",
+  "description": "DORA metrics with Python calculator",
+  "context": "context/skills/enablement/dora-metrics-calculator/SKILL.md",
+  "files": [
+    "calculator.py",
+    "test_calculator.py",
+    {"src": "../../schemas/dora-analyst.schema.json", "dest": "schema.json"}
+  ],
+  "template_files": [
+    {"src": "config.py.j2", "dest": "config.py"}
+  ]
+}
+```
+
+In this example:
+- `calculator.py` and `test_calculator.py` are copied directly
+- The schema file is copied and renamed to `schema.json`
+- `config.py.j2` is rendered with Jinja2 and written as `config.py`
 
 ## Custom Filters
 

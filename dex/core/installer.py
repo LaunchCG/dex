@@ -414,6 +414,12 @@ class PluginInstaller:
             for prompt in manifest.prompts:
                 self._install_prompt(prompt, manifest, source_dir, adapter_vars, old_files)
 
+            # Install manifest-level files (first-class file resources)
+            if manifest.files or manifest.template_files:
+                self._install_manifest_files(
+                    manifest, source_dir, adapter_vars, old_files
+                )
+
             # Install agent file content if specified
             if manifest.agent_file:
                 self._install_agent_file(
@@ -536,7 +542,7 @@ class PluginInstaller:
         )
 
         # Execute the plan
-        self._execute_plan(plan, old_files)
+        self._execute_plan(plan, old_files, template_context=context)
 
     def _install_command(
         self,
@@ -575,7 +581,7 @@ class PluginInstaller:
             source_dir=source_dir,
         )
 
-        self._execute_plan(plan, old_files)
+        self._execute_plan(plan, old_files, template_context=context)
 
     def _install_subagent(
         self,
@@ -614,7 +620,7 @@ class PluginInstaller:
             source_dir=source_dir,
         )
 
-        self._execute_plan(plan, old_files)
+        self._execute_plan(plan, old_files, template_context=context)
 
     def _install_rule(
         self,
@@ -652,7 +658,7 @@ class PluginInstaller:
             source_dir=source_dir,
         )
 
-        self._execute_plan(plan, old_files)
+        self._execute_plan(plan, old_files, template_context=context)
 
     def _install_instruction(
         self,
@@ -690,7 +696,7 @@ class PluginInstaller:
             source_dir=source_dir,
         )
 
-        self._execute_plan(plan, old_files)
+        self._execute_plan(plan, old_files, template_context=context)
 
     def _install_prompt(
         self,
@@ -728,7 +734,53 @@ class PluginInstaller:
             source_dir=source_dir,
         )
 
-        self._execute_plan(plan, old_files)
+        self._execute_plan(plan, old_files, template_context=context)
+
+    def _install_manifest_files(
+        self,
+        manifest: PluginManifest,
+        source_dir: Path,
+        adapter_vars: dict[str, Any],
+        old_files: set[str] | None = None,
+    ) -> None:
+        """Install manifest-level files (first-class file resources).
+
+        These are files declared at the manifest level, not associated with
+        any specific component. They are installed to a plugin-specific
+        files directory.
+        """
+        files_dir = self.adapter.get_files_directory(self.project.root, manifest.name)
+
+        try:
+            context_root = str(files_dir.relative_to(self.project.root)) + "/"
+        except ValueError:
+            context_root = str(files_dir) + "/"
+
+        context = build_context(
+            project_root=self.project.root,
+            agent_name=self.project.agent,
+            plugin=manifest,
+            component=None,  # No specific component for manifest-level files
+            component_type="files",
+            project_name=self.project.project_name,
+            adapter_variables=adapter_vars,
+            context_root=context_root,
+        )
+
+        # Create a simple plan for manifest-level files
+        plan = InstallationPlan(directories_to_create=[files_dir])
+
+        # Add files to copy (from plugin root)
+        self.adapter._add_files_to_plan(
+            plan, manifest.files, source_dir, files_dir, render_as_template=False
+        )
+
+        # Add template files to render (from plugin root)
+        self.adapter._add_files_to_plan(
+            plan, manifest.template_files, source_dir, files_dir, render_as_template=True
+        )
+
+        self._execute_plan(plan, old_files, template_context=context)
 
     def _install_agent_file(
         self,
@@ -775,7 +827,7 @@ class PluginInstaller:
             source_dir=source_dir,
         )
 
-        self._execute_plan(plan, old_files)
+        self._execute_plan(plan, old_files, template_context=context)
 
     def _render_context(
         self,
@@ -955,7 +1007,10 @@ class PluginInstaller:
         self._backed_up_files.clear()
 
     def _execute_plan(
-        self, plan: InstallationPlan, exclude_conflict_files: set[str] | None = None
+        self,
+        plan: InstallationPlan,
+        exclude_conflict_files: set[str] | None = None,
+        template_context: dict[str, Any] | None = None,
     ) -> None:
         """Execute an installation plan.
 
@@ -965,6 +1020,7 @@ class PluginInstaller:
         Args:
             plan: The installation plan to execute
             exclude_conflict_files: Files to exclude from conflict check (e.g., old plugin files)
+            template_context: Context for rendering template files (required if plan has template_files_to_render)
         """
         # Check for file conflicts (unless --force is used)
         if not self.force:
@@ -999,6 +1055,28 @@ class PluginInstaller:
 
                 shutil.copy2(src, dest)
                 # Track copied file in manifest
+                if self._current_plugin:
+                    self.manifest_manager.add_file(self._current_plugin, dest)
+
+        # Render and write template files (with backup)
+        for src, dest in plan.template_files_to_render.items():
+            if src.exists():
+                ensure_directory(dest.parent)
+
+                # Backup existing file before overwriting
+                self._backup_file(dest)
+
+                # Render template with context
+                if template_context is None:
+                    logger.warning(
+                        "Template file %s requires context but none provided, skipping",
+                        src,
+                    )
+                    continue
+                rendered_content = render_file(src, template_context, base_path=src.parent)
+                write_text_file(dest, rendered_content)
+
+                # Track rendered file in manifest
                 if self._current_plugin:
                     self.manifest_manager.add_file(self._current_plugin, dest)
 

@@ -28,7 +28,7 @@ def full_test_plugin(temp_dir: Path) -> Path:
                 "name": "test-skill",
                 "description": "A test skill for installation tests",
                 "context": "./context/skill.md",
-                "files": ["./files/config.json"],
+                "files": [{"src": "files/config.json"}],
             }
         ],
         "commands": [
@@ -147,9 +147,9 @@ class TestInstallPluginWithFiles:
             use_lockfile=False,
         )
 
-        # Verify config file was copied
+        # Verify config file was copied (dest defaults to basename)
         config_path = (
-            temp_project / ".claude" / "skills" / "full-plugin-test-skill" / "files" / "config.json"
+            temp_project / ".claude" / "skills" / "full-plugin-test-skill" / "config.json"
         )
         assert config_path.exists()
         assert json.loads(config_path.read_text())["setting"] == "value"
