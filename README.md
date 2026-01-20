@@ -26,10 +26,14 @@ agent platforms.
 | Prompts | - | - | ✓ | - | - |
 | Agent File | ✓ | - | - | ✓ | - |
 | MCP Servers | ✓ | ✓ | ✓ | ✓ | - |
+| Files | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Template Files | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 **Notes:**
 - Agent File: Content injected into `CLAUDE.md` (Claude Code) or `AGENTS.md` (Codex) with markers
 - Antigravity MCP: Configured through UI only, not project-level config files
+- Files: Static files bundled with components (scripts, schemas, configs)
+- Template Files: Jinja2-rendered files for dynamic configuration
 
 See [docs/plugins.md](docs/plugins.md) for detailed platform mapping and file locations
 
@@ -100,7 +104,14 @@ my-plugin/
     {
       "name": "code-review",
       "description": "Automated code review",
-      "context": "./skills/code-review.md"
+      "context": "./skills/code-review.md",
+      "files": [
+        {"src": "scripts/setup.sh"},
+        {"src": "configs/settings.json", "dest": "config.json"}
+      ],
+      "template_files": [
+        {"src": "templates/review-config.py.j2", "dest": "config.py"}
+      ]
     }
   ],
   "rules": [
@@ -114,6 +125,10 @@ my-plugin/
   ]
 }
 ```
+
+**File target format:**
+- `src`: Path relative to plugin root (required)
+- `dest`: Destination filename, defaults to basename of `src` (optional)
 
 ### Installed Directory Structure
 
