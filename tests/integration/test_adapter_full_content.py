@@ -234,8 +234,8 @@ class TestCursorAdapterFullContent:
         skill_file = temp_project / ".cursor" / "rules" / "test-plugin-code-review.mdc"
         assert not skill_file.exists(), "Skills should not be installed in Cursor"
 
-    def test_cursor_does_not_install_commands(self, temp_project: Path, test_plugin_dir: Path):
-        """Cursor: commands are not installed (not supported)."""
+    def test_cursor_installs_commands(self, temp_project: Path, test_plugin_dir: Path):
+        """Cursor: commands are installed as plain Markdown files."""
         project = Project.init(temp_project, "cursor")
 
         installer = PluginInstaller(project)
@@ -244,10 +244,18 @@ class TestCursorAdapterFullContent:
             use_lockfile=False,
         )
 
-        # Commands directory should not exist or should be empty
+        # Commands should be installed in .cursor/commands/
         commands_dir = temp_project / ".cursor" / "commands"
-        if commands_dir.exists():
-            assert not any(commands_dir.iterdir())
+        assert commands_dir.exists()
+
+        # Verify command file was created
+        command_file = commands_dir / "test-plugin-lint.md"
+        assert command_file.exists()
+
+        # Verify content is plain Markdown (no frontmatter)
+        content = command_file.read_text()
+        assert not content.startswith("---"), "Command should not have frontmatter"
+        assert "Run linting" in content
 
 
 # =============================================================================

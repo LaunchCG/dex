@@ -1,7 +1,10 @@
 """Cursor IDE platform adapter.
 
-Cursor uses .cursor/rules/ directory with MDC files for rules/skills.
-MDC files have YAML frontmatter with description, globs, and alwaysApply fields.
+Cursor uses:
+- .cursor/rules/ directory with MDC files for rules (YAML frontmatter with
+  description, globs, and alwaysApply fields)
+- .cursor/commands/ directory with plain Markdown files for commands
+  (no frontmatter required)
 """
 
 from pathlib import Path
@@ -11,6 +14,7 @@ from dex.adapters import register_adapter
 from dex.adapters.base import PlatformAdapter
 from dex.config.schemas import (
     AdapterMetadata,
+    CommandConfig,
     FileToWrite,
     InstallationPlan,
     MCPServerConfig,
@@ -26,17 +30,21 @@ from dex.utils.platform import get_os, is_unix
 class CursorAdapter(PlatformAdapter):
     """Adapter for Cursor IDE.
 
-    Cursor supports rules and MCP servers only.
+    Cursor supports rules, commands, and MCP servers.
 
     Directory structure:
     .cursor/
-    └── rules/
-        └── {plugin}-{rule}.mdc     # Rules as MDC files
+    ├── rules/
+    │   └── {plugin}-{rule}.mdc     # Rules as MDC files
+    └── commands/
+        └── {plugin}-{command}.md   # Commands as plain Markdown
 
-    MDC frontmatter fields:
+    MDC frontmatter fields (rules only):
     - description: When the rule should apply (for intelligent selection)
     - globs: File patterns to auto-attach (e.g., "**/*.ts")
     - alwaysApply: Boolean, if true applies to every chat session
+
+    Commands are plain Markdown files without frontmatter, triggered with / prefix.
     """
 
     @property
@@ -62,6 +70,10 @@ class CursorAdapter(PlatformAdapter):
     def get_rules_directory(self, project_root: Path) -> Path:
         """Rules are stored in .cursor/rules/."""
         return self.get_base_directory(project_root) / "rules"
+
+    def get_commands_directory(self, project_root: Path) -> Path:
+        """Commands are stored in .cursor/commands/."""
+        return self.get_base_directory(project_root) / "commands"
 
     def get_mcp_config_path(self, project_root: Path) -> Path:
         """MCP config at .cursor/mcp.json."""
@@ -101,6 +113,32 @@ class CursorAdapter(PlatformAdapter):
         # Add associated files to rules directory
         self._add_files_to_plan(plan, rule.files, source_dir, rules_dir)
 
+        return plan
+
+    def plan_command_installation(
+        self,
+        command: CommandConfig,
+        plugin: PluginManifest,
+        rendered_content: str,
+        project_root: Path,
+        source_dir: Path,
+    ) -> InstallationPlan:
+        """Plan command installation for Cursor.
+
+        Creates: .cursor/commands/{plugin}-{command}.md
+        """
+        commands_dir = self.get_commands_directory(project_root)
+        command_file = commands_dir / f"{plugin.name}-{command.name}.md"
+
+        frontmatter = self.generate_command_frontmatter(command, plugin)
+        full_content = frontmatter + rendered_content
+
+        plan = InstallationPlan(
+            directories_to_create=[commands_dir],
+            files_to_write=[FileToWrite(path=command_file, content=full_content)],
+        )
+
+        self._add_files_to_plan(plan, command.files, source_dir, commands_dir)
         return plan
 
     def _add_files_to_plan(
@@ -260,6 +298,14 @@ class CursorAdapter(PlatformAdapter):
 
         return "\n".join(lines)
 
+    def generate_command_frontmatter(
+        self,
+        command: CommandConfig,
+        plugin: PluginManifest,
+    ) -> str:
+        """Cursor commands do not require frontmatter."""
+        return ""
+
     # =========================================================================
     # Validation
     # =========================================================================
@@ -287,3 +333,4 @@ class CursorAdapter(PlatformAdapter):
         base_dir = self.get_base_directory(project_root)
         base_dir.mkdir(parents=True, exist_ok=True)
         self.get_rules_directory(project_root).mkdir(parents=True, exist_ok=True)
+        self.get_commands_directory(project_root).mkdir(parents=True, exist_ok=True)

@@ -21,7 +21,7 @@ Each component type maps to different locations and formats depending on the tar
 | Platform | Location | Format |
 |----------|----------|--------|
 | Claude Code | `.claude/commands/{plugin}-{command}.md` | YAML frontmatter (argument_hint, allowed_tools, model) |
-| Cursor | ❌ Not supported | - |
+| Cursor | `.cursor/commands/{plugin}-{command}.md` | Plain markdown (no frontmatter) |
 | GitHub Copilot | `.github/instructions/{command}.instructions.md` | YAML frontmatter (applyTo, excludeAgent) |
 | GitHub Copilot | `.github/prompts/{command}.prompt.md` | Plain markdown (set `copilot_mode: "prompt"`) |
 | Codex | ❌ Not supported (use AGENTS.md) | - |

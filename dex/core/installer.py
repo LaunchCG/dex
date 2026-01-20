@@ -798,7 +798,7 @@ class PluginInstaller:
             full_path = source_dir / path
 
             try:
-                return render_file(full_path, template_context)
+                return render_file(full_path, template_context, base_path=source_dir)
             except FileNotFoundError:
                 return f"<!-- Context file not found: {path} -->\n"
             except TemplateRenderError as e:
@@ -815,7 +815,7 @@ class PluginInstaller:
                     full_path = source_dir / path
 
                     try:
-                        parts.append(render_file(full_path, template_context))
+                        parts.append(render_file(full_path, template_context, base_path=source_dir))
                     except FileNotFoundError:
                         parts.append(f"<!-- Context file not found: {path} -->\n")
                     except TemplateRenderError as e:
@@ -832,7 +832,7 @@ class PluginInstaller:
                         full_path = source_dir / path
 
                         try:
-                            parts.append(render_file(full_path, template_context))
+                            parts.append(render_file(full_path, template_context, base_path=source_dir))
                         except FileNotFoundError:
                             pass
                         except TemplateRenderError as e:

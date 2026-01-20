@@ -246,7 +246,7 @@ class TestCursorAdapterIntegration:
         assert not skill2.exists(), "Skills should not be installed in Cursor"
 
     def test_ignores_unsupported_features(self, temp_project: Path, comprehensive_plugin: Path):
-        """Cursor: ignores unsupported features like skills, subagents and commands."""
+        """Cursor: ignores unsupported features like skills and subagents."""
         project = Project.init(temp_project, "cursor")
         installer = PluginInstaller(project)
         summary = installer.install(
@@ -258,12 +258,14 @@ class TestCursorAdapterIntegration:
         assert summary.all_successful
 
         # Verify no unsupported files were created
-        # Commands directory shouldn't exist for Cursor
-        commands_dir = temp_project / ".cursor" / "commands"
-        assert not commands_dir.exists()
         # Subagents directory shouldn't exist for Cursor
         agents_dir = temp_project / ".cursor" / "agents"
         assert not agents_dir.exists()
+
+        # Commands ARE supported - verify they're installed
+        commands_dir = temp_project / ".cursor" / "commands"
+        assert commands_dir.exists()
+        assert any(commands_dir.iterdir())
 
 
 class TestGitHubCopilotAdapterIntegration:

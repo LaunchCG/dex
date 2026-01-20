@@ -19,7 +19,7 @@ agent platforms.
 | Feature | Claude Code | Cursor | GitHub Copilot | Codex | Antigravity |
 |---------|:-----------:|:------:|:--------------:|:-----:|:-----------:|
 | Skills | ✓ | - | ✓ | ✓ | ✓ |
-| Commands | ✓ | - | - | - | - |
+| Commands | ✓ | ✓ | - | - | - |
 | Sub-agents | ✓ | - | ✓ | - | - |
 | Rules | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Instructions | - | - | ✓ | - | - |

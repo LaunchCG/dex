@@ -330,11 +330,12 @@ class TestCursorAdapterPreInstall:
     def test_creates_directories(
         self, adapter: CursorAdapter, temp_dir: Path, sample_manifest: PluginManifest
     ):
-        """Creates .cursor and rules directories."""
+        """Creates .cursor, rules, and commands directories."""
         adapter.pre_install(temp_dir, [sample_manifest])
 
         assert (temp_dir / ".cursor").exists()
         assert (temp_dir / ".cursor" / "rules").exists()
+        assert (temp_dir / ".cursor" / "commands").exists()
 
     def test_handles_existing_directories(
         self, adapter: CursorAdapter, temp_dir: Path, sample_manifest: PluginManifest
@@ -411,3 +412,129 @@ class TestCursorAdapterMCPConfig:
 
         assert "existing-server" in result["mcpServers"]
         assert "new-server" in result["mcpServers"]
+
+
+class TestCursorAdapterGetCommandsDirectory:
+    """Tests for CursorAdapter.get_commands_directory()."""
+
+    def test_returns_commands_directory(self, adapter: CursorAdapter, temp_dir: Path):
+        """Returns .cursor/commands directory."""
+        result = adapter.get_commands_directory(temp_dir)
+        assert result == temp_dir / ".cursor" / "commands"
+
+
+class TestCursorAdapterGenerateCommandFrontmatter:
+    """Tests for CursorAdapter.generate_command_frontmatter()."""
+
+    def test_returns_empty_string(
+        self,
+        adapter: CursorAdapter,
+        sample_command: CommandConfig,
+        sample_manifest: PluginManifest,
+    ):
+        """Cursor commands do not require frontmatter."""
+        frontmatter = adapter.generate_command_frontmatter(sample_command, sample_manifest)
+        assert frontmatter == ""
+
+
+class TestCursorAdapterPlanCommandInstallation:
+    """Tests for CursorAdapter.plan_command_installation()."""
+
+    def test_creates_installation_plan(
+        self,
+        adapter: CursorAdapter,
+        temp_dir: Path,
+        sample_command: CommandConfig,
+        sample_manifest: PluginManifest,
+    ):
+        """Creates an installation plan with Markdown file."""
+        source_dir = temp_dir / "plugin"
+        source_dir.mkdir()
+
+        plan = adapter.plan_command_installation(
+            command=sample_command,
+            plugin=sample_manifest,
+            rendered_content="# Test Content",
+            project_root=temp_dir,
+            source_dir=source_dir,
+        )
+
+        assert len(plan.directories_to_create) > 0
+        assert len(plan.files_to_write) == 1
+
+    def test_command_file_path_is_md(
+        self,
+        adapter: CursorAdapter,
+        temp_dir: Path,
+        sample_command: CommandConfig,
+        sample_manifest: PluginManifest,
+    ):
+        """Command file is created as .md in .cursor/commands/."""
+        source_dir = temp_dir / "plugin"
+        source_dir.mkdir()
+
+        plan = adapter.plan_command_installation(
+            command=sample_command,
+            plugin=sample_manifest,
+            rendered_content="# Test",
+            project_root=temp_dir,
+            source_dir=source_dir,
+        )
+
+        # Cursor uses flat .md files: .cursor/commands/{plugin}-{command}.md
+        expected_path = temp_dir / ".cursor" / "commands" / "test-plugin-test-command.md"
+        assert plan.files_to_write[0].path == expected_path
+
+    def test_content_is_plain_markdown(
+        self,
+        adapter: CursorAdapter,
+        temp_dir: Path,
+        sample_command: CommandConfig,
+        sample_manifest: PluginManifest,
+    ):
+        """File content is plain Markdown without frontmatter."""
+        source_dir = temp_dir / "plugin"
+        source_dir.mkdir()
+
+        plan = adapter.plan_command_installation(
+            command=sample_command,
+            plugin=sample_manifest,
+            rendered_content="# Content",
+            project_root=temp_dir,
+            source_dir=source_dir,
+        )
+
+        content = plan.files_to_write[0].content
+        expected = "# Content"
+        assert content == expected
+
+    def test_copies_associated_files(
+        self,
+        adapter: CursorAdapter,
+        temp_dir: Path,
+        sample_manifest: PluginManifest,
+    ):
+        """Copies associated files to commands directory."""
+        source_dir = temp_dir / "plugin"
+        source_dir.mkdir()
+        (source_dir / "helper.py").write_text("# helper")
+
+        command = CommandConfig(
+            name="test-command",
+            description="A test command",
+            context="./context/command.md",
+            files=["helper.py"],
+        )
+
+        plan = adapter.plan_command_installation(
+            command=command,
+            plugin=sample_manifest,
+            rendered_content="# Content",
+            project_root=temp_dir,
+            source_dir=source_dir,
+        )
+
+        expected_src = source_dir / "helper.py"
+        expected_dest = temp_dir / ".cursor" / "commands" / "helper.py"
+        assert expected_src in plan.files_to_copy
+        assert plan.files_to_copy[expected_src] == expected_dest
