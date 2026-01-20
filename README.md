@@ -36,10 +36,10 @@ See [docs/plugins.md](docs/plugins.md) for detailed platform mapping and file lo
 
 ### Installation
 
-Run dex directly using `uv` without installing:
+Run dex directly using `uvx` without installing:
 
 ```bash
-uv run --from git+https://github.com/launchcg/dex dex <command>
+uvx --from git+https://github.com/launchcg/dex dex <command>
 ```
 
 Or install globally:
@@ -53,25 +53,25 @@ uv tool install git+https://github.com/launchcg/dex
 
 ```bash
 # Initialize a project for a specific AI agent
-uv run --from git+https://github.com/launchcg/dex dex init --agent claude-code
+uvx --from git+https://github.com/launchcg/dex dex init --agent claude-code
 
 # Install a plugin from GitHub
-uv run --from git+https://github.com/launchcg/dex dex install --source git+https://github.com/owner/my-plugin.git
+uvx --from git+https://github.com/launchcg/dex dex install --source git+https://github.com/owner/my-plugin.git
 
 # Install from a local directory (for development)
-uv run --from git+https://github.com/launchcg/dex dex install --source /path/to/my-plugin
+uvx --from git+https://github.com/launchcg/dex dex install --source /path/to/my-plugin
 
 # Install and save to dex.yaml
-uv run --from git+https://github.com/launchcg/dex dex install --source git+https://github.com/owner/my-plugin.git --save
+uvx --from git+https://github.com/launchcg/dex dex install --source git+https://github.com/owner/my-plugin.git --save
 
 # Remove a plugin
-uv run --from git+https://github.com/launchcg/dex dex uninstall my-plugin
+uvx --from git+https://github.com/launchcg/dex dex uninstall my-plugin
 
 # Remove and delete from dex.yaml
-uv run --from git+https://github.com/launchcg/dex dex uninstall my-plugin --remove
+uvx --from git+https://github.com/launchcg/dex dex uninstall my-plugin --remove
 
 # List installed plugins
-uv run --from git+https://github.com/launchcg/dex dex list
+uvx --from git+https://github.com/launchcg/dex dex list
 ```
 
 
