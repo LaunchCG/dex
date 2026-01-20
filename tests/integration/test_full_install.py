@@ -148,9 +148,7 @@ class TestInstallPluginWithFiles:
         )
 
         # Verify config file was copied (dest defaults to basename)
-        config_path = (
-            temp_project / ".claude" / "skills" / "full-plugin-test-skill" / "config.json"
-        )
+        config_path = temp_project / ".claude" / "skills" / "full-plugin-test-skill" / "config.json"
         assert config_path.exists()
         assert json.loads(config_path.read_text())["setting"] == "value"
 

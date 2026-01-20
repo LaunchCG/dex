@@ -682,7 +682,7 @@ class TestClaudeCodeAdapterFilesHandling:
             name="test-skill",
             description="Skill with template files",
             context="./context.md",
-            template_files=[{"src": "./config.py.j2", "dest": "config.py"}],
+            template_files=[FileTarget(src="./config.py.j2", dest="config.py")],
         )
         source_dir = temp_dir / "plugin"
         source_dir.mkdir()

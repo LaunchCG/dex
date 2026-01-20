@@ -114,7 +114,9 @@ class AntigravityAdapter(PlatformAdapter):
 
         # Add associated files
         self._add_files_to_plan(plan, skill.files, source_dir, skill_dir)
-        self._add_files_to_plan(plan, skill.template_files, source_dir, skill_dir, render_as_template=True)
+        self._add_files_to_plan(
+            plan, skill.template_files, source_dir, skill_dir, render_as_template=True
+        )
 
         return plan
 
@@ -167,7 +169,9 @@ class AntigravityAdapter(PlatformAdapter):
 
         # Add associated files
         self._add_files_to_plan(plan, rule.files, source_dir, rules_dir)
-        self._add_files_to_plan(plan, rule.template_files, source_dir, rules_dir, render_as_template=True)
+        self._add_files_to_plan(
+            plan, rule.template_files, source_dir, rules_dir, render_as_template=True
+        )
 
         return plan
 

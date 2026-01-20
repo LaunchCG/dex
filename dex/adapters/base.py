@@ -412,6 +412,8 @@ class PlatformAdapter(ABC):
             resolved_path = find_platform_specific_file(source_dir, src_path, self.metadata.name)
             src = source_dir / resolved_path
             # Use dest_path for destination (allows renaming)
+            # dest_path is guaranteed non-None by FileTarget validator
+            assert dest_path is not None
             dest = dest_dir / dest_path
 
             if src.exists():

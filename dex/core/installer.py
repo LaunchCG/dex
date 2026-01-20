@@ -390,35 +390,45 @@ class PluginInstaller:
 
             # Install skills
             for skill in manifest.skills:
+                if not self._should_install_component(skill):
+                    continue
                 self._install_skill(skill, manifest, source_dir, adapter_vars, old_files)
 
             # Install commands
             for command in manifest.commands:
+                if not self._should_install_component(command):
+                    continue
                 self._install_command(command, manifest, source_dir, adapter_vars, old_files)
 
             # Install sub-agents
             for subagent in manifest.sub_agents:
+                if not self._should_install_component(subagent):
+                    continue
                 self._install_subagent(subagent, manifest, source_dir, adapter_vars, old_files)
 
             # Install rules (list[RuleConfig])
             for rule in manifest.rules:
+                if not self._should_install_component(rule):
+                    continue
                 self._install_rule(rule, manifest, source_dir, adapter_vars, old_files)
 
             # Install instructions (list[InstructionConfig])
             for instruction in manifest.instructions:
+                if not self._should_install_component(instruction):
+                    continue
                 self._install_instruction(
                     instruction, manifest, source_dir, adapter_vars, old_files
                 )
 
             # Install prompts (list[PromptConfig])
             for prompt in manifest.prompts:
+                if not self._should_install_component(prompt):
+                    continue
                 self._install_prompt(prompt, manifest, source_dir, adapter_vars, old_files)
 
             # Install manifest-level files (first-class file resources)
             if manifest.files or manifest.template_files:
-                self._install_manifest_files(
-                    manifest, source_dir, adapter_vars, old_files
-                )
+                self._install_manifest_files(manifest, source_dir, adapter_vars, old_files)
 
             # Install agent file content if specified
             if manifest.agent_file:
@@ -500,6 +510,16 @@ class PluginInstaller:
                             break
                 except OSError:
                     pass
+
+    def _should_install_component(self, component: Any) -> bool:
+        """Check if component should be installed for current adapter.
+
+        If the component has an `adapters` field set, only install on those adapters.
+        If not set or empty, install on all adapters (backward compatible).
+        """
+        if not hasattr(component, "adapters") or component.adapters is None:
+            return True  # No restriction, install on all
+        return self.project.agent in component.adapters
 
     def _install_skill(
         self,
@@ -884,7 +904,9 @@ class PluginInstaller:
                         full_path = source_dir / path
 
                         try:
-                            parts.append(render_file(full_path, template_context, base_path=source_dir))
+                            parts.append(
+                                render_file(full_path, template_context, base_path=source_dir)
+                            )
                         except FileNotFoundError:
                             pass
                         except TemplateRenderError as e:

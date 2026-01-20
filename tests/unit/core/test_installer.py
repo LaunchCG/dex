@@ -324,3 +324,142 @@ class TestInstallError:
 
         assert error.plugin_name == "test-plugin"
         assert str(error) == "Error message"
+
+
+class TestPluginInstallerShouldInstallComponent:
+    """Tests for PluginInstaller._should_install_component() method."""
+
+    def test_installs_component_without_adapters_field(self, installer: PluginInstaller):
+        """Component without adapters field installs on all adapters."""
+        from dex.config.schemas import RuleConfig
+
+        component = RuleConfig(
+            name="universal-rule",
+            description="No adapter restriction",
+            context="./context/rule.md",
+        )
+
+        assert installer._should_install_component(component) is True
+
+    def test_installs_component_with_none_adapters(self, installer: PluginInstaller):
+        """Component with adapters=None installs on all adapters."""
+        from dex.config.schemas import SkillConfig
+
+        component = SkillConfig(
+            name="universal-skill",
+            description="Explicit None adapters",
+            context="./context/skill.md",
+            adapters=None,
+        )
+
+        assert installer._should_install_component(component) is True
+
+    def test_installs_component_when_adapter_matches(self, installer: PluginInstaller):
+        """Component installs when current adapter is in the list."""
+        from dex.config.schemas import RuleConfig
+
+        # The initialized_project uses claude-code adapter
+        component = RuleConfig(
+            name="claude-code-rule",
+            description="For Claude Code",
+            context="./context/rule.md",
+            adapters=["claude-code", "cursor"],
+        )
+
+        assert installer._should_install_component(component) is True
+
+    def test_skips_component_when_adapter_not_in_list(self, installer: PluginInstaller):
+        """Component is skipped when current adapter is not in the list."""
+        from dex.config.schemas import RuleConfig
+
+        # The initialized_project uses claude-code adapter
+        component = RuleConfig(
+            name="cursor-only-rule",
+            description="Only for Cursor",
+            context="./context/rule.md",
+            adapters=["cursor"],
+        )
+
+        assert installer._should_install_component(component) is False
+
+    def test_skips_component_with_empty_adapters_list(self, installer: PluginInstaller):
+        """Component with empty adapters list installs on no adapters."""
+        from dex.config.schemas import CommandConfig
+
+        component = CommandConfig(
+            name="nowhere-command",
+            description="Should never install",
+            context="./context/command.md",
+            adapters=[],
+        )
+
+        assert installer._should_install_component(component) is False
+
+    def test_handles_object_without_adapters_attribute(self, installer: PluginInstaller):
+        """Handles objects without adapters attribute gracefully."""
+
+        # Create a simple object without adapters attribute
+        class SimpleObject:
+            pass
+
+        component = SimpleObject()
+
+        # Should return True (install on all) when attribute is missing
+        assert installer._should_install_component(component) is True
+
+    def test_all_component_types_support_adapters(self, installer: PluginInstaller):
+        """All component config types support the adapters field."""
+        from dex.config.schemas import (
+            CommandConfig,
+            InstructionConfig,
+            PromptConfig,
+            RuleConfig,
+            SkillConfig,
+            SubAgentConfig,
+        )
+
+        # Test each component type with adapters=["cursor"] (not matching claude-code)
+        components = [
+            SkillConfig(
+                name="test",
+                description="Test",
+                context="./test.md",
+                adapters=["cursor"],
+            ),
+            CommandConfig(
+                name="test",
+                description="Test",
+                context="./test.md",
+                adapters=["cursor"],
+            ),
+            SubAgentConfig(
+                name="test",
+                description="Test",
+                context="./test.md",
+                adapters=["cursor"],
+            ),
+            InstructionConfig(
+                name="test",
+                description="Test",
+                context="./test.md",
+                adapters=["cursor"],
+            ),
+            RuleConfig(
+                name="test",
+                description="Test",
+                context="./test.md",
+                adapters=["cursor"],
+            ),
+            PromptConfig(
+                name="test",
+                description="Test",
+                context="./test.md",
+                adapters=["cursor"],
+            ),
+        ]
+
+        # All should return False since we're on claude-code, not cursor
+        for component in components:
+            assert (
+                installer._should_install_component(component) is False
+            ), f"{type(component).__name__} should support adapter filtering"

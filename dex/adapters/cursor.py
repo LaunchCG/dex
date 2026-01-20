@@ -110,7 +110,9 @@ class CursorAdapter(PlatformAdapter):
 
         # Add associated files to rules directory
         self._add_files_to_plan(plan, rule.files, source_dir, rules_dir)
-        self._add_files_to_plan(plan, rule.template_files, source_dir, rules_dir, render_as_template=True)
+        self._add_files_to_plan(
+            plan, rule.template_files, source_dir, rules_dir, render_as_template=True
+        )
 
         return plan
 
@@ -138,7 +140,9 @@ class CursorAdapter(PlatformAdapter):
         )
 
         self._add_files_to_plan(plan, command.files, source_dir, commands_dir)
-        self._add_files_to_plan(plan, command.template_files, source_dir, commands_dir, render_as_template=True)
+        self._add_files_to_plan(
+            plan, command.template_files, source_dir, commands_dir, render_as_template=True
+        )
         return plan
 
     # Note: _add_files_to_plan is inherited from PlatformAdapter base class

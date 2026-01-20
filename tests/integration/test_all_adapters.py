@@ -194,11 +194,7 @@ class TestClaudeCodeAdapterIntegration:
 
         # Verify config file copied to skill directory (dest defaults to basename)
         config = (
-            temp_project
-            / ".claude"
-            / "skills"
-            / "comprehensive-plugin-code-review"
-            / "config.json"
+            temp_project / ".claude" / "skills" / "comprehensive-plugin-code-review" / "config.json"
         )
         assert config.exists()
 

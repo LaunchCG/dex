@@ -52,6 +52,7 @@ class TestSkillConfig:
                 FileTarget(src="tools/file2.txt"),
             ],
         )
+        assert skill.files is not None
         assert len(skill.files) == 2
         assert skill.files[0].src == "tools/file1.txt"
         assert skill.files[0].dest == "file1.txt"  # Defaults to basename
@@ -77,6 +78,7 @@ class TestSkillConfig:
                 FileTarget(src="templates/settings.yaml.j2", dest="settings.yaml"),
             ],
         )
+        assert skill.template_files is not None
         assert len(skill.template_files) == 2
         assert skill.template_files[0].src == "templates/config.py.j2"
         assert skill.template_files[0].dest == "config.py"
@@ -90,8 +92,10 @@ class TestSkillConfig:
             files=[FileTarget(src="static.txt")],
             template_files=[FileTarget(src="config.py.j2")],
         )
+        assert skill.files is not None
         assert len(skill.files) == 1
         assert skill.files[0].src == "static.txt"
+        assert skill.template_files is not None
         assert len(skill.template_files) == 1
         assert skill.template_files[0].src == "config.py.j2"
 
@@ -435,7 +439,9 @@ class TestInstallationPlan:
             }
         )
         assert len(plan.template_files_to_render) == 2
-        assert plan.template_files_to_render[Path("/tmp/config.py.j2")] == Path("/tmp/output/config.py")
+        assert plan.template_files_to_render[Path("/tmp/config.py.j2")] == Path(
+            "/tmp/output/config.py"
+        )
 
     def test_plan_with_directories(self):
         """Plan with directories to create."""

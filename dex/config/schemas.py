@@ -87,6 +87,7 @@ class SkillConfig(BaseModel):
     context: ContextSpec
     files: FileSpec | None = None
     template_files: TemplateFileSpec | None = None
+    adapters: list[str] | None = None  # If set, only install on these adapters
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -100,6 +101,7 @@ class CommandConfig(BaseModel):
     allowed_tools: list[str] | str | None = None  # Tools this command can use (e.g., "Bash(uv:*)")
     files: FileSpec | None = None
     template_files: TemplateFileSpec | None = None
+    adapters: list[str] | None = None  # If set, only install on these adapters
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -114,6 +116,7 @@ class SubAgentConfig(BaseModel):
     allowed_tools: list[str] | str | None = None  # Tools this agent can use
     files: FileSpec | None = None
     template_files: TemplateFileSpec | None = None
+    adapters: list[str] | None = None  # If set, only install on these adapters
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -142,6 +145,7 @@ class InstructionConfig(BaseModel):
     )  # Agent to exclude (e.g., "code-review")
     files: FileSpec | None = None
     template_files: TemplateFileSpec | None = None
+    adapters: list[str] | None = None  # If set, only install on these adapters
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -159,6 +163,7 @@ class RuleConfig(BaseModel):
     always: bool = False  # Always apply this rule (Cursor)
     files: FileSpec | None = None
     template_files: TemplateFileSpec | None = None
+    adapters: list[str] | None = None  # If set, only install on these adapters
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -175,6 +180,7 @@ class PromptConfig(BaseModel):
     trigger: str | None = None  # Optional trigger phrase
     files: FileSpec | None = None
     template_files: TemplateFileSpec | None = None
+    adapters: list[str] | None = None  # If set, only install on these adapters
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
