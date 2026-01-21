@@ -21,7 +21,6 @@ from dex.config.schemas import (
     PluginManifest,
     RuleConfig,
 )
-from dex.utils.platform import get_os, is_unix
 
 
 @register_adapter("cursor")
@@ -164,35 +163,11 @@ class CursorAdapter(PlatformAdapter):
         """
         config: dict[str, Any] = {}
 
-        if mcp_server.type == "bundled":
-            path = mcp_server.path
-            if isinstance(path, dict):
-                current_os = get_os()
-                if current_os in path:
-                    path = path[current_os]
-                elif is_unix() and "unix" in path:
-                    path = path["unix"]
-                else:
-                    path = next(iter(path.values()))
-
-            if path and path.startswith("./"):
-                path = path[2:]
-
-            server_path = source_dir / path if path else None
-
-            if server_path and server_path.suffix == ".js":
-                config["command"] = "node"
-                config["args"] = [str(server_path)]
-            elif server_path and server_path.suffix == ".py":
-                config["command"] = "python"
-                config["args"] = [str(server_path)]
-            elif server_path:
-                config["command"] = str(server_path)
-                config["args"] = []
-
-        elif mcp_server.type == "remote":
-            source = mcp_server.source
-            if source:
+        if mcp_server.type == "command":
+            # Command-based server (stdio transport)
+            if mcp_server.source:
+                # Expand source shortcut to command/args
+                source = mcp_server.source
                 if source.startswith("npm:"):
                     package_name = source[4:]
                     config["command"] = "npx"
@@ -205,15 +180,22 @@ class CursorAdapter(PlatformAdapter):
                     package_name = source[4:]
                     config["command"] = package_name
                     config["args"] = []
+            else:
+                # Direct command/args
+                config["command"] = mcp_server.command
+                config["args"] = list(mcp_server.args) if mcp_server.args else []
 
-        if mcp_server.config:
-            if "args" in mcp_server.config:
-                existing_args = config.get("args", [])
-                config["args"] = existing_args + mcp_server.config["args"]
-            if "env" in mcp_server.config:
-                config["env"] = mcp_server.config["env"]
-            if "command" in mcp_server.config:
-                config["command"] = mcp_server.config["command"]
+            # Add extra args from config
+            if mcp_server.args and mcp_server.source:
+                config["args"] = config.get("args", []) + list(mcp_server.args)
+
+            # Add env if provided
+            if mcp_server.env:
+                config["env"] = dict(mcp_server.env)
+
+        elif mcp_server.type == "http":
+            # HTTP-based server - Cursor uses just url field
+            config["url"] = mcp_server.url
 
         return {mcp_server.name: config}
 

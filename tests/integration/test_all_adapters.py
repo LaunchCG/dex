@@ -69,7 +69,7 @@ def comprehensive_plugin(temp_dir: Path) -> Path:
         "mcp_servers": [
             {
                 "name": "test-server",
-                "type": "remote",
+                "type": "command",
                 "source": "npm:@test/mcp-server",
             }
         ],
@@ -97,43 +97,39 @@ def comprehensive_plugin(temp_dir: Path) -> Path:
         "Project: {{ env.project.name }}\n"
     )
     (skills_dir / "testing.md").write_text(
-        "# Testing Skill\n\n" "Help with writing and running tests.\n"
+        "# Testing Skill\n\nHelp with writing and running tests.\n"
     )
     (skills_dir / "config.json").write_text('{"reviewers": ["claude"]}')
 
     # Create command context files
     commands_dir = plugin_dir / "commands"
     commands_dir.mkdir()
-    (commands_dir / "lint.md").write_text(
-        "# Lint Command\n\n" "Run linting tools on the codebase.\n"
-    )
+    (commands_dir / "lint.md").write_text("# Lint Command\n\nRun linting tools on the codebase.\n")
 
     # Create agent context files
     agents_dir = plugin_dir / "agents"
     agents_dir.mkdir()
-    (agents_dir / "reviewer.md").write_text(
-        "# Reviewer Agent\n\n" "Autonomous code review agent.\n"
-    )
+    (agents_dir / "reviewer.md").write_text("# Reviewer Agent\n\nAutonomous code review agent.\n")
 
     # Create rule context files
     rules_dir = plugin_dir / "rules"
     rules_dir.mkdir()
     (rules_dir / "code-style.md").write_text(
-        "# Code Style Rules\n\n" "Follow the project's coding style.\n"
+        "# Code Style Rules\n\nFollow the project's coding style.\n"
     )
 
     # Create instruction context files
     instructions_dir = plugin_dir / "instructions"
     instructions_dir.mkdir()
     (instructions_dir / "lint.md").write_text(
-        "# Lint Instructions\n\n" "Instructions for linting Python code.\n"
+        "# Lint Instructions\n\nInstructions for linting Python code.\n"
     )
 
     # Create agent_file context files
     agent_file_dir = plugin_dir / "agent_file"
     agent_file_dir.mkdir()
     (agent_file_dir / "content.md").write_text(
-        "# Agent Instructions\n\n" "This content appears in CLAUDE.md or AGENTS.md.\n"
+        "# Agent Instructions\n\nThis content appears in CLAUDE.md or AGENTS.md.\n"
     )
 
     return plugin_dir
@@ -414,7 +410,9 @@ class TestCrossAdapterConsistency:
     def test_project_initialization(self, temp_project: Path, agent_type: str):
         """Projects can be initialized for all adapters."""
         project = Project.init(
-            temp_project / agent_type, agent_type, "test-project"  # type: ignore[arg-type]
+            temp_project / agent_type,
+            agent_type,  # type: ignore[arg-type]
+            "test-project",
         )
         assert project.agent == agent_type
 

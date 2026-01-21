@@ -109,7 +109,7 @@ class TestPluginProperties:
             "name": "test-plugin",
             "version": "1.0.0",
             "description": "Test",
-            "mcp_servers": [{"name": "server1", "type": "bundled", "path": "./server.js"}],
+            "mcp_servers": [{"name": "server1", "type": "command", "source": "npm:@test/server"}],
         }
         (temp_dir / "package.json").write_text(json.dumps(manifest))
 
@@ -189,7 +189,7 @@ class TestPluginHasComponent:
             "skills": [{"name": "skill1", "description": "Skill 1", "context": "./s.md"}],
             "commands": [{"name": "cmd1", "description": "Command 1", "context": "./c.md"}],
             "sub_agents": [{"name": "agent1", "description": "Agent 1", "context": "./a.md"}],
-            "mcp_servers": [{"name": "server1", "type": "bundled", "path": "./s.js"}],
+            "mcp_servers": [{"name": "server1", "type": "command", "source": "npm:@test/server"}],
         }
         (temp_dir / "package.json").write_text(json.dumps(manifest))
 

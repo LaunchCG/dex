@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 AgentType = Literal["claude-code", "cursor", "codex", "antigravity", "github-copilot"]
 PlatformOS = Literal["windows", "linux", "macos", "unix"]
-MCPServerType = Literal["bundled", "remote"]
+MCPServerType = Literal["command", "http"]
 ComponentType = Literal["skill", "command", "sub_agent", "instruction", "rule", "prompt"]
 
 
@@ -190,23 +190,37 @@ class PromptConfig(BaseModel):
 
 
 class MCPServerConfig(BaseModel):
-    """MCP server configuration within a plugin."""
+    """MCP server configuration within a plugin.
+
+    Two types supported:
+    - command: Runs a local command (stdio transport)
+    - http: Connects to an HTTP endpoint
+
+    For command type, you can either specify command/args directly,
+    or use a source shortcut (npm:, uvx:, pip:) that expands to command/args.
+    """
 
     name: str
-    description: str = ""  # Optional for MCP servers since they're often external
+    description: str = ""
     type: MCPServerType
-    path: str | dict[PlatformOS, str] | None = None
-    source: str | None = None
-    version: str | None = None
-    config: dict[str, Any] = Field(default_factory=dict)
+
+    # For command type
+    command: str | None = None
+    args: list[str] = Field(default_factory=list)
+    env: dict[str, str] = Field(default_factory=dict)
+    source: str | None = None  # Shortcut: npm:, uvx:, pip: expand to command/args
+
+    # For http type
+    url: str | None = None
 
     @model_validator(mode="after")
     def validate_server_type(self) -> "MCPServerConfig":
-        """Validate that bundled servers have path and remote servers have source."""
-        if self.type == "bundled" and not self.path:
-            raise ValueError("Bundled MCP servers must specify a 'path'")
-        if self.type == "remote" and not self.source:
-            raise ValueError("Remote MCP servers must specify a 'source'")
+        """Validate fields based on server type."""
+        if self.type == "command":
+            if not self.source and not self.command:
+                raise ValueError("Command MCP servers must specify 'source' or 'command'")
+        elif self.type == "http" and not self.url:
+            raise ValueError("HTTP MCP servers must specify 'url'")
         return self
 
 

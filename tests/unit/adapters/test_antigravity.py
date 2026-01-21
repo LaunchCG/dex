@@ -220,7 +220,7 @@ class TestAntigravityAdapterValidatePluginCompatibility:
             name="test-plugin",
             version="1.0.0",
             description="Plugin with MCP",
-            mcp_servers=[MCPServerConfig(name="test-server", type="remote", source="npm:test")],
+            mcp_servers=[MCPServerConfig(name="test-server", type="command", source="npm:test")],
         )
 
         warnings = adapter.validate_plugin_compatibility(manifest)
@@ -332,7 +332,7 @@ class TestAntigravityAdapterMCPConfig:
 
         mcp_server = MCPServerConfig(
             name="test-server",
-            type="remote",
+            type="command",
             source="npm:@example/mcp-server",
         )
         source_dir = temp_dir / "plugin"

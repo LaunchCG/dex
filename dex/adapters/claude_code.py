@@ -22,7 +22,6 @@ from dex.config.schemas import (  # First-class types this adapter supports; Cor
     SubAgentConfig,
 )
 from dex.utils.markers import insert_plugin_section
-from dex.utils.platform import get_os, is_unix
 
 
 @register_adapter("claude-code")
@@ -303,68 +302,40 @@ class ClaudeCodeAdapter(PlatformAdapter):
         """
         config: dict[str, Any] = {}
 
-        if mcp_server.type == "bundled":
-            # Bundled server - resolve path
-            path = mcp_server.path
-            if isinstance(path, dict):
-                # Platform-specific paths
-                current_os = get_os()
-                if current_os in path:
-                    path = path[current_os]
-                elif is_unix() and "unix" in path:
-                    path = path["unix"]
-                else:
-                    # Fallback to first available
-                    path = next(iter(path.values()))
-
-            # Resolve path relative to source directory
-            if path and path.startswith("./"):
-                path = path[2:]
-
-            # Store path relative to project root for now
-            # The actual command will be determined by the file type
-            server_path = source_dir / path if path else None
-
-            if server_path and server_path.suffix == ".js":
-                config["command"] = "node"
-                config["args"] = [str(server_path)]
-            elif server_path and server_path.suffix == ".py":
-                config["command"] = "python"
-                config["args"] = [str(server_path)]
-            elif server_path:
-                config["command"] = str(server_path)
-                config["args"] = []
-
-        elif mcp_server.type == "remote":
-            # Remote server - determine command based on source prefix
-            source = mcp_server.source
-            if source:
+        if mcp_server.type == "command":
+            # Command-based server (stdio transport)
+            if mcp_server.source:
+                # Expand source shortcut to command/args
+                source = mcp_server.source
                 if source.startswith("npm:"):
-                    # npm package: npx -y package-name
                     package_name = source[4:]
                     config["command"] = "npx"
                     config["args"] = ["-y", package_name]
                 elif source.startswith("uvx:"):
-                    # uvx package: uvx --from source package-command
                     package_source = source[4:]
                     config["command"] = "uvx"
                     config["args"] = ["--from", package_source]
                 elif source.startswith("pip:"):
-                    # pip package installed globally
                     package_name = source[4:]
                     config["command"] = package_name
                     config["args"] = []
+            else:
+                # Direct command/args
+                config["command"] = mcp_server.command
+                config["args"] = list(mcp_server.args) if mcp_server.args else []
 
-        # Add additional config (args, env, etc.)
-        if mcp_server.config:
-            if "args" in mcp_server.config:
-                existing_args = config.get("args", [])
-                config["args"] = existing_args + mcp_server.config["args"]
-            if "env" in mcp_server.config:
-                config["env"] = mcp_server.config["env"]
-            if "command" in mcp_server.config:
-                # Allow explicit override of command
-                config["command"] = mcp_server.config["command"]
+            # Add extra args from config
+            if mcp_server.args and mcp_server.source:
+                config["args"] = config.get("args", []) + list(mcp_server.args)
+
+            # Add env if provided
+            if mcp_server.env:
+                config["env"] = dict(mcp_server.env)
+
+        elif mcp_server.type == "http":
+            # HTTP-based server
+            config["type"] = "http"
+            config["url"] = mcp_server.url
 
         return {mcp_server.name: config}
 

@@ -239,67 +239,16 @@ class TestClaudeCodeAdapterPlanSubagentInstallation:
 class TestClaudeCodeAdapterGenerateMCPConfig:
     """Tests for ClaudeCodeAdapter.generate_mcp_config()."""
 
-    def test_generates_bundled_server_config(
+    def test_generates_npm_command_config(
         self,
         adapter: ClaudeCodeAdapter,
         temp_dir: Path,
         sample_manifest: PluginManifest,
     ):
-        """Generates config for bundled server."""
+        """Generates config for npm source shortcut."""
         mcp_server = MCPServerConfig(
-            name="test-server",
-            type="bundled",
-            path="./server.js",
-        )
-        source_dir = temp_dir / "plugin"
-        source_dir.mkdir()
-        (source_dir / "server.js").write_text("// server")
-
-        config = adapter.generate_mcp_config(
-            mcp_server=mcp_server,
-            plugin=sample_manifest,
-            project_root=temp_dir,
-            source_dir=source_dir,
-        )
-
-        assert "test-server" in config
-        assert config["test-server"]["command"] == "node"
-
-    def test_generates_python_server_config(
-        self,
-        adapter: ClaudeCodeAdapter,
-        temp_dir: Path,
-        sample_manifest: PluginManifest,
-    ):
-        """Generates config for Python bundled server."""
-        mcp_server = MCPServerConfig(
-            name="py-server",
-            type="bundled",
-            path="./server.py",
-        )
-        source_dir = temp_dir / "plugin"
-        source_dir.mkdir()
-        (source_dir / "server.py").write_text("# server")
-
-        config = adapter.generate_mcp_config(
-            mcp_server=mcp_server,
-            plugin=sample_manifest,
-            project_root=temp_dir,
-            source_dir=source_dir,
-        )
-
-        assert config["py-server"]["command"] == "python"
-
-    def test_generates_remote_server_config(
-        self,
-        adapter: ClaudeCodeAdapter,
-        temp_dir: Path,
-        sample_manifest: PluginManifest,
-    ):
-        """Generates config for remote NPM server."""
-        mcp_server = MCPServerConfig(
-            name="remote-server",
-            type="remote",
+            name="npm-server",
+            type="command",
             source="npm:@example/mcp-server",
         )
         source_dir = temp_dir / "plugin"
@@ -312,26 +261,28 @@ class TestClaudeCodeAdapterGenerateMCPConfig:
             source_dir=source_dir,
         )
 
-        assert config["remote-server"]["command"] == "npx"
-        assert "-y" in config["remote-server"]["args"]
-        assert "@example/mcp-server" in config["remote-server"]["args"]
+        expected = {
+            "npm-server": {
+                "command": "npx",
+                "args": ["-y", "@example/mcp-server"],
+            }
+        }
+        assert config == expected
 
-    def test_includes_additional_config(
+    def test_generates_uvx_command_config(
         self,
         adapter: ClaudeCodeAdapter,
         temp_dir: Path,
         sample_manifest: PluginManifest,
     ):
-        """Includes additional config like env vars."""
+        """Generates config for uvx source shortcut."""
         mcp_server = MCPServerConfig(
-            name="test-server",
-            type="bundled",
-            path="./server.js",
-            config={"env": {"API_KEY": "secret"}},
+            name="uvx-server",
+            type="command",
+            source="uvx:mcp-package",
         )
         source_dir = temp_dir / "plugin"
         source_dir.mkdir()
-        (source_dir / "server.js").write_text("// server")
 
         config = adapter.generate_mcp_config(
             mcp_server=mcp_server,
@@ -340,7 +291,153 @@ class TestClaudeCodeAdapterGenerateMCPConfig:
             source_dir=source_dir,
         )
 
-        assert config["test-server"]["env"]["API_KEY"] == "secret"
+        expected = {
+            "uvx-server": {
+                "command": "uvx",
+                "args": ["--from", "mcp-package"],
+            }
+        }
+        assert config == expected
+
+    def test_generates_direct_command_config(
+        self,
+        adapter: ClaudeCodeAdapter,
+        temp_dir: Path,
+        sample_manifest: PluginManifest,
+    ):
+        """Generates config for direct command/args."""
+        mcp_server = MCPServerConfig(
+            name="docker-server",
+            type="command",
+            command="docker",
+            args=["run", "-i", "--rm", "ghcr.io/github/github-mcp-server"],
+            env={"GITHUB_TOKEN": "${GITHUB_TOKEN}"},
+        )
+        source_dir = temp_dir / "plugin"
+        source_dir.mkdir()
+
+        config = adapter.generate_mcp_config(
+            mcp_server=mcp_server,
+            plugin=sample_manifest,
+            project_root=temp_dir,
+            source_dir=source_dir,
+        )
+
+        expected = {
+            "docker-server": {
+                "command": "docker",
+                "args": ["run", "-i", "--rm", "ghcr.io/github/github-mcp-server"],
+                "env": {"GITHUB_TOKEN": "${GITHUB_TOKEN}"},
+            }
+        }
+        assert config == expected
+
+    def test_generates_config_with_source_and_extra_args(
+        self,
+        adapter: ClaudeCodeAdapter,
+        temp_dir: Path,
+        sample_manifest: PluginManifest,
+    ):
+        """Generates config with uvx source and additional args."""
+        mcp_server = MCPServerConfig(
+            name="serena",
+            type="command",
+            source="uvx:git+https://github.com/oraios/serena",
+            args=[
+                "serena",
+                "start-mcp-server",
+                "--context",
+                "ide-assistant",
+                "--project",
+                "${PWD}",
+            ],
+        )
+        source_dir = temp_dir / "plugin"
+        source_dir.mkdir()
+
+        config = adapter.generate_mcp_config(
+            mcp_server=mcp_server,
+            plugin=sample_manifest,
+            project_root=temp_dir,
+            source_dir=source_dir,
+        )
+
+        expected = {
+            "serena": {
+                "command": "uvx",
+                "args": [
+                    "--from",
+                    "git+https://github.com/oraios/serena",
+                    "serena",
+                    "start-mcp-server",
+                    "--context",
+                    "ide-assistant",
+                    "--project",
+                    "${PWD}",
+                ],
+            }
+        }
+        assert config == expected
+
+    def test_generates_http_server_config(
+        self,
+        adapter: ClaudeCodeAdapter,
+        temp_dir: Path,
+        sample_manifest: PluginManifest,
+    ):
+        """Generates config for HTTPS-based MCP server."""
+        mcp_server = MCPServerConfig(
+            name="atlassian",
+            type="http",
+            url="https://mcp.atlassian.com/v1/mcp",
+        )
+        source_dir = temp_dir / "plugin"
+        source_dir.mkdir()
+
+        config = adapter.generate_mcp_config(
+            mcp_server=mcp_server,
+            plugin=sample_manifest,
+            project_root=temp_dir,
+            source_dir=source_dir,
+        )
+
+        expected = {
+            "atlassian": {
+                "type": "http",
+                "url": "https://mcp.atlassian.com/v1/mcp",
+            }
+        }
+        assert config == expected
+
+    def test_generates_http_server_config_insecure(
+        self,
+        adapter: ClaudeCodeAdapter,
+        temp_dir: Path,
+        sample_manifest: PluginManifest,
+    ):
+        """Generates config for HTTP-based MCP server (non-HTTPS)."""
+        mcp_server = MCPServerConfig(
+            name="local-server",
+            type="http",
+            url="http://localhost:8080/mcp",
+        )
+        source_dir = temp_dir / "plugin"
+        source_dir.mkdir()
+
+        config = adapter.generate_mcp_config(
+            mcp_server=mcp_server,
+            plugin=sample_manifest,
+            project_root=temp_dir,
+            source_dir=source_dir,
+        )
+
+        expected = {
+            "local-server": {
+                "type": "http",
+                "url": "http://localhost:8080/mcp",
+            }
+        }
+        assert config == expected
 
 
 class TestClaudeCodeAdapterMergeMCPConfig:

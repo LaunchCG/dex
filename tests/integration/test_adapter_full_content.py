@@ -97,22 +97,18 @@ def test_plugin_dir(temp_dir: Path) -> Path:
     # Create command context
     commands_dir = plugin_dir / "commands"
     commands_dir.mkdir()
-    (commands_dir / "lint.md").write_text(
-        "# Lint Command\n\n" "Run linting tools on the codebase.\n"
-    )
+    (commands_dir / "lint.md").write_text("# Lint Command\n\nRun linting tools on the codebase.\n")
 
     # Create agent context
     agents_dir = plugin_dir / "agents"
     agents_dir.mkdir()
-    (agents_dir / "reviewer.md").write_text(
-        "# Reviewer Agent\n\n" "Autonomous code review agent.\n"
-    )
+    (agents_dir / "reviewer.md").write_text("# Reviewer Agent\n\nAutonomous code review agent.\n")
 
     # Create instruction context
     instructions_dir = plugin_dir / "instructions"
     instructions_dir.mkdir()
     (instructions_dir / "lint-guidance.md").write_text(
-        "# Lint Guidance\n\n" "Guidelines for linting Python files.\n"
+        "# Lint Guidance\n\nGuidelines for linting Python files.\n"
     )
 
     # Create rule context
@@ -568,7 +564,9 @@ class TestDirectVsRegistryInstallation:
         direct_project_dir = temp_dir / f"direct-{agent_type}"
         direct_project_dir.mkdir()
         direct_project = Project.init(
-            direct_project_dir, agent_type, "test-project"  # type: ignore[arg-type]
+            direct_project_dir,
+            agent_type,  # type: ignore[arg-type]
+            "test-project",
         )
         direct_installer = PluginInstaller(direct_project)
         direct_installer.install(
@@ -580,7 +578,9 @@ class TestDirectVsRegistryInstallation:
         registry_project_dir = temp_dir / f"registry-{agent_type}"
         registry_project_dir.mkdir()
         registry_project = Project.init(
-            registry_project_dir, agent_type, "test-project"  # type: ignore[arg-type]
+            registry_project_dir,
+            agent_type,  # type: ignore[arg-type]
+            "test-project",
         )
         registry_project._config.registries["local"] = f"file://{test_registry}"
         registry_project._config.default_registry = "local"

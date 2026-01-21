@@ -156,56 +156,59 @@ class TestSubAgentConfig:
 class TestMCPServerConfig:
     """Tests for MCPServerConfig model."""
 
-    def test_valid_bundled_server(self):
-        """Create a valid bundled MCP server."""
+    def test_valid_command_server_with_source(self):
+        """Create a valid command MCP server with source shortcut."""
         server = MCPServerConfig(
             name="test-server",
-            type="bundled",
-            path="./server.js",
-        )
-        assert server.name == "test-server"
-        assert server.type == "bundled"
-        assert server.path == "./server.js"
-
-    def test_valid_remote_server(self):
-        """Create a valid remote MCP server."""
-        server = MCPServerConfig(
-            name="test-server",
-            type="remote",
+            type="command",
             source="npm:@example/server",
         )
-        assert server.type == "remote"
+        assert server.name == "test-server"
+        assert server.type == "command"
         assert server.source == "npm:@example/server"
 
-    def test_bundled_requires_path(self):
-        """Bundled server requires path."""
-        with pytest.raises(ValidationError, match="must specify a 'path'"):
-            MCPServerConfig(name="test", type="bundled")
+    def test_valid_command_server_with_command(self):
+        """Create a valid command MCP server with direct command."""
+        server = MCPServerConfig(
+            name="test-server",
+            type="command",
+            command="docker",
+            args=["run", "-i", "--rm", "image"],
+        )
+        assert server.type == "command"
+        assert server.command == "docker"
+        assert server.args == ["run", "-i", "--rm", "image"]
 
-    def test_remote_requires_source(self):
-        """Remote server requires source."""
-        with pytest.raises(ValidationError, match="must specify a 'source'"):
-            MCPServerConfig(name="test", type="remote")
+    def test_valid_http_server(self):
+        """Create a valid HTTP MCP server."""
+        server = MCPServerConfig(
+            name="test-server",
+            type="http",
+            url="https://mcp.example.com/v1/mcp",
+        )
+        assert server.type == "http"
+        assert server.url == "https://mcp.example.com/v1/mcp"
 
-    def test_server_with_config(self):
-        """Server with additional config."""
+    def test_command_requires_source_or_command(self):
+        """Command server requires source or command."""
+        with pytest.raises(ValidationError, match="must specify 'source' or 'command'"):
+            MCPServerConfig(name="test", type="command")
+
+    def test_http_requires_url(self):
+        """HTTP server requires url."""
+        with pytest.raises(ValidationError, match="must specify 'url'"):
+            MCPServerConfig(name="test", type="http")
+
+    def test_server_with_env(self):
+        """Server with environment variables."""
         server = MCPServerConfig(
             name="test",
-            type="bundled",
-            path="./server.js",
-            config={"args": ["--port", "8080"], "env": {"DEBUG": "true"}},
+            type="command",
+            command="docker",
+            args=["run", "image"],
+            env={"API_KEY": "${API_KEY}"},
         )
-        assert server.config["args"] == ["--port", "8080"]
-
-    def test_platform_specific_path(self):
-        """Server with platform-specific paths."""
-        server = MCPServerConfig(
-            name="test",
-            type="bundled",
-            path={"windows": "./server.exe", "unix": "./server"},
-        )
-        assert isinstance(server.path, dict)
-        assert server.path["windows"] == "./server.exe"
+        assert server.env == {"API_KEY": "${API_KEY}"}
 
 
 class TestPluginManifest:

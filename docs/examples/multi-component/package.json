@@ -21,12 +21,9 @@
   "mcp_servers": [
     {
       "name": "code-analyzer",
-      "type": "bundled",
-      "path": "./servers/mcp-server.py",
-      "config": {
-        "args": ["--mode", "analyze"],
-        "env": {}
-      }
+      "type": "command",
+      "command": "python",
+      "args": ["./servers/mcp-server.py", "--mode", "analyze"]
     }
   ],
   "dependencies": {}

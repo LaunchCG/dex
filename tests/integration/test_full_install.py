@@ -45,9 +45,7 @@ def full_test_plugin(temp_dir: Path) -> Path:
     context_dir = plugin_dir / "context"
     context_dir.mkdir()
     (context_dir / "skill.md").write_text(
-        "# {{ plugin.name }} Skill\n\n"
-        "Project: {{ env.project.name }}\n"
-        "Platform: {{ platform.os }}"
+        "# {{ plugin.name }} Skill\n\nProject: {{ env.project.name }}\nPlatform: {{ platform.os }}"
     )
     (context_dir / "command.md").write_text("# Test Command\n\nThis is a command.")
 

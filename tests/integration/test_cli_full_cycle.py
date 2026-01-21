@@ -61,7 +61,7 @@ def comprehensive_plugin(temp_dir: Path) -> Path:
         "mcp_servers": [
             {
                 "name": "test-mcp-server",
-                "type": "remote",
+                "type": "command",
                 "source": "npm:@test/mcp-server",
             }
         ],

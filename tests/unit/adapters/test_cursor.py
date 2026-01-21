@@ -8,6 +8,7 @@ from dex.adapters.cursor import CursorAdapter
 from dex.config.schemas import (
     CommandConfig,
     FileTarget,
+    MCPServerConfig,
     PluginManifest,
     RuleConfig,
     SkillConfig,
@@ -309,7 +310,7 @@ class TestCursorAdapterValidatePluginCompatibility:
             name="test-plugin",
             version="1.0.0",
             description="Plugin with MCP",
-            mcp_servers=[MCPServerConfig(name="test-server", type="remote", source="npm:test")],
+            mcp_servers=[MCPServerConfig(name="test-server", type="command", source="npm:test")],
         )
 
         warnings = adapter.validate_plugin_compatibility(manifest)
@@ -351,15 +352,15 @@ class TestCursorAdapterPreInstall:
 class TestCursorAdapterMCPConfig:
     """Tests for CursorAdapter MCP configuration."""
 
-    def test_generate_mcp_config_remote_npm(
+    def test_generate_mcp_config_npm(
         self, adapter: CursorAdapter, temp_dir: Path, sample_manifest: PluginManifest
     ):
-        """Generates MCP config for remote npm package."""
+        """Generates MCP config for npm source shortcut."""
         from dex.config.schemas import MCPServerConfig
 
         mcp_server = MCPServerConfig(
             name="test-server",
-            type="remote",
+            type="command",
             source="npm:@example/mcp-server",
         )
         source_dir = temp_dir / "plugin"
@@ -383,9 +384,9 @@ class TestCursorAdapterMCPConfig:
 
         mcp_server = MCPServerConfig(
             name="test-server",
-            type="remote",
+            type="command",
             source="npm:@example/mcp-server",
-            config={"env": {"API_KEY": "${API_KEY}"}},
+            env={"API_KEY": "${API_KEY}"},
         )
         source_dir = temp_dir / "plugin"
         source_dir.mkdir()
@@ -413,6 +414,111 @@ class TestCursorAdapterMCPConfig:
 
         assert "existing-server" in result["mcpServers"]
         assert "new-server" in result["mcpServers"]
+
+    def test_generates_config_with_source_and_extra_args(
+        self,
+        adapter: CursorAdapter,
+        temp_dir: Path,
+        sample_manifest: PluginManifest,
+    ):
+        """Generates config with uvx source and additional args."""
+        mcp_server = MCPServerConfig(
+            name="serena",
+            type="command",
+            source="uvx:git+https://github.com/oraios/serena",
+            args=[
+                "serena",
+                "start-mcp-server",
+                "--context",
+                "ide-assistant",
+                "--project",
+                "${PWD}",
+            ],
+        )
+        source_dir = temp_dir / "plugin"
+        source_dir.mkdir()
+
+        config = adapter.generate_mcp_config(
+            mcp_server=mcp_server,
+            plugin=sample_manifest,
+            project_root=temp_dir,
+            source_dir=source_dir,
+        )
+
+        expected = {
+            "serena": {
+                "command": "uvx",
+                "args": [
+                    "--from",
+                    "git+https://github.com/oraios/serena",
+                    "serena",
+                    "start-mcp-server",
+                    "--context",
+                    "ide-assistant",
+                    "--project",
+                    "${PWD}",
+                ],
+            }
+        }
+        assert config == expected
+
+    def test_generates_http_server_config(
+        self,
+        adapter: CursorAdapter,
+        temp_dir: Path,
+        sample_manifest: PluginManifest,
+    ):
+        """Generates config for HTTPS-based MCP server."""
+        mcp_server = MCPServerConfig(
+            name="atlassian",
+            type="http",
+            url="https://mcp.atlassian.com/v1/mcp",
+        )
+        source_dir = temp_dir / "plugin"
+        source_dir.mkdir()
+
+        config = adapter.generate_mcp_config(
+            mcp_server=mcp_server,
+            plugin=sample_manifest,
+            project_root=temp_dir,
+            source_dir=source_dir,
+        )
+
+        expected = {
+            "atlassian": {
+                "url": "https://mcp.atlassian.com/v1/mcp",
+            }
+        }
+        assert config == expected
+
+    def test_generates_http_server_config_insecure(
+        self,
+        adapter: CursorAdapter,
+        temp_dir: Path,
+        sample_manifest: PluginManifest,
+    ):
+        """Generates config for HTTP-based MCP server (non-HTTPS)."""
+        mcp_server = MCPServerConfig(
+            name="local-server",
+            type="http",
+            url="http://localhost:8080/mcp",
+        )
+        source_dir = temp_dir / "plugin"
+        source_dir.mkdir()
+
+        config = adapter.generate_mcp_config(
+            mcp_server=mcp_server,
+            plugin=sample_manifest,
+            project_root=temp_dir,
+            source_dir=source_dir,
+        )
+
+        expected = {
+            "local-server": {
+                "url": "http://localhost:8080/mcp",
+            }
+        }
+        assert config == expected
 
 
 class TestCursorAdapterGetCommandsDirectory:

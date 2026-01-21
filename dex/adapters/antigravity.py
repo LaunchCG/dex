@@ -283,7 +283,7 @@ class AntigravityAdapter(PlatformAdapter):
 
         if plugin.sub_agents:
             warnings.append(
-                f"Plugin '{plugin.name}' has subagents which are not supported by " "Antigravity"
+                f"Plugin '{plugin.name}' has subagents which are not supported by Antigravity"
             )
 
         return warnings

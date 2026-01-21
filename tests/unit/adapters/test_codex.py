@@ -8,6 +8,7 @@ from dex.adapters.codex import CodexAdapter
 from dex.config.schemas import (
     CommandConfig,
     FileTarget,
+    MCPServerConfig,
     PluginManifest,
     RuleConfig,
     SkillConfig,
@@ -220,7 +221,7 @@ class TestCodexAdapterValidatePluginCompatibility:
             name="test-plugin",
             version="1.0.0",
             description="Plugin with MCP",
-            mcp_servers=[MCPServerConfig(name="test-server", type="remote", source="npm:test")],
+            mcp_servers=[MCPServerConfig(name="test-server", type="command", source="npm:test")],
         )
 
         warnings = adapter.validate_plugin_compatibility(manifest)
@@ -328,15 +329,15 @@ class TestCodexAdapterFilesHandling:
 class TestCodexAdapterMCPConfig:
     """Tests for CodexAdapter MCP configuration (TOML format)."""
 
-    def test_generate_mcp_config_remote_npm(
+    def test_generate_mcp_config_npm(
         self, adapter: CodexAdapter, temp_dir: Path, sample_manifest: PluginManifest
     ):
-        """Generates MCP config for remote npm package."""
+        """Generates MCP config for npm source shortcut."""
         from dex.config.schemas import MCPServerConfig
 
         mcp_server = MCPServerConfig(
             name="test-server",
-            type="remote",
+            type="command",
             source="npm:@example/mcp-server",
         )
         source_dir = temp_dir / "plugin"
@@ -352,25 +353,6 @@ class TestCodexAdapterMCPConfig:
         }
         assert config == expected
 
-    def test_generate_mcp_config_bundled_js(
-        self, adapter: CodexAdapter, temp_dir: Path, sample_manifest: PluginManifest
-    ):
-        """Generates MCP config for bundled JavaScript server."""
-        from dex.config.schemas import MCPServerConfig
-
-        mcp_server = MCPServerConfig(
-            name="bundled-server",
-            type="bundled",
-            path="./servers/server.js",
-        )
-        source_dir = temp_dir / "plugin"
-        source_dir.mkdir()
-
-        config = adapter.generate_mcp_config(mcp_server, sample_manifest, temp_dir, source_dir)
-
-        assert config["bundled-server"]["command"] == "node"
-        assert str(source_dir / "servers" / "server.js") in config["bundled-server"]["args"][0]
-
     def test_generate_mcp_config_with_env(
         self, adapter: CodexAdapter, temp_dir: Path, sample_manifest: PluginManifest
     ):
@@ -379,9 +361,9 @@ class TestCodexAdapterMCPConfig:
 
         mcp_server = MCPServerConfig(
             name="test-server",
-            type="remote",
+            type="command",
             source="npm:@example/mcp-server",
-            config={"env": {"API_KEY": "${API_KEY}"}},
+            env={"API_KEY": "${API_KEY}"},
         )
         source_dir = temp_dir / "plugin"
         source_dir.mkdir()
@@ -413,6 +395,111 @@ class TestCodexAdapterMCPConfig:
         assert "existing-server" in result["mcp_servers"]
         assert "new-server" in result["mcp_servers"]
         assert result["other_setting"] == "value"
+
+    def test_generates_config_with_source_and_extra_args(
+        self,
+        adapter: CodexAdapter,
+        temp_dir: Path,
+        sample_manifest: PluginManifest,
+    ):
+        """Generates config with uvx source and additional args."""
+        mcp_server = MCPServerConfig(
+            name="serena",
+            type="command",
+            source="uvx:git+https://github.com/oraios/serena",
+            args=[
+                "serena",
+                "start-mcp-server",
+                "--context",
+                "ide-assistant",
+                "--project",
+                "${PWD}",
+            ],
+        )
+        source_dir = temp_dir / "plugin"
+        source_dir.mkdir()
+
+        config = adapter.generate_mcp_config(
+            mcp_server=mcp_server,
+            plugin=sample_manifest,
+            project_root=temp_dir,
+            source_dir=source_dir,
+        )
+
+        expected = {
+            "serena": {
+                "command": "uvx",
+                "args": [
+                    "--from",
+                    "git+https://github.com/oraios/serena",
+                    "serena",
+                    "start-mcp-server",
+                    "--context",
+                    "ide-assistant",
+                    "--project",
+                    "${PWD}",
+                ],
+            }
+        }
+        assert config == expected
+
+    def test_generates_http_server_config(
+        self,
+        adapter: CodexAdapter,
+        temp_dir: Path,
+        sample_manifest: PluginManifest,
+    ):
+        """Generates config for HTTPS-based MCP server."""
+        mcp_server = MCPServerConfig(
+            name="atlassian",
+            type="http",
+            url="https://mcp.atlassian.com/v1/mcp",
+        )
+        source_dir = temp_dir / "plugin"
+        source_dir.mkdir()
+
+        config = adapter.generate_mcp_config(
+            mcp_server=mcp_server,
+            plugin=sample_manifest,
+            project_root=temp_dir,
+            source_dir=source_dir,
+        )
+
+        expected = {
+            "atlassian": {
+                "url": "https://mcp.atlassian.com/v1/mcp",
+            }
+        }
+        assert config == expected
+
+    def test_generates_http_server_config_insecure(
+        self,
+        adapter: CodexAdapter,
+        temp_dir: Path,
+        sample_manifest: PluginManifest,
+    ):
+        """Generates config for HTTP-based MCP server (non-HTTPS)."""
+        mcp_server = MCPServerConfig(
+            name="local-server",
+            type="http",
+            url="http://localhost:8080/mcp",
+        )
+        source_dir = temp_dir / "plugin"
+        source_dir.mkdir()
+
+        config = adapter.generate_mcp_config(
+            mcp_server=mcp_server,
+            plugin=sample_manifest,
+            project_root=temp_dir,
+            source_dir=source_dir,
+        )
+
+        expected = {
+            "local-server": {
+                "url": "http://localhost:8080/mcp",
+            }
+        }
+        assert config == expected
 
 
 class TestCodexAdapterGenerateRuleFrontmatter:

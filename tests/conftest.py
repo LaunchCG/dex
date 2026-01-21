@@ -75,24 +75,23 @@ def sample_subagent_config() -> SubAgentConfig:
 
 
 @pytest.fixture
-def sample_mcp_server_bundled() -> MCPServerConfig:
-    """Sample bundled MCP server configuration."""
+def sample_mcp_server_command() -> MCPServerConfig:
+    """Sample command MCP server configuration."""
     return MCPServerConfig(
         name="test-mcp",
-        type="bundled",
-        path="./servers/server.js",
-        config={"env": {"API_KEY": "${API_KEY}"}},
+        type="command",
+        source="npm:@example/mcp-server",
+        env={"API_KEY": "${API_KEY}"},
     )
 
 
 @pytest.fixture
-def sample_mcp_server_remote() -> MCPServerConfig:
-    """Sample remote MCP server configuration."""
+def sample_mcp_server_http() -> MCPServerConfig:
+    """Sample HTTP MCP server configuration."""
     return MCPServerConfig(
-        name="test-remote-mcp",
-        type="remote",
-        source="npm:@example/mcp-server",
-        version="1.0.0",
+        name="test-http-mcp",
+        type="http",
+        url="https://mcp.example.com/v1/mcp",
     )
 
 
@@ -116,7 +115,7 @@ def sample_plugin_manifest_full(
     sample_skill_config: SkillConfig,
     sample_command_config: CommandConfig,
     sample_subagent_config: SubAgentConfig,
-    sample_mcp_server_bundled: MCPServerConfig,
+    sample_mcp_server_command: MCPServerConfig,
 ) -> PluginManifest:
     """Sample plugin manifest with all component types."""
     return PluginManifest(
@@ -126,7 +125,7 @@ def sample_plugin_manifest_full(
         skills=[sample_skill_config],
         commands=[sample_command_config],
         sub_agents=[sample_subagent_config],
-        mcp_servers=[sample_mcp_server_bundled],
+        mcp_servers=[sample_mcp_server_command],
         dependencies={"other-plugin": "^1.0.0"},
     )
 

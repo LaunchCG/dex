@@ -126,7 +126,7 @@ class TestMultiComponentExample:
         # Check MCP server
         assert len(manifest.mcp_servers) == 1
         assert manifest.mcp_servers[0].name == "code-analyzer"
-        assert manifest.mcp_servers[0].type == "bundled"
+        assert manifest.mcp_servers[0].type == "command"
 
     def test_plugin_can_load(self, plugin_dir: Path) -> None:
         """Verify the plugin can be loaded."""
