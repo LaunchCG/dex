@@ -1,0 +1,15 @@
+{
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "serena",
+    "context7",
+    "github"
+  ],
+  "permissions": {
+    "allow": [
+      "mcp__serena",
+      "mcp__context7",
+      "mcp__github"
+    ]
+  }
+}

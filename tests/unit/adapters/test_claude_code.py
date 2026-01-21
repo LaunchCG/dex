@@ -6,6 +6,7 @@ import pytest
 
 from dex.adapters.claude_code import ClaudeCodeAdapter
 from dex.config.schemas import (
+    ClaudeSettingsConfig,
     CommandConfig,
     FileTarget,
     MCPServerConfig,
@@ -1099,3 +1100,166 @@ class TestClaudeCodeAdapterPlatformSpecificFiles:
         src_path = list(plan.files_to_copy.keys())[0]
         assert "run.claude_code.sh" in str(src_path)
         assert "{claude_code,cursor}" not in str(src_path)
+
+
+class TestClaudeCodeAdapterGetClaudeSettingsPath:
+    """Tests for ClaudeCodeAdapter.get_claude_settings_path()."""
+
+    def test_returns_settings_path(self, adapter: ClaudeCodeAdapter, temp_dir: Path):
+        """Returns .claude/settings.json path."""
+        result = adapter.get_claude_settings_path(temp_dir)
+        assert result == temp_dir / ".claude" / "settings.json"
+
+
+class TestClaudeCodeAdapterGenerateClaudeSettingsConfig:
+    """Tests for ClaudeCodeAdapter.generate_claude_settings_config()."""
+
+    def test_generates_config_with_allow(
+        self, adapter: ClaudeCodeAdapter, temp_dir: Path, sample_manifest: PluginManifest
+    ):
+        """Generates config with allow permissions."""
+        claude_settings = ClaudeSettingsConfig(
+            allow=["mcp__serena", "mcp__github"],
+        )
+
+        config = adapter.generate_claude_settings_config(
+            claude_settings, sample_manifest, temp_dir
+        )
+
+        expected = {
+            "permissions": {
+                "allow": ["mcp__serena", "mcp__github"],
+            }
+        }
+        assert config == expected
+
+    def test_generates_config_with_deny(
+        self, adapter: ClaudeCodeAdapter, temp_dir: Path, sample_manifest: PluginManifest
+    ):
+        """Generates config with deny permissions."""
+        claude_settings = ClaudeSettingsConfig(
+            deny=["Bash(curl:*)", "WebFetch"],
+        )
+
+        config = adapter.generate_claude_settings_config(
+            claude_settings, sample_manifest, temp_dir
+        )
+
+        expected = {
+            "permissions": {
+                "deny": ["Bash(curl:*)", "WebFetch"],
+            }
+        }
+        assert config == expected
+
+    def test_generates_config_with_both(
+        self, adapter: ClaudeCodeAdapter, temp_dir: Path, sample_manifest: PluginManifest
+    ):
+        """Generates config with both allow and deny permissions."""
+        claude_settings = ClaudeSettingsConfig(
+            allow=["mcp__serena"],
+            deny=["Bash(rm:*)"],
+        )
+
+        config = adapter.generate_claude_settings_config(
+            claude_settings, sample_manifest, temp_dir
+        )
+
+        expected = {
+            "permissions": {
+                "allow": ["mcp__serena"],
+                "deny": ["Bash(rm:*)"],
+            }
+        }
+        assert config == expected
+
+    def test_generates_empty_config_when_no_permissions(
+        self, adapter: ClaudeCodeAdapter, temp_dir: Path, sample_manifest: PluginManifest
+    ):
+        """Returns empty dict when no permissions specified."""
+        claude_settings = ClaudeSettingsConfig()
+
+        config = adapter.generate_claude_settings_config(
+            claude_settings, sample_manifest, temp_dir
+        )
+
+        assert config == {}
+
+
+class TestClaudeCodeAdapterMergeClaudeSettingsConfig:
+    """Tests for ClaudeCodeAdapter.merge_claude_settings_config()."""
+
+    def test_creates_permissions_section(self, adapter: ClaudeCodeAdapter):
+        """Creates permissions section if not present."""
+        existing: dict[str, object] = {}
+        new_entries = {"permissions": {"allow": ["mcp__serena"]}}
+
+        result = adapter.merge_claude_settings_config(existing, new_entries)
+
+        assert "permissions" in result
+        assert "allow" in result["permissions"]
+        assert "mcp__serena" in result["permissions"]["allow"]
+
+    def test_merges_with_existing_permissions(self, adapter: ClaudeCodeAdapter):
+        """Merges with existing permissions."""
+        existing = {"permissions": {"allow": ["mcp__existing"]}}
+        new_entries = {"permissions": {"allow": ["mcp__new"]}}
+
+        result = adapter.merge_claude_settings_config(existing, new_entries)
+
+        assert "mcp__existing" in result["permissions"]["allow"]
+        assert "mcp__new" in result["permissions"]["allow"]
+
+    def test_deduplicates_permissions(self, adapter: ClaudeCodeAdapter):
+        """De-duplicates permission entries."""
+        existing = {"permissions": {"allow": ["mcp__serena", "mcp__github"]}}
+        new_entries = {"permissions": {"allow": ["mcp__serena", "mcp__new"]}}
+
+        result = adapter.merge_claude_settings_config(existing, new_entries)
+
+        # Should have 3 unique entries, not 4
+        assert len(result["permissions"]["allow"]) == 3
+        assert result["permissions"]["allow"].count("mcp__serena") == 1
+
+    def test_preserves_other_settings(self, adapter: ClaudeCodeAdapter):
+        """Preserves other settings in config."""
+        existing = {
+            "enableAllProjectMcpServers": True,
+            "otherSetting": "value",
+            "permissions": {"allow": ["existing"]},
+        }
+        new_entries = {"permissions": {"allow": ["new"]}}
+
+        result = adapter.merge_claude_settings_config(existing, new_entries)
+
+        assert result["enableAllProjectMcpServers"] is True
+        assert result["otherSetting"] == "value"
+
+    def test_returns_existing_when_no_new_permissions(self, adapter: ClaudeCodeAdapter):
+        """Returns existing config unchanged when no new permissions."""
+        existing = {"enableAllProjectMcpServers": True}
+        new_entries: dict[str, object] = {}
+
+        result = adapter.merge_claude_settings_config(existing, new_entries)
+
+        assert result == existing
+
+    def test_merges_deny_permissions(self, adapter: ClaudeCodeAdapter):
+        """Merges deny permissions correctly."""
+        existing = {"permissions": {"deny": ["Bash(rm:*)"]}}
+        new_entries = {"permissions": {"deny": ["Bash(curl:*)"]}}
+
+        result = adapter.merge_claude_settings_config(existing, new_entries)
+
+        assert "Bash(rm:*)" in result["permissions"]["deny"]
+        assert "Bash(curl:*)" in result["permissions"]["deny"]
+
+    def test_preserves_order(self, adapter: ClaudeCodeAdapter):
+        """Preserves order of existing entries while de-duplicating."""
+        existing = {"permissions": {"allow": ["a", "b", "c"]}}
+        new_entries = {"permissions": {"allow": ["b", "d"]}}
+
+        result = adapter.merge_claude_settings_config(existing, new_entries)
+
+        # Order should be: existing (a, b, c), then new non-duplicates (d)
+        assert result["permissions"]["allow"] == ["a", "b", "c", "d"]

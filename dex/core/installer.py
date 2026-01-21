@@ -185,10 +185,13 @@ class PluginInstaller:
 
         # Install each plugin
         mcp_configs: dict[str, Any] = {}
+        claude_settings_entries: dict[str, Any] = {}
         installed_manifests: list[PluginManifest] = []
 
         for name, spec, resolved in resolved_plugins:
-            result = self._install_single_plugin(name, spec, resolved, mcp_configs)
+            result = self._install_single_plugin(
+                name, spec, resolved, mcp_configs, claude_settings_entries
+            )
             summary.results.append(result)
 
             if result.success and update_lockfile:
@@ -209,6 +212,13 @@ class PluginInstaller:
         if mcp_configs:
             logger.info("Updating MCP config with %d server(s)", len(mcp_configs))
             self._update_mcp_config(mcp_configs)
+            # Enable all project MCP servers in settings when MCP servers are installed
+            self._set_enable_all_project_mcp_servers()
+
+        # Update Claude settings config if any permission entries were collected
+        if claude_settings_entries:
+            logger.info("Updating Claude settings config with permission entries")
+            self._update_claude_settings_config(claude_settings_entries)
 
         # Post-install hook
         self.adapter.post_install(self.project.root, installed_manifests)
@@ -334,6 +344,7 @@ class PluginInstaller:
         spec: PluginSpec,
         resolved: ResolvedPackage,
         mcp_configs: dict[str, Any],
+        claude_settings_entries: dict[str, Any],
     ) -> InstallResult:
         """Install a single plugin."""
         # Track which plugin we're installing for manifest
@@ -444,6 +455,29 @@ class PluginInstaller:
                 mcp_configs.update(mcp_entry)
                 # Track which plugin added this server
                 self.manifest_manager.add_mcp_server(name, mcp_server.name)
+
+            # Collect claude_settings and track in manifest
+            if manifest.claude_settings:
+                settings_entry = self.adapter.generate_claude_settings_config(
+                    manifest.claude_settings, manifest, self.project.root
+                )
+                # Deep merge permissions
+                if "permissions" in settings_entry:
+                    if "permissions" not in claude_settings_entries:
+                        claude_settings_entries["permissions"] = {}
+                    for key in ("allow", "deny"):
+                        if key in settings_entry["permissions"]:
+                            if key not in claude_settings_entries["permissions"]:
+                                claude_settings_entries["permissions"][key] = []
+                            claude_settings_entries["permissions"][key].extend(
+                                settings_entry["permissions"][key]
+                            )
+
+                # Track for cleanup
+                for pattern in manifest.claude_settings.allow:
+                    self.manifest_manager.add_claude_settings_allow(name, pattern)
+                for pattern in manifest.claude_settings.deny:
+                    self.manifest_manager.add_claude_settings_deny(name, pattern)
 
             # Clean up old files that are no longer used (after install so we know new files)
             self._cleanup_old_files(name, old_files)
@@ -1141,6 +1175,59 @@ class PluginInstaller:
             else:
                 json.dump(merged, f, indent=2)
                 f.write("\n")
+
+    def _set_enable_all_project_mcp_servers(self) -> None:
+        """Set enableAllProjectMcpServers in Claude settings when MCP servers are installed.
+
+        This is a dex behavior (not plugin-controlled) that ensures project MCP servers
+        are enabled when any plugin installs MCP servers.
+        """
+        settings_path = self.adapter.get_claude_settings_path(self.project.root)
+        if settings_path is None:
+            return
+
+        # Load existing config
+        existing: dict[str, Any] = {}
+        if settings_path.exists():
+            try:
+                with open(settings_path, encoding="utf-8") as f:
+                    existing = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        # Only set if not already set
+        if not existing.get("enableAllProjectMcpServers"):
+            existing["enableAllProjectMcpServers"] = True
+
+            # Save
+            ensure_directory(settings_path.parent)
+            with open(settings_path, "w", encoding="utf-8") as f:
+                json.dump(existing, f, indent=2)
+                f.write("\n")
+
+    def _update_claude_settings_config(self, settings_entries: dict[str, Any]) -> None:
+        """Update the Claude Code settings configuration file."""
+        config_path = self.adapter.get_claude_settings_path(self.project.root)
+        if config_path is None:
+            return
+
+        # Load existing config
+        existing: dict[str, Any] = {}
+        if config_path.exists():
+            try:
+                with open(config_path, encoding="utf-8") as f:
+                    existing = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        # Merge via adapter
+        merged = self.adapter.merge_claude_settings_config(existing, settings_entries)
+
+        # Save
+        ensure_directory(config_path.parent)
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(merged, f, indent=2)
+            f.write("\n")
 
     def _collect_env_warnings(self, manifests: list[PluginManifest]) -> list[str]:
         """Collect warnings about unset environment variables."""

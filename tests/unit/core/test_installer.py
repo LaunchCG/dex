@@ -326,6 +326,97 @@ class TestInstallError:
         assert str(error) == "Error message"
 
 
+class TestPluginInstallerSetEnableAllProjectMcpServers:
+    """Tests for PluginInstaller._set_enable_all_project_mcp_servers() method."""
+
+    def test_creates_settings_with_enable_flag(self, installer: PluginInstaller, temp_dir: Path):
+        """Creates settings file with enableAllProjectMcpServers."""
+        installer.project._root = temp_dir
+        claude_dir = temp_dir / ".claude"
+        claude_dir.mkdir(parents=True)
+
+        installer._set_enable_all_project_mcp_servers()
+
+        settings_path = temp_dir / ".claude" / "settings.json"
+        assert settings_path.exists()
+        settings_data = json.loads(settings_path.read_text())
+        assert settings_data.get("enableAllProjectMcpServers") is True
+
+    def test_preserves_existing_settings(self, installer: PluginInstaller, temp_dir: Path):
+        """Preserves existing settings when adding enable flag."""
+        installer.project._root = temp_dir
+        claude_dir = temp_dir / ".claude"
+        claude_dir.mkdir(parents=True)
+
+        # Create existing settings
+        existing = {"permissions": {"allow": ["mcp__existing"]}, "otherSetting": "value"}
+        settings_path = temp_dir / ".claude" / "settings.json"
+        settings_path.write_text(json.dumps(existing))
+
+        installer._set_enable_all_project_mcp_servers()
+
+        settings_data = json.loads(settings_path.read_text())
+        assert settings_data.get("enableAllProjectMcpServers") is True
+        assert settings_data.get("otherSetting") == "value"
+        assert settings_data.get("permissions") == {"allow": ["mcp__existing"]}
+
+    def test_does_not_overwrite_existing_flag(self, installer: PluginInstaller, temp_dir: Path):
+        """Does not change existing enableAllProjectMcpServers if already set."""
+        installer.project._root = temp_dir
+        claude_dir = temp_dir / ".claude"
+        claude_dir.mkdir(parents=True)
+
+        # Create existing settings with flag already set
+        existing = {"enableAllProjectMcpServers": True}
+        settings_path = temp_dir / ".claude" / "settings.json"
+        settings_path.write_text(json.dumps(existing))
+
+        installer._set_enable_all_project_mcp_servers()
+
+        settings_data = json.loads(settings_path.read_text())
+        assert settings_data.get("enableAllProjectMcpServers") is True
+
+
+class TestPluginInstallerUpdateClaudeSettingsConfig:
+    """Tests for PluginInstaller._update_claude_settings_config() method."""
+
+    def test_creates_new_settings_config(self, installer: PluginInstaller, temp_dir: Path):
+        """Creates new settings config file."""
+        installer.project._root = temp_dir
+        claude_dir = temp_dir / ".claude"
+        claude_dir.mkdir(parents=True)
+
+        settings_entries = {"permissions": {"allow": ["mcp__serena"]}}
+        installer._update_claude_settings_config(settings_entries)
+
+        settings_path = temp_dir / ".claude" / "settings.json"
+        assert settings_path.exists()
+        settings_data = json.loads(settings_path.read_text())
+        assert "permissions" in settings_data
+        assert "mcp__serena" in settings_data["permissions"]["allow"]
+
+    def test_merges_with_existing_config(self, installer: PluginInstaller, temp_dir: Path):
+        """Merges with existing settings config."""
+        installer.project._root = temp_dir
+        claude_dir = temp_dir / ".claude"
+        claude_dir.mkdir(parents=True)
+
+        # Create existing config
+        existing = {
+            "enableAllProjectMcpServers": True,
+            "permissions": {"allow": ["mcp__existing"]},
+        }
+        settings_path = temp_dir / ".claude" / "settings.json"
+        settings_path.write_text(json.dumps(existing))
+
+        installer._update_claude_settings_config({"permissions": {"allow": ["mcp__new"]}})
+
+        settings_data = json.loads(settings_path.read_text())
+        assert settings_data.get("enableAllProjectMcpServers") is True
+        assert "mcp__existing" in settings_data["permissions"]["allow"]
+        assert "mcp__new" in settings_data["permissions"]["allow"]
+
+
 class TestPluginInstallerShouldInstallComponent:
     """Tests for PluginInstaller._should_install_component() method."""
 

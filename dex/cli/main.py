@@ -468,6 +468,9 @@ def uninstall(
         # Get MCP servers to remove (before removing from manifest)
         mcp_servers_to_remove = manifest_manager.get_mcp_servers_to_remove(plugin_name)
 
+        # Get claude_settings to remove (before removing from manifest)
+        claude_settings_to_remove = manifest_manager.get_claude_settings_to_remove(plugin_name)
+
         # Remove tracked files
         if plugin_files:
             for rel_path in plugin_files.files:
@@ -521,6 +524,29 @@ def uninstall(
                         # Write updated config
                         with open(mcp_config_path, "w", encoding="utf-8") as f:
                             json.dump(mcp_config, f, indent=2)
+                            f.write("\n")
+                except (json.JSONDecodeError, OSError):
+                    pass
+
+        # Remove claude_settings from settings file
+        if any(claude_settings_to_remove.values()):
+            settings_path = adapter.get_claude_settings_path(project.root)
+            if settings_path is not None and settings_path.exists():
+                try:
+                    with open(settings_path, encoding="utf-8") as f:
+                        settings_config = json.load(f)
+
+                    if "permissions" in settings_config:
+                        for pattern in claude_settings_to_remove.get("allow", []):
+                            if pattern in settings_config["permissions"].get("allow", []):
+                                settings_config["permissions"]["allow"].remove(pattern)
+                        for pattern in claude_settings_to_remove.get("deny", []):
+                            if pattern in settings_config["permissions"].get("deny", []):
+                                settings_config["permissions"]["deny"].remove(pattern)
+
+                        # Write updated config
+                        with open(settings_path, "w", encoding="utf-8") as f:
+                            json.dump(settings_config, f, indent=2)
                             f.write("\n")
                 except (json.JSONDecodeError, OSError):
                     pass

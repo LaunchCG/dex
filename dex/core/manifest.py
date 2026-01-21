@@ -133,6 +133,41 @@ class ManifestManager:
         manifest = self.load()
         return manifest.get_mcp_servers_to_remove(plugin_name)
 
+    def add_claude_settings_allow(self, plugin_name: str, pattern: str) -> None:
+        """Record a permission allow pattern as added by a plugin.
+
+        Args:
+            plugin_name: Name of the plugin
+            pattern: The permission allow pattern
+        """
+        manifest = self.load()
+        manifest.add_claude_settings_allow(plugin_name, pattern)
+
+    def add_claude_settings_deny(self, plugin_name: str, pattern: str) -> None:
+        """Record a permission deny pattern as added by a plugin.
+
+        Args:
+            plugin_name: Name of the plugin
+            pattern: The permission deny pattern
+        """
+        manifest = self.load()
+        manifest.add_claude_settings_deny(plugin_name, pattern)
+
+    def get_claude_settings_to_remove(self, plugin_name: str) -> dict[str, list[str]]:
+        """Get settings that should be removed when uninstalling a plugin.
+
+        Returns dict with keys: 'allow', 'deny'
+        Only returns items not used by any other plugin.
+
+        Args:
+            plugin_name: Name of the plugin being uninstalled
+
+        Returns:
+            Dict with 'allow' and 'deny' lists of patterns to remove
+        """
+        manifest = self.load()
+        return manifest.get_claude_settings_to_remove(plugin_name)
+
     def remove_plugin(self, plugin_name: str) -> PluginFiles | None:
         """Remove a plugin from the manifest.
 

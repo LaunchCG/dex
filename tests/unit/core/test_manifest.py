@@ -107,6 +107,81 @@ class TestDexManifest:
         result = manifest.get_mcp_servers_to_remove("plugin-a")
         assert result == []
 
+    def test_add_claude_settings_allow(self):
+        """Records permission allow patterns by plugin."""
+        manifest = DexManifest()
+        manifest.add_claude_settings_allow("test-plugin", "mcp__serena")
+
+        assert "test-plugin" in manifest.plugins
+        assert "mcp__serena" in manifest.plugins["test-plugin"].claude_settings_allow
+
+    def test_add_claude_settings_allow_creates_plugin_entry(self):
+        """Creates plugin entry if it doesn't exist."""
+        manifest = DexManifest()
+        manifest.add_claude_settings_allow("new-plugin", "mcp__github")
+
+        assert "new-plugin" in manifest.plugins
+        assert isinstance(manifest.plugins["new-plugin"], PluginFiles)
+
+    def test_add_claude_settings_allow_no_duplicates(self):
+        """Does not add duplicate allow patterns."""
+        manifest = DexManifest()
+        manifest.add_claude_settings_allow("test-plugin", "mcp__serena")
+        manifest.add_claude_settings_allow("test-plugin", "mcp__serena")
+
+        assert manifest.plugins["test-plugin"].claude_settings_allow.count("mcp__serena") == 1
+
+    def test_add_claude_settings_deny(self):
+        """Records permission deny patterns by plugin."""
+        manifest = DexManifest()
+        manifest.add_claude_settings_deny("test-plugin", "Bash(curl:*)")
+
+        assert "test-plugin" in manifest.plugins
+        assert "Bash(curl:*)" in manifest.plugins["test-plugin"].claude_settings_deny
+
+    def test_add_claude_settings_deny_no_duplicates(self):
+        """Does not add duplicate deny patterns."""
+        manifest = DexManifest()
+        manifest.add_claude_settings_deny("test-plugin", "Bash(rm:*)")
+        manifest.add_claude_settings_deny("test-plugin", "Bash(rm:*)")
+
+        assert manifest.plugins["test-plugin"].claude_settings_deny.count("Bash(rm:*)") == 1
+
+    def test_get_claude_settings_to_remove_returns_orphaned(self):
+        """Returns settings only used by the plugin being removed."""
+        manifest = DexManifest()
+        manifest.add_claude_settings_allow("plugin-a", "mcp__shared")
+        manifest.add_claude_settings_allow("plugin-a", "mcp__exclusive")
+        manifest.add_claude_settings_allow("plugin-b", "mcp__shared")
+        manifest.add_claude_settings_deny("plugin-a", "Bash(rm:*)")
+
+        result = manifest.get_claude_settings_to_remove("plugin-a")
+
+        # mcp__exclusive should be removed, mcp__shared should not
+        assert "mcp__exclusive" in result["allow"]
+        assert "mcp__shared" not in result["allow"]
+        assert "Bash(rm:*)" in result["deny"]
+
+    def test_get_claude_settings_to_remove_preserves_shared(self):
+        """Preserves settings used by other plugins."""
+        manifest = DexManifest()
+        manifest.add_claude_settings_allow("plugin-a", "mcp__shared")
+        manifest.add_claude_settings_allow("plugin-b", "mcp__shared")
+        manifest.add_claude_settings_deny("plugin-a", "shared_deny")
+        manifest.add_claude_settings_deny("plugin-b", "shared_deny")
+
+        result = manifest.get_claude_settings_to_remove("plugin-a")
+
+        assert result == {"allow": [], "deny": []}
+
+    def test_get_claude_settings_to_remove_empty_for_nonexistent(self):
+        """Returns empty lists for nonexistent plugin."""
+        manifest = DexManifest()
+
+        result = manifest.get_claude_settings_to_remove("nonexistent")
+
+        assert result == {"allow": [], "deny": []}
+
 
 class TestManifestManager:
     """Tests for ManifestManager."""
@@ -223,3 +298,33 @@ class TestManifestManager:
 
         # Should be the same object (cached)
         assert manifest1 is manifest2
+
+    def test_add_claude_settings_allow(self, temp_project: Path):
+        """Records a permission allow pattern."""
+        manager = ManifestManager(temp_project)
+        manager.add_claude_settings_allow("test-plugin", "mcp__serena")
+
+        files = manager.get_plugin_files("test-plugin")
+        assert files is not None
+        assert "mcp__serena" in files.claude_settings_allow
+
+    def test_add_claude_settings_deny(self, temp_project: Path):
+        """Records a permission deny pattern."""
+        manager = ManifestManager(temp_project)
+        manager.add_claude_settings_deny("test-plugin", "Bash(rm:*)")
+
+        files = manager.get_plugin_files("test-plugin")
+        assert files is not None
+        assert "Bash(rm:*)" in files.claude_settings_deny
+
+    def test_get_claude_settings_to_remove(self, temp_project: Path):
+        """Delegates to manifest's get_claude_settings_to_remove."""
+        manager = ManifestManager(temp_project)
+        manager.add_claude_settings_allow("plugin-a", "mcp__exclusive")
+        manager.add_claude_settings_allow("plugin-a", "mcp__shared")
+        manager.add_claude_settings_allow("plugin-b", "mcp__shared")
+
+        result = manager.get_claude_settings_to_remove("plugin-a")
+
+        assert "mcp__exclusive" in result["allow"]
+        assert "mcp__shared" not in result["allow"]

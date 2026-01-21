@@ -185,6 +185,22 @@ class PromptConfig(BaseModel):
 
 
 # =============================================================================
+# Claude Settings Models
+# =============================================================================
+
+
+class ClaudeSettingsConfig(BaseModel):
+    """Claude Code settings configuration within a plugin.
+
+    Allows plugins to contribute permission patterns to settings.json.
+    Only permissions are managed - other settings are user-controlled.
+    """
+
+    allow: list[str] = Field(default_factory=list)
+    deny: list[str] = Field(default_factory=list)
+
+
+# =============================================================================
 # MCP Server Models
 # =============================================================================
 
@@ -288,6 +304,9 @@ class PluginManifest(BaseModel):
 
     # Infrastructure
     mcp_servers: list[MCPServerConfig] = Field(default_factory=list)
+
+    # Claude Code settings (permissions)
+    claude_settings: ClaudeSettingsConfig | None = None
 
     # Agent file injection (for CLAUDE.md, AGENTS.md, etc.)
     agent_file: AgentFileConfig | None = None
@@ -460,6 +479,8 @@ class PluginFiles(BaseModel):
     files: list[str] = Field(default_factory=list)  # Relative to project root
     directories: list[str] = Field(default_factory=list)  # Relative to project root
     mcp_servers: list[str] = Field(default_factory=list)  # Server names added to .mcp.json
+    claude_settings_allow: list[str] = Field(default_factory=list)  # Permission allow patterns
+    claude_settings_deny: list[str] = Field(default_factory=list)  # Permission deny patterns
 
 
 class DexManifest(BaseModel):
@@ -517,3 +538,40 @@ class DexManifest(BaseModel):
 
         # Return servers only used by this plugin
         return [s for s in plugin_files.mcp_servers if s not in other_servers]
+
+    def add_claude_settings_allow(self, plugin_name: str, pattern: str) -> None:
+        """Record a permission allow pattern as added by a plugin."""
+        if plugin_name not in self.plugins:
+            self.plugins[plugin_name] = PluginFiles()
+        if pattern not in self.plugins[plugin_name].claude_settings_allow:
+            self.plugins[plugin_name].claude_settings_allow.append(pattern)
+
+    def add_claude_settings_deny(self, plugin_name: str, pattern: str) -> None:
+        """Record a permission deny pattern as added by a plugin."""
+        if plugin_name not in self.plugins:
+            self.plugins[plugin_name] = PluginFiles()
+        if pattern not in self.plugins[plugin_name].claude_settings_deny:
+            self.plugins[plugin_name].claude_settings_deny.append(pattern)
+
+    def get_claude_settings_to_remove(self, plugin_name: str) -> dict[str, list[str]]:
+        """Get settings that should be removed when uninstalling a plugin.
+
+        Returns dict with keys: 'allow', 'deny'
+        Only returns items not used by any other plugin.
+        """
+        plugin_files = self.plugins.get(plugin_name)
+        if not plugin_files:
+            return {"allow": [], "deny": []}
+
+        # Get patterns used by other plugins
+        other_allow: set[str] = set()
+        other_deny: set[str] = set()
+        for name, files in self.plugins.items():
+            if name != plugin_name:
+                other_allow.update(files.claude_settings_allow)
+                other_deny.update(files.claude_settings_deny)
+
+        return {
+            "allow": [p for p in plugin_files.claude_settings_allow if p not in other_allow],
+            "deny": [p for p in plugin_files.claude_settings_deny if p not in other_deny],
+        }

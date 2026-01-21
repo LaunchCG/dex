@@ -12,6 +12,7 @@ from dex.adapters.base import PlatformAdapter
 from dex.config.schemas import (  # First-class types this adapter supports; Core types this adapter supports
     AdapterMetadata,
     AgentFileConfig,
+    ClaudeSettingsConfig,
     CommandConfig,
     FileToWrite,
     InstallationPlan,
@@ -353,6 +354,54 @@ class ClaudeCodeAdapter(PlatformAdapter):
         existing_config["mcpServers"].update(new_entries)
 
         return existing_config
+
+    # =========================================================================
+    # Claude Settings Configuration
+    # =========================================================================
+
+    def get_claude_settings_path(self, project_root: Path) -> Path:
+        """Get the path to Claude Code settings.json."""
+        return self.get_base_directory(project_root) / "settings.json"
+
+    def generate_claude_settings_config(
+        self,
+        claude_settings: ClaudeSettingsConfig,
+        plugin: PluginManifest,
+        project_root: Path,
+    ) -> dict[str, Any]:
+        """Generate settings entries for permissions."""
+        result: dict[str, Any] = {}
+        if claude_settings.allow or claude_settings.deny:
+            result["permissions"] = {}
+            if claude_settings.allow:
+                result["permissions"]["allow"] = list(claude_settings.allow)
+            if claude_settings.deny:
+                result["permissions"]["deny"] = list(claude_settings.deny)
+        return result
+
+    def merge_claude_settings_config(
+        self,
+        existing_config: dict[str, Any],
+        new_entries: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Merge permissions with de-duplication, preserve other settings."""
+        result = dict(existing_config)
+
+        new_perms = new_entries.get("permissions", {})
+        if not new_perms:
+            return result
+
+        if "permissions" not in result:
+            result["permissions"] = {}
+
+        for key in ("allow", "deny"):
+            if key in new_perms:
+                existing_list = result["permissions"].get(key, [])
+                # De-duplicate while preserving order
+                merged = list(dict.fromkeys(existing_list + new_perms[key]))
+                result["permissions"][key] = merged
+
+        return result
 
     # =========================================================================
     # Frontmatter Generation

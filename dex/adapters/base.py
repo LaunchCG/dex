@@ -12,6 +12,7 @@ from typing import Any
 from dex.config.schemas import (
     AdapterMetadata,
     AgentFileConfig,
+    ClaudeSettingsConfig,
     CommandConfig,
     FileTarget,
     InstallationPlan,
@@ -465,6 +466,64 @@ class PlatformAdapter(ABC):
             Merged configuration
         """
         ...
+
+    # =========================================================================
+    # Claude Settings Configuration
+    # =========================================================================
+
+    def get_claude_settings_path(self, project_root: Path) -> Path | None:
+        """Get path to Claude settings file.
+
+        Default implementation returns None (not supported).
+        Override in adapters that support Claude settings.
+
+        Args:
+            project_root: Path to the project root
+
+        Returns:
+            Path to the settings file, or None if not supported
+        """
+        return None
+
+    def generate_claude_settings_config(
+        self,
+        claude_settings: ClaudeSettingsConfig,
+        plugin: PluginManifest,
+        project_root: Path,
+    ) -> dict[str, Any]:
+        """Generate settings entries for this platform.
+
+        Default implementation returns empty dict (not supported).
+        Override in adapters that support Claude settings.
+
+        Args:
+            claude_settings: Claude settings configuration from the plugin manifest
+            plugin: The plugin manifest
+            project_root: Path to the project root
+
+        Returns:
+            Dictionary representing the settings config entries
+        """
+        return {}
+
+    def merge_claude_settings_config(
+        self,
+        existing_config: dict[str, Any],
+        new_entries: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Merge new settings into existing configuration.
+
+        Default implementation returns existing_config unchanged.
+        Override in adapters that support Claude settings.
+
+        Args:
+            existing_config: Current settings configuration
+            new_entries: New settings entries to add
+
+        Returns:
+            Merged configuration
+        """
+        return existing_config
 
     # =========================================================================
     # Frontmatter Generation
