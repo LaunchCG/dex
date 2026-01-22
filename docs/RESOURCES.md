@@ -7,7 +7,7 @@ Dex uses HCL (HashiCorp Configuration Language) to define resources that are ins
 - [HCL Functions](#hcl-functions)
 - [Template Variables](#template-variables)
 - [File Blocks](#file-blocks)
-- [Claude Code Resources](#resources)
+- [Claude Code Resources](#claude-code-resources)
   - [claude_skill](#claude_skill)
   - [claude_command](#claude_command)
   - [claude_subagent](#claude_subagent)
@@ -15,6 +15,11 @@ Dex uses HCL (HashiCorp Configuration Language) to define resources that are ins
   - [claude_rules](#claude_rules)
   - [claude_settings](#claude_settings)
   - [claude_mcp_server](#claude_mcp_server)
+- [Cursor Resources](#cursor-resources)
+  - [cursor_rule](#cursor_rule)
+  - [cursor_rules](#cursor_rules)
+  - [cursor_command](#cursor_command)
+  - [cursor_mcp_server](#cursor_mcp_server)
 - [GitHub Copilot Resources](#github-copilot-resources)
   - [copilot_instruction](#copilot_instruction)
   - [copilot_mcp_server](#copilot_mcp_server)
@@ -137,7 +142,9 @@ template_file {
 
 ---
 
-## Resources
+## Claude Code Resources
+
+The following resources are available for Claude Code projects (`agentic_platform = "claude-code"`).
 
 ### claude_skill
 
@@ -170,7 +177,6 @@ Skills provide specialized knowledge or capabilities to Claude. Each skill is in
 
 ```hcl
 claude_skill "code-review" {
-  name        = "code-review"
   description = "Performs thorough code reviews focusing on correctness and maintainability"
 
   content = <<-EOT
@@ -187,7 +193,6 @@ claude_skill "code-review" {
 
 ```hcl
 claude_skill "testing" {
-  name        = "testing"
   description = "Helps write comprehensive tests using pytest"
   content     = file("skills/testing.md")
 }
@@ -197,7 +202,6 @@ claude_skill "testing" {
 
 ```hcl
 claude_skill "data-validation" {
-  name        = "data-validation"
   description = "Validates JSON data against schemas"
   content     = file("skills/data-validation.md")
 
@@ -220,7 +224,6 @@ claude_skill "data-validation" {
 
 ```hcl
 claude_skill "deployment" {
-  name        = "deployment"
   description = "Guides deployment to configured environment"
   content     = templatefile("skills/deployment.md.tmpl", {
     environment = "production"
@@ -233,7 +236,6 @@ claude_skill "deployment" {
 
 ```hcl
 claude_skill "file-analyzer" {
-  name          = "file-analyzer"
   description   = "Analyzes a specific file for issues and improvements"
   argument_hint = "[filename]"
 
@@ -254,7 +256,6 @@ claude_skill "file-analyzer" {
 
 ```hcl
 claude_skill "internal-helper" {
-  name           = "internal-helper"
   description    = "Internal skill used by other skills"
   user_invocable = false
 
@@ -269,7 +270,6 @@ claude_skill "internal-helper" {
 
 ```hcl
 claude_skill "codebase-explorer" {
-  name        = "codebase-explorer"
   description = "Explores the codebase to answer architectural questions"
   context     = "fork"
   agent       = "Explore"
@@ -289,7 +289,6 @@ claude_skill "codebase-explorer" {
 
 ```hcl
 claude_skill "dangerous-operations" {
-  name                     = "dangerous-operations"
   description              = "Performs potentially destructive operations - use with caution"
   disable_model_invocation = true
 
@@ -333,7 +332,6 @@ Commands are user-invokable actions accessible via `/{name}` syntax. Each comman
 
 ```hcl
 claude_command "test" {
-  name        = "test"
   description = "Run project tests"
 
   content = <<-EOT
@@ -349,7 +347,6 @@ claude_command "test" {
 
 ```hcl
 claude_command "deploy" {
-  name          = "deploy"
   description   = "Deploy the application to a specified environment"
   argument_hint = "[environment]"
 
@@ -370,7 +367,6 @@ claude_command "deploy" {
 
 ```hcl
 claude_command "migrate" {
-  name        = "migrate"
   description = "Run database migrations"
   content     = file("commands/migrate.md")
 
@@ -409,7 +405,6 @@ Subagents are specialized agents that can be spawned by Claude for specific task
 
 ```hcl
 claude_subagent "test-runner" {
-  name        = "test-runner"
   description = "Runs tests and reports results. Use when you need to verify code changes."
 
   content = <<-EOT
@@ -430,7 +425,6 @@ claude_subagent "test-runner" {
 
 ```hcl
 claude_subagent "code-reviewer" {
-  name        = "code-reviewer"
   description = "Reviews code for quality, security, and best practices"
   content     = file("agents/code-reviewer.md")
 
@@ -466,7 +460,6 @@ Rules are merged into the project's `CLAUDE.md` file. Multiple plugins can contr
 
 ```hcl
 claude_rule "no-console-log" {
-  name        = "no-console-log"
   description = "Avoid console.log in production code"
 
   content = <<-EOT
@@ -480,7 +473,6 @@ claude_rule "no-console-log" {
 
 ```hcl
 claude_rule "typescript-strict" {
-  name        = "typescript-strict"
   description = "TypeScript strict mode requirements"
 
   content = <<-EOT
@@ -518,7 +510,6 @@ A standalone rules file owned by a single plugin. Installed to `.claude/rules/{p
 
 ```hcl
 claude_rules "security" {
-  name        = "security"
   description = "Security best practices for web applications"
   content     = file("rules/security.md")
   paths       = ["**/*.ts", "**/*.js"]
@@ -567,7 +558,6 @@ Settings are merged into `.claude/settings.json`. Multiple plugins can contribut
 
 ```hcl
 claude_settings "node-tools" {
-  name = "node-tools"
 
   allow = [
     "Bash(npm:*)",
@@ -585,7 +575,6 @@ claude_settings "node-tools" {
 
 ```hcl
 claude_settings "project" {
-  name = "project"
 
   allow = ["Bash(docker:*)"]
   deny  = ["Bash(rm -rf /)"]
@@ -625,7 +614,6 @@ MCP servers provide additional tools and capabilities to Claude. Configurations 
 
 ```hcl
 claude_mcp_server "filesystem" {
-  name    = "filesystem"
   type    = "command"
   command = "npx"
   args    = ["-y", "@anthropic/mcp-filesystem"]
@@ -640,7 +628,6 @@ claude_mcp_server "filesystem" {
 
 ```hcl
 claude_mcp_server "postgres" {
-  name   = "postgres"
   type   = "command"
   source = "uvx:mcp-postgres"
 
@@ -654,7 +641,6 @@ claude_mcp_server "postgres" {
 
 ```hcl
 claude_mcp_server "remote-api" {
-  name        = "remote-api"
   description = "Remote API integration server"
   type        = "http"
   url         = "https://mcp.example.com/api"
@@ -665,10 +651,202 @@ claude_mcp_server "remote-api" {
 
 ```hcl
 claude_mcp_server "serena" {
-  name    = "serena"
   type    = "command"
   command = "uvx"
   args    = ["--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server"]
+}
+```
+
+---
+
+## Cursor Resources
+
+The following resources are available for Cursor projects (`agentic_platform = "cursor"`).
+
+### cursor_rule
+
+Rules (singular) are merged into the project's `AGENTS.md` file. Multiple plugins can contribute rules which are combined together using marker comments.
+
+#### Attributes
+
+| Attribute | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | yes | Block label identifying this rule |
+| `description` | string | yes | Explains what this rule provides |
+| `content` | string | yes | The rule content |
+
+#### Examples
+
+**Global rule:**
+
+```hcl
+cursor_rule "coding-standards" {
+  description = "Project coding standards"
+
+  content = <<-EOT
+    Always follow these coding standards:
+    - Use TypeScript strict mode
+    - Prefer async/await over callbacks
+    - Document all public APIs
+  EOT
+}
+```
+
+---
+
+### cursor_rules
+
+A standalone rules file owned by a single plugin. Installed to `.cursor/rules/{plugin}-{name}.mdc`.
+
+#### Attributes
+
+| Attribute | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | yes | Rules file identifier |
+| `description` | string | yes | Rules description |
+| `content` | string | yes | Rules content |
+| `globs` | list(string) | no | File patterns for selective application |
+| `always_apply` | bool | no | Whether the rule should always be applied |
+
+#### Nested Blocks
+
+- `file` - Static files to copy alongside the rules
+- `template_file` - Template files to render and copy
+
+#### Examples
+
+**Path-scoped rules:**
+
+```hcl
+cursor_rules "typescript" {
+  description = "TypeScript best practices"
+  globs       = ["**/*.ts", "**/*.tsx"]
+
+  content = <<-EOT
+    When writing TypeScript:
+    - Always use explicit types, avoid `any`
+    - Use strict null checks
+    - Prefer interfaces over type aliases for object shapes
+  EOT
+}
+```
+
+**Always-applied rules:**
+
+```hcl
+cursor_rules "security" {
+  description  = "Security best practices"
+  always_apply = true
+  content      = file("rules/security.md")
+}
+```
+
+---
+
+### cursor_command
+
+Commands are user-invokable actions accessible via `/{name}` syntax. Each command is installed to `.cursor/commands/{plugin}-{name}.md`.
+
+#### Attributes
+
+| Attribute | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | yes | Command name (invoked as `/{name}`) |
+| `description` | string | yes | Brief description shown to user |
+| `content` | string | yes | Command instructions |
+
+#### Nested Blocks
+
+- `file` - Static files to copy alongside the command
+- `template_file` - Template files to render and copy
+
+#### Examples
+
+**Simple command:**
+
+```hcl
+cursor_command "test" {
+  description = "Run project tests"
+
+  content = <<-EOT
+    Run the project's test suite:
+    1. Identify the test framework (pytest, jest, go test, etc.)
+    2. Run all tests
+    3. Report results and any failures
+  EOT
+}
+```
+
+**Command with helper files:**
+
+```hcl
+cursor_command "migrate" {
+  description = "Run database migrations"
+  content     = file("commands/migrate.md")
+
+  file {
+    src   = "scripts/migrate.sh"
+    chmod = "755"
+  }
+}
+```
+
+---
+
+### cursor_mcp_server
+
+MCP servers provide additional tools and capabilities to Cursor. Configurations are merged into `.cursor/mcp.json`.
+
+#### Attributes
+
+| Attribute | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | yes | Server identifier |
+| `description` | string | no | Server description |
+| `type` | string | yes | Server type: `stdio`, `http`, or `sse` |
+| `command` | string | conditional | Command to run (required for `type = "stdio"`) |
+| `args` | list(string) | no | Command-line arguments |
+| `env` | map(string) | no | Environment variables |
+| `env_file` | string | no | Path to an env file to load |
+| `url` | string | conditional | HTTP/SSE endpoint (required for `type = "http"` or `type = "sse"`) |
+| `headers` | map(string) | no | HTTP headers for http/sse servers |
+
+#### Examples
+
+**Stdio-based MCP server:**
+
+```hcl
+cursor_mcp_server "filesystem" {
+  type    = "stdio"
+  command = "npx"
+  args    = ["-y", "@anthropic/mcp-filesystem"]
+
+  env = {
+    HOME = env("HOME")
+  }
+}
+```
+
+**HTTP-based MCP server:**
+
+```hcl
+cursor_mcp_server "context7" {
+  description = "Context7 documentation server"
+  type        = "http"
+  url         = "https://mcp.context7.com/mcp"
+}
+```
+
+**SSE-based MCP server:**
+
+```hcl
+cursor_mcp_server "realtime" {
+  type    = "sse"
+  url     = "https://api.example.com/events"
+
+  headers = {
+    Authorization = "Bearer ${env("API_TOKEN")}"
+  }
 }
 ```
 
@@ -701,7 +879,6 @@ Instructions (singular) are merged into the project's `.github/copilot-instructi
 
 ```hcl
 copilot_instruction "coding-standards" {
-  name        = "coding-standards"
   description = "Project coding standards"
 
   content = <<-EOT
@@ -739,7 +916,6 @@ MCP servers provide additional tools and capabilities to GitHub Copilot. Configu
 
 ```hcl
 copilot_mcp_server "filesystem" {
-  name    = "filesystem"
   type    = "stdio"
   command = "npx"
   args    = ["-y", "@anthropic/mcp-filesystem"]
@@ -754,7 +930,6 @@ copilot_mcp_server "filesystem" {
 
 ```hcl
 copilot_mcp_server "context7" {
-  name        = "context7"
   description = "Context7 documentation server"
   type        = "http"
   url         = "https://mcp.context7.com/mcp"
@@ -785,7 +960,6 @@ Standalone instruction files owned by a single plugin. Installed to `.github/ins
 
 ```hcl
 copilot_instructions "typescript" {
-  name        = "typescript"
   description = "TypeScript best practices"
   apply_to    = "**/*.ts"
 
@@ -827,7 +1001,6 @@ Prompts are user-invokable actions in GitHub Copilot. Each prompt is installed t
 
 ```hcl
 copilot_prompt "review" {
-  name        = "review"
   description = "Review code for issues"
   agent       = "ask"
 
@@ -845,7 +1018,6 @@ copilot_prompt "review" {
 
 ```hcl
 copilot_prompt "refactor" {
-  name        = "refactor"
   description = "Refactor code to improve quality"
   agent       = "edit"
   model       = "gpt-4o"
@@ -890,7 +1062,6 @@ Agents are specialized agents that can be used by GitHub Copilot for specific ta
 
 ```hcl
 copilot_agent "test-runner" {
-  name        = "test-runner"
   description = "Runs tests and reports results"
 
   content = <<-EOT
@@ -910,7 +1081,6 @@ copilot_agent "test-runner" {
 
 ```hcl
 copilot_agent "planner" {
-  name        = "planner"
   description = "Creates implementation plans"
 
   content = <<-EOT
@@ -948,7 +1118,6 @@ Skills provide specialized knowledge or capabilities to GitHub Copilot. Each ski
 
 ```hcl
 copilot_skill "testing" {
-  name        = "testing"
   description = "Best practices for writing comprehensive tests"
 
   content = <<-EOT
@@ -965,7 +1134,6 @@ copilot_skill "testing" {
 
 ```hcl
 copilot_skill "data-validation" {
-  name        = "data-validation"
   description = "Validates JSON data against schemas"
   content     = file("skills/data-validation.md")
 
@@ -1033,19 +1201,16 @@ variable "test_framework" {
 }
 
 claude_skill "python-best-practices" {
-  name        = "python-best-practices"
   description = "Python coding standards and best practices"
   content     = file("skills/python-best-practices.md")
 }
 
 claude_command "test" {
-  name        = "test"
   description = "Run Python tests"
   content     = file("commands/test.md")
 }
 
 claude_settings "python" {
-  name = "python"
 
   allow = [
     "Bash(python:*)",
@@ -1059,7 +1224,6 @@ claude_settings "python" {
 }
 
 claude_mcp_server "python-lsp" {
-  name    = "python-lsp"
   type    = "command"
   source  = "pip:python-lsp-server"
 }

@@ -1,14 +1,16 @@
-.PHONY: build test test-cover fmt vet lint clean install help
+.PHONY: build test test-cover fmt vet lint clean install install-user help
 
 BINARY_NAME := dex
 GOPATH := $(shell go env GOPATH)
+BIN_DIR := bin
 
 # Default target
 all: build
 
-## build: Build the CLI binary to ./dex
+## build: Build the CLI binary to bin/dex
 build:
-	go build -o $(BINARY_NAME) ./cmd/dex
+	@mkdir -p $(BIN_DIR)
+	go build -o $(BIN_DIR)/$(BINARY_NAME) ./cmd/dex
 
 ## test: Run all tests
 test:
@@ -33,12 +35,19 @@ lint: fmt vet
 
 ## clean: Remove built binary and coverage files
 clean:
-	rm -f $(BINARY_NAME)
+	rm -rf $(BIN_DIR)
 	rm -f coverage.out coverage.html
 
 ## install: Install binary to GOPATH/bin
 install: build
-	cp $(BINARY_NAME) $(GOPATH)/bin/
+	cp $(BIN_DIR)/$(BINARY_NAME) $(GOPATH)/bin/
+
+## install-user: Install binary to ~/.bin
+install-user: build
+	@mkdir -p $(HOME)/.bin
+	cp $(BIN_DIR)/$(BINARY_NAME) $(HOME)/.bin/
+	@echo "Installed to $(HOME)/.bin/$(BINARY_NAME)"
+	@echo "Make sure $(HOME)/.bin is in your PATH"
 
 ## help: Show this help message
 help:

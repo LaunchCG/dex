@@ -1,545 +1,344 @@
 # Plugin Development
 
-Plugins are the core of Dex. They contain skills, commands, sub-agents, and MCP server configurations that extend AI coding assistants.
-
-## Platform Mapping
-
-Each component type maps to different locations and formats depending on the target platform:
-
-### Skills
-
-| Platform | Location | Format |
-|----------|----------|--------|
-| Claude Code | `.claude/skills/{plugin}-{skill}/SKILL.md` | YAML frontmatter (name, description) |
-| Cursor | ❌ Not supported | - |
-| GitHub Copilot | `.github/skills/{skill}/SKILL.md` | YAML frontmatter (name, description) |
-| Codex | `.codex/skills/{skill}/SKILL.md` | YAML frontmatter (name, description, allowed-tools, license) |
-| Antigravity | `.agent/skills/{skill}/SKILL.md` | YAML frontmatter (name, description) |
-
-### Commands
-
-| Platform | Location | Format |
-|----------|----------|--------|
-| Claude Code | `.claude/commands/{plugin}-{command}.md` | YAML frontmatter (argument_hint, allowed_tools, model) |
-| Cursor | `.cursor/commands/{plugin}-{command}.md` | Plain markdown (no frontmatter) |
-| GitHub Copilot | `.github/instructions/{command}.instructions.md` | YAML frontmatter (applyTo, excludeAgent) |
-| GitHub Copilot | `.github/prompts/{command}.prompt.md` | Plain markdown (set `copilot_mode: "prompt"`) |
-| Codex | ❌ Not supported (use AGENTS.md) | - |
-| Antigravity | ❌ Not supported | - |
-
-### Sub-agents
-
-| Platform | Location | Format |
-|----------|----------|--------|
-| Claude Code | `.claude/agents/{plugin}-{agent}.md` | YAML frontmatter (model, color, tools) |
-| Cursor | ❌ Not supported | - |
-| GitHub Copilot | `.github/agents/{agent}.agent.md` | YAML frontmatter (name, description) |
-| Codex | ❌ Not supported | - |
-| Antigravity | ❌ Not supported | - |
-
-### Instructions
-
-Instructions are file-scoped guidance that apply to specific file patterns (e.g., all Python files).
-
-| Platform | Location | Format |
-|----------|----------|--------|
-| Claude Code | ❌ Not supported | - |
-| Cursor | ❌ Not supported | - |
-| GitHub Copilot | `.github/instructions/{name}.instructions.md` | YAML frontmatter (applyTo, description, excludeAgent) |
-| Codex | ❌ Not supported | - |
-| Antigravity | ❌ Not supported | - |
-
-### Rules
-
-Rules provide project-wide guidelines and constraints.
-
-| Platform | Location | Format |
-|----------|----------|--------|
-| Claude Code | `.claude/rules/{plugin}-{rule}.md` | YAML frontmatter (paths) or plain markdown |
-| Cursor | `.cursor/rules/{plugin}-{rule}.mdc` | MDC frontmatter (description, globs, alwaysApply) |
-| GitHub Copilot | `.github/copilot-instructions.md` | Plain markdown (appended) |
-| Codex | `.codex/rules/{rule}.md` | Plain markdown (no frontmatter) |
-| Antigravity | `.agent/rules/{rule}.md` | Plain markdown (no frontmatter) |
-
-**Note:** Claude Code supports the `paths` field in rule configuration, which generates YAML frontmatter with file path patterns. If no `paths` are specified, rules are plain markdown.
-
-### Prompts
-
-Prompts are reusable prompt templates.
-
-| Platform | Location | Format |
-|----------|----------|--------|
-| Claude Code | ❌ Not supported | - |
-| Cursor | ❌ Not supported | - |
-| GitHub Copilot | `.github/prompts/{name}.prompt.md` | Plain markdown |
-| Codex | ❌ Not supported | - |
-| Antigravity | ❌ Not supported | - |
-
-### Agent File
-
-Content injected into the main agent instruction file using marker-based management.
-
-| Platform | Location | Format |
-|----------|----------|--------|
-| Claude Code | `CLAUDE.md` | Markdown with dex markers |
-| Cursor | ❌ Not supported | - |
-| GitHub Copilot | ❌ Not supported | - |
-| Codex | `AGENTS.md` | Markdown with dex markers |
-| Antigravity | ❌ Not supported | - |
-
-### MCP Servers
-
-| Platform | Location | Format |
-|----------|----------|--------|
-| Claude Code | `.mcp.json` | JSON (mcpServers object) |
-| Cursor | `.cursor/mcp.json` | JSON (mcpServers object) |
-| GitHub Copilot | `.vscode/mcp.json` | JSON (mcpServers object) |
-| Codex | `~/.codex/config.toml` | TOML (mcp_servers table, global) |
-| Antigravity | ❌ UI-only | Configured via Antigravity UI |
+Plugins are the core of Dex. They contain skills, commands, rules, agents, and MCP server configurations that extend AI coding assistants.
 
 ## Plugin Structure
 
 ```
 my-plugin/
-├── package.json          # Plugin manifest
-├── context/              # Context files (Markdown with Jinja2)
-│   ├── skill.md
-│   └── command.md
-├── files/                # Associated files
-│   └── config.json
-└── servers/              # MCP server scripts
-    └── server.js
+├── package.hcl           # Plugin manifest (required)
+├── content/              # Shared content files
+│   └── code-review.md
+├── skills/               # Skill-specific content
+│   └── testing.md
+├── commands/             # Command content
+│   └── deploy.md.tmpl
+├── rules/                # Rule content
+│   └── security.md
+└── scripts/              # Helper scripts
+    └── setup.sh
 ```
 
-## Component Feature Matrix
+## Package Manifest (package.hcl)
 
-All component types support `files` and `template_files` for bundling associated resources:
+The `package.hcl` file defines your plugin's metadata and resources using HCL syntax.
 
-| Component | `files` | `template_files` | Notes |
-|-----------|---------|------------------|-------|
-| `skills` | ✓ | ✓ | Installed to skill directory |
-| `commands` | ✓ | ✓ | Installed to command directory |
-| `sub_agents` | ✓ | ✓ | Installed to agent directory |
-| `instructions` | ✓ | ✓ | Installed to instructions directory |
-| `rules` | ✓ | ✓ | Installed to rules directory |
-| `prompts` | ✓ | ✓ | Installed to prompts directory |
-| Manifest-level | ✓ | ✓ | Installed to `.claude/files/{plugin}/` |
+```hcl
+package {
+  name        = "my-plugin"
+  version     = "1.0.0"
+  description = "A useful plugin for AI coding assistants"
+  author      = "Your Name"
+  license     = "MIT"
+  repository  = "https://github.com/owner/my-plugin"
+  platforms   = ["claude-code", "cursor", "github-copilot"]
+}
 
-## package.json Manifest
+variable "api_endpoint" {
+  description = "API endpoint URL"
+  default     = "https://api.example.com"
+}
 
-```json
-{
-  "name": "my-plugin",
-  "version": "1.0.0",
-  "description": "A useful plugin",
-  "skills": [
-    {
-      "name": "my-skill",
-      "description": "A useful skill",
-      "context": "./context/skill.md",
-      "files": [
-        {"src": "tools/calculator.py"},
-        {"src": "schemas/config.json", "dest": "schema.json"}
-      ],
-      "template_files": [
-        {"src": "templates/settings.py.j2", "dest": "settings.py"}
-      ]
-    }
-  ],
-  "commands": [
-    {
-      "name": "my-command",
-      "description": "A useful command",
-      "context": "./context/command.md"
-    }
-  ],
-  "sub_agents": [],
-  "mcp_servers": [
-    {
-      "name": "my-server",
-      "type": "bundled",
-      "path": "./servers/server.js"
-    }
-  ],
-  "files": [
-    {"src": "shared/utils.py"}
-  ],
-  "template_files": [
-    {"src": "templates/shared-config.py.j2", "dest": "config.py"}
-  ],
-  "dependencies": {
-    "other-plugin": "^1.0.0"
-  }
+claude_skill "code-review" {
+  description = "Performs thorough code reviews"
+  content     = file("skills/code-review.md")
+}
+
+claude_command "deploy" {
+  description = "Deploy the application"
+  content     = templatefile("commands/deploy.md.tmpl", {
+    environment = "production"
+  })
 }
 ```
 
-### Manifest Fields
+### Package Block
 
-#### `name` (required)
+| Attribute | Required | Description |
+|-----------|----------|-------------|
+| `name` | yes | Plugin name (lowercase, hyphens allowed) |
+| `version` | yes | Semantic version (e.g., "1.0.0") |
+| `description` | no | Human-readable description |
+| `author` | no | Plugin author |
+| `license` | no | License identifier (e.g., "MIT") |
+| `repository` | no | Source repository URL |
+| `platforms` | no | Supported platforms (empty = all) |
 
-Plugin name. Must:
-- Start with a letter or number
-- Contain only lowercase letters, numbers, hyphens, and underscores
+### Variable Block
 
-#### `version` (required)
+Variables allow users to customize plugin behavior at installation time.
 
-Semantic version string (e.g., "1.0.0", "2.0.0-beta.1").
-
-#### `description` (required)
-
-Human-readable plugin description.
-
-#### `skills`, `commands`, `sub_agents`
-
-Arrays of component configurations:
-
-```json
-{
-  "name": "component-name",
-  "description": "What this component does",
-  "context": "./path/to/context.md",
-  "files": [
-    {"src": "tools/helper.py"},
-    {"src": "schemas/config.json", "dest": "schema.json"}
-  ],
-  "template_files": [
-    {"src": "templates/config.py.j2", "dest": "config.py"}
-  ],
-  "metadata": {
-    "author": "Your Name"
-  }
+```hcl
+variable "python_version" {
+  description = "Python version to use"
+  default     = "3.11"
+  required    = false
+  env         = "PYTHON_VERSION"
 }
 ```
 
-#### `mcp_servers`
+| Attribute | Required | Description |
+|-----------|----------|-------------|
+| `name` | yes | Variable identifier (block label) |
+| `description` | no | Variable description |
+| `default` | no | Default value |
+| `required` | no | Whether user must provide a value |
+| `env` | no | Environment variable to read from |
 
-MCP server configurations:
+## HCL Functions
 
-**Bundled (local script):**
-```json
-{
-  "name": "server-name",
-  "type": "bundled",
-  "path": "./servers/server.js",
-  "config": {
-    "args": ["--port", "8080"],
-    "env": {
-      "API_KEY": "${API_KEY}"
-    }
-  }
-}
+### file()
+
+Reads the contents of a file relative to the plugin directory.
+
+```hcl
+content = file("skills/my-skill.md")
 ```
 
-**Remote (npm package):**
-```json
-{
-  "name": "server-name",
-  "type": "remote",
-  "source": "npm:@example/mcp-server",
-  "version": "1.0.0"
+### templatefile()
+
+Reads a template file and renders it with Go `text/template` syntax.
+
+```hcl
+content = templatefile("skills/my-skill.md.tmpl", {
+  project_name = "MyProject"
+  api_version  = "v2"
+})
+```
+
+### env()
+
+Reads an environment variable with an optional default value.
+
+```hcl
+env = {
+  API_KEY = env("MY_API_KEY")
+  DEBUG   = env("DEBUG", "false")
 }
 ```
 
 ## Template Variables
 
-Context files support Jinja2 templating with these variables:
+These variables are available in templates rendered via `templatefile()`:
 
-### Platform Variables
+| Variable | Description |
+|----------|-------------|
+| `{{ .ComponentDir }}` | Absolute path to the installed component directory |
+| `{{ .PluginName }}` | Name of the plugin being installed |
+| `{{ .PluginVersion }}` | Version of the plugin |
+| `{{ .ProjectRoot }}` | Absolute path to the project root |
+| `{{ .Platform }}` | Target platform (e.g., `claude-code`) |
 
-```jinja
-{{ platform.os }}    {# "windows" | "linux" | "macos" #}
-{{ platform.arch }}  {# "x64" | "arm64" | "arm" | "x86" #}
-```
-
-### Agent Variables
-
-```jinja
-{{ agent.name }}     {# "claude-code" | "cursor" | etc. #}
-```
-
-### Environment Variables
-
-```jinja
-{{ env.project.name }}   {# Project name from sdlc.json #}
-{{ env.project.root }}   {# Project root path #}
-{{ env.home }}           {# User home directory #}
-{{ env.PATH }}           {# Any environment variable #}
-```
-
-### Plugin Variables
-
-```jinja
-{{ plugin.name }}        {# Plugin name #}
-{{ plugin.version }}     {# Plugin version #}
-{{ plugin.description }} {# Plugin description #}
-```
-
-### Component Variables
-
-```jinja
-{{ component.name }}     {# Component name #}
-{{ component.type }}     {# "skill" | "command" | "sub_agent" #}
-```
-
-### Context Variables
-
-```jinja
-{{ context.root }}       {# Installation directory relative to project root #}
-```
-
-The `context.root` variable provides the path where the component is installed, relative to the project root. This is useful for referencing files that are part of the component.
-
-**Examples by component type:**
-
-| Component | `context.root` Example |
-|-----------|------------------------|
-| Skill | `.claude/skills/my-plugin-my-skill/` |
-| Command | `.claude/commands/` |
-| Sub-agent | `.claude/agents/` |
-
-**Use case: Reference a bundled script**
-
-If your skill includes a script file at `files/setup.sh`, you can reference it in the context:
+### Template Example
 
 ```markdown
-Run the setup script:
-\`\`\`bash
-{{ env.project.root }}/{{ context.root }}files/setup.sh
-\`\`\`
+# Setup for {{ .PluginName }}
+
+Install dependencies:
+
+```bash
+cd {{ .ComponentDir }}
+pip install -r requirements.txt
 ```
 
-This renders to something like:
-```markdown
-Run the setup script:
-\`\`\`bash
-/path/to/project/.claude/skills/my-plugin-my-skill/files/setup.sh
-\`\`\`
+This skill is part of {{ .PluginName }} v{{ .PluginVersion }}.
 ```
 
-## Conditional Content
+## Platform Resource Mapping
 
-Use platform conditionals for OS-specific instructions:
+Each resource type maps to different locations depending on the target platform:
 
-```jinja
-{% if platform.os is windows %}
-Use Windows-specific commands here.
-{% elif platform.os is macos %}
-Use macOS-specific commands here.
-{% else %}
-Use Linux/Unix commands here.
-{% endif %}
-```
+### Skills
 
-The `unix` test matches both Linux and macOS:
+| Platform | Location |
+|----------|----------|
+| Claude Code | `.claude/skills/{plugin}-{name}/SKILL.md` |
+| GitHub Copilot | `.github/skills/{plugin}-{name}/SKILL.md` |
+| Cursor | Not supported |
 
-```jinja
-{% if platform.os is unix %}
-This works on Linux and macOS.
-{% endif %}
-```
+### Commands
 
-## Files and Template Files
+| Platform | Location |
+|----------|----------|
+| Claude Code | `.claude/commands/{plugin}-{name}.md` |
+| Cursor | `.cursor/commands/{plugin}-{name}.md` |
+| GitHub Copilot | Not supported (use prompts) |
 
-Components can include additional files beyond the main context file:
+### Prompts
 
-### File Format
+| Platform | Location |
+|----------|----------|
+| GitHub Copilot | `.github/prompts/{plugin}-{name}.prompt.md` |
+| Claude Code | Not supported (use commands) |
+| Cursor | Not supported |
 
-Both `files` and `template_files` are arrays of file targets:
+### Agents/Subagents
 
-```json
-{
-  "files": [
-    {"src": "tools/calculator.py"},
-    {"src": "schemas/input.json", "dest": "schema.json"}
-  ],
-  "template_files": [
-    {"src": "templates/config.py.j2", "dest": "config.py"}
-  ]
+| Platform | Location |
+|----------|----------|
+| Claude Code | `.claude/agents/{plugin}-{name}.md` |
+| GitHub Copilot | `.github/agents/{plugin}-{name}.agent.md` |
+| Cursor | Not supported |
+
+### Rules (Merged)
+
+Content merged into a single file with markers.
+
+| Platform | Location |
+|----------|----------|
+| Claude Code | `CLAUDE.md` |
+| Cursor | `AGENTS.md` |
+| GitHub Copilot | `.github/copilot-instructions.md` |
+
+### Rules (Standalone)
+
+Individual rule files per plugin.
+
+| Platform | Location |
+|----------|----------|
+| Claude Code | `.claude/rules/{plugin}-{name}.md` |
+| Cursor | `.cursor/rules/{plugin}-{name}.mdc` |
+| GitHub Copilot | `.github/instructions/{plugin}-{name}.instructions.md` |
+
+### MCP Servers
+
+| Platform | Location |
+|----------|----------|
+| Claude Code | `.mcp.json` |
+| Cursor | `.cursor/mcp.json` |
+| GitHub Copilot | `.vscode/mcp.json` |
+
+## Resource Types by Platform
+
+See [resources.md](resources.md) for complete documentation of all resource types.
+
+### Claude Code Resources
+
+- `claude_skill` - Skills with specialized knowledge
+- `claude_command` - User-invokable commands (`/{name}`)
+- `claude_subagent` - Specialized agents
+- `claude_rule` - Rules merged into CLAUDE.md
+- `claude_rules` - Standalone rule files
+- `claude_settings` - Settings merged into settings.json
+- `claude_mcp_server` - MCP server configurations
+
+### Cursor Resources
+
+- `cursor_rule` - Rules merged into AGENTS.md
+- `cursor_rules` - Standalone rule files
+- `cursor_command` - User-invokable commands
+- `cursor_mcp_server` - MCP server configurations
+
+### GitHub Copilot Resources
+
+- `copilot_instruction` - Instructions merged into copilot-instructions.md
+- `copilot_instructions` - Standalone instruction files
+- `copilot_prompt` - User-invokable prompts
+- `copilot_agent` - Specialized agents
+- `copilot_skill` - Skills with specialized knowledge
+- `copilot_mcp_server` - MCP server configurations
+
+## File and Template File Blocks
+
+Resources can include additional files:
+
+### file Block
+
+Copies a static file alongside the resource.
+
+```hcl
+claude_skill "data-validation" {
+  description = "Validates JSON data against schemas"
+  content     = file("skills/data-validation.md")
+
+  file {
+    src   = "schemas/user.schema.json"
+    dest  = "schema.json"
+  }
+
+  file {
+    src   = "scripts/validate.py"
+    chmod = "755"
+  }
 }
 ```
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `src` | Yes | Path relative to plugin root |
-| `dest` | No | Destination filename (defaults to basename of `src`) |
+| Attribute | Required | Description |
+|-----------|----------|-------------|
+| `src` | yes | Source path relative to plugin root |
+| `dest` | no | Destination filename (defaults to basename) |
+| `chmod` | no | File permissions (e.g., "755") |
 
-### Files vs Template Files
+### template_file Block
 
-| Type | Rendering | Use Case |
-|------|-----------|----------|
-| `files` | Direct copy | Static files (scripts, schemas, data) |
-| `template_files` | Jinja2 rendered | Dynamic files that need platform/plugin info |
+Renders a template and copies the result.
 
-### Template File Context
+```hcl
+claude_command "setup" {
+  description = "Project setup"
+  content     = file("commands/setup.md")
 
-Template files have access to all template variables:
-
-```python
-# templates/config.py.j2
-"""Config for {{ component.name if component else 'shared' }}."""
-
-CONFIG = {
-    "plugin": "{{ plugin.name }}",
-    "version": "{{ plugin.version }}",
-    "platform": "{{ platform.os }}",
-    "agent": "{{ agent.name }}",
-}
-```
-
-**Note:** Manifest-level template files don't have a `component`, so use conditionals like `{{ component.name if component else 'fallback' }}`.
-
-## Platform-Specific File Overrides
-
-Dex supports platform-specific file overrides using file naming conventions. This works for **any file** in the plugin - context files, scripts, configs, etc.
-
-### Convention
-
-- `{filename}.{ext}` - default for all platforms
-- `{filename}.{platform}.{ext}` - platform-specific override
-- `{filename}.{platform1,platform2}.{ext}` - shared override for multiple platforms
-
-Examples:
-- `context.md` - default context
-- `context.claude_code.md` - Claude Code override
-- `config.json` - default config
-- `config.cursor.json` - Cursor-specific config
-- `setup.{codex,antigravity}.sh` - shared script for Codex + Antigravity
-
-### Platform Identifiers
-
-Use underscores (not hyphens) in file names:
-
-| Identifier | Platform |
-|------------|----------|
-| `claude_code` | Claude Code |
-| `cursor` | Cursor |
-| `codex` | OpenAI Codex |
-| `github_copilot` | GitHub Copilot |
-| `antigravity` | Antigravity |
-
-### Example Directory Structure
-
-```
-my-plugin/
-├── package.json
-├── context/
-│   ├── skill.md                          # Default for all platforms
-│   ├── skill.claude_code.md              # Claude Code only
-│   └── skill.cursor.md                   # Cursor only
-├── scripts/
-│   ├── setup.sh                          # Default script
-│   ├── setup.claude_code.sh              # Claude Code version
-│   └── setup.{codex,antigravity}.sh      # Shared for Codex + Antigravity
-└── configs/
-    ├── settings.json                     # Default config
-    └── settings.cursor.json              # Cursor-specific config
-```
-
-### Resolution Order
-
-When installing, Dex resolves files in this order:
-
-1. **Platform-specific override** (e.g., `script.claude_code.sh`)
-2. **Multi-platform override** (e.g., `script.{claude_code,cursor}.sh`)
-3. **Default file** (e.g., `script.sh`)
-
-### Usage
-
-Reference the default file path in your `package.json`:
-
-```json
-{
-  "skills": [
-    {
-      "name": "my-skill",
-      "context": "./context/skill.md",
-      "files": ["./scripts/setup.sh", "./configs/settings.json"]
+  template_file {
+    src   = "scripts/config.py.tmpl"
+    dest  = "config.py"
+    vars = {
+      api_endpoint = "https://api.example.com"
     }
-  ]
+  }
 }
 ```
 
-Dex automatically resolves to the platform-specific version during installation. You don't need to modify the manifest.
+| Attribute | Required | Description |
+|-----------|----------|-------------|
+| `src` | yes | Source template path |
+| `dest` | no | Destination filename |
+| `chmod` | no | File permissions |
+| `vars` | no | Additional template variables |
 
-## Files and Template Files
+## Cross-Platform Plugins
 
-Components can include additional files beyond the main context file:
+Create plugins that work across multiple platforms by defining resources for each:
 
-| Field | Rendering | Description |
-|-------|-----------|-------------|
-| `files` | Direct copy | Copies files as-is to the installation directory |
-| `template_files` | Jinja2 rendered | Renders files through the template engine before writing |
+```hcl
+package {
+  name      = "code-review-tools"
+  version   = "1.0.0"
+  platforms = ["claude-code", "github-copilot", "cursor"]
+}
 
-### Simple File List
+# Shared content - write once, use everywhere
+claude_skill "code-review" {
+  description = "Thorough code review capability"
+  content     = file("content/code-review.md")
+}
 
-Copy files directly without any template processing:
+copilot_skill "code-review" {
+  description = "Thorough code review capability"
+  content     = file("content/code-review.md")  # Same file!
+}
 
-```json
-{
-  "files": ["calculator.py", "requirements.txt"]
+# Platform-specific commands using templates
+claude_command "review" {
+  description = "Run code review"
+  content     = templatefile("commands/review.md.tmpl", {
+    tool_name = "Read"
+  })
+}
+
+copilot_prompt "review" {
+  description = "Run code review"
+  content     = templatefile("commands/review.md.tmpl", {
+    tool_name = "fetch"
+  })
+}
+
+cursor_command "review" {
+  description = "Run code review"
+  content     = templatefile("commands/review.md.tmpl", {
+    tool_name = "read_file"
+  })
 }
 ```
-
-### Files with Custom Destination
-
-Use src/dest format to rename files during installation:
-
-```json
-{
-  "files": [
-    {"src": "../../schemas/dora-analyst.schema.json", "dest": "schema.json"}
-  ]
-}
-```
-
-### Template Files
-
-Files declared in `template_files` are rendered through Jinja2 before writing. They have access to all template variables: `platform`, `agent`, `env`, `plugin`, `component`, and `context`.
-
-```json
-{
-  "template_files": [
-    "config.py.j2",
-    {"src": "settings.yaml.j2", "dest": "settings.yaml"}
-  ]
-}
-```
-
-### Combining Files and Template Files
-
-You can use both `files` and `template_files` in the same component:
-
-```json
-{
-  "name": "dora-metrics-calculator",
-  "description": "DORA metrics with Python calculator",
-  "context": "context/skills/enablement/dora-metrics-calculator/SKILL.md",
-  "files": [
-    "calculator.py",
-    "test_calculator.py",
-    {"src": "../../schemas/dora-analyst.schema.json", "dest": "schema.json"}
-  ],
-  "template_files": [
-    {"src": "config.py.j2", "dest": "config.py"}
-  ]
-}
-```
-
-In this example:
-- `calculator.py` and `test_calculator.py` are copied directly
-- The schema file is copied and renamed to `schema.json`
-- `config.py.j2` is rendered with Jinja2 and written as `config.py`
-
-## Custom Filters
-
-Available Jinja2 filters:
-
-| Filter | Example | Result |
-|--------|---------|--------|
-| `basename` | `{{ "/path/to/file.txt" \| basename }}` | `file.txt` |
-| `dirname` | `{{ "/path/to/file.txt" \| dirname }}` | `/path/to` |
-| `extension` | `{{ "file.txt" \| extension }}` | `.txt` |
-| `to_posix` | `{{ "path\\to\\file" \| to_posix }}` | `path/to/file` |
 
 ## Publishing Plugins
 
@@ -550,246 +349,26 @@ cd my-plugin
 tar -czvf ../my-plugin-1.0.0.tar.gz .
 ```
 
-### Adding to a Registry
+### Publishing to Git
 
-1. Copy the tarball to the registry directory
-2. Update `registry.json`:
+Simply push your plugin to a Git repository:
 
-```json
-{
-  "packages": {
-    "my-plugin": {
-      "versions": ["1.0.0"],
-      "latest": "1.0.0"
-    }
-  }
-}
+```bash
+git tag v1.0.0
+git push origin v1.0.0
 ```
 
-## Platform-Specific Metadata
+Users can install directly:
 
-Each component (skill, command, sub_agent) supports a `metadata` field for passing platform-specific configuration. Each adapter only reads the keys it recognizes; unknown keys are ignored.
-
-### Cursor Metadata
-
-Cursor rules use MDC format with frontmatter:
-
-```json
-{
-  "name": "code-style",
-  "description": "Enforce code style guidelines",
-  "context": "./skills/code-style.md",
-  "glob": "**/*.ts",
-  "always": true
-}
+```bash
+dex install git+https://github.com/owner/my-plugin.git@v1.0.0
 ```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `glob` | string | File patterns to auto-attach rule (e.g., `"**/*.py"`, `"src/**/*.ts"`) |
-| `always` | boolean | If true, applies to every chat session |
-
-**Generated frontmatter:**
-```yaml
----
-description: Enforce code style guidelines
-globs: **/*.ts
-alwaysApply: true
----
-```
-
-### Claude Code Rule Metadata
-
-Claude Code rules support file path scoping via the `paths` field:
-
-```json
-{
-  "name": "testing-rules",
-  "description": "Testing guidelines for test files",
-  "context": "./rules/testing.md",
-  "paths": ["tests/**/*.py", "**/*_test.py"]
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `paths` | string or string[] | File patterns to scope the rule (single path or array) |
-
-**Generated frontmatter (when paths specified):**
-```yaml
----
-paths:
-  - tests/**/*.py
-  - **/*_test.py
----
-```
-
-If no `paths` are specified, Claude Code rules have no frontmatter (plain markdown).
-
-### Cross-Platform Rule Example
-
-This rule works on both Claude Code and Cursor:
-
-```json
-{
-  "rules": [
-    {
-      "name": "typescript-style",
-      "description": "TypeScript coding style guidelines",
-      "context": "./rules/typescript.md",
-      "glob": "**/*.ts",
-      "paths": ["src/**/*.ts", "lib/**/*.ts"],
-      "always": false
-    }
-  ]
-}
-```
-
-When installed:
-- **Cursor**: Uses `glob` and `always` → MDC frontmatter with `globs: **/*.ts`
-- **Claude Code**: Uses `paths` → YAML frontmatter with `paths` array
-- **Codex/Antigravity**: Plain markdown (no frontmatter)
-
-### GitHub Copilot Metadata
-
-GitHub Copilot uses instruction files with optional frontmatter:
-
-```json
-{
-  "name": "python-lint",
-  "description": "Python linting instructions",
-  "context": "./commands/lint.md",
-  "metadata": {
-    "applyTo": "**/*.py",
-    "excludeAgent": "code-review"
-  }
-}
-```
-
-| Key | Type | Description |
-|-----|------|-------------|
-| `applyTo` | string | Glob pattern for auto-attachment |
-| `excludeAgent` | string | Agent to exclude (`"code-review"` or `"coding-agent"`) |
-
-**Generated frontmatter (only if `applyTo` is set):**
-```yaml
----
-applyTo: "**/*.py"
-excludeAgent: "code-review"
----
-```
-
-### Claude Code Metadata
-
-Claude Code supports rich metadata for commands and sub-agents:
-
-**Command metadata:**
-```json
-{
-  "name": "deploy",
-  "description": "Deploy to production",
-  "context": "./commands/deploy.md",
-  "metadata": {
-    "argument_hint": "[environment] [--dry-run]",
-    "allowed_tools": "Bash(deploy:*), Read",
-    "model": "sonnet"
-  }
-}
-```
-
-| Key | Type | Description |
-|-----|------|-------------|
-| `argument_hint` | string | Hint for command arguments (e.g., `"[file] [options]"`) |
-| `allowed_tools` | string/array | Tools this command can use |
-| `model` | string | Model to use (`"sonnet"`, `"haiku"`, `"opus"`) |
-
-**Sub-agent metadata:**
-```json
-{
-  "name": "reviewer",
-  "description": "Code review specialist",
-  "context": "./agents/reviewer.md",
-  "metadata": {
-    "model": "inherit",
-    "color": "green",
-    "tools": ["Read", "Grep", "Glob"]
-  }
-}
-```
-
-| Key | Type | Description |
-|-----|------|-------------|
-| `model` | string | Model to use (`"inherit"` or specific model) |
-| `color` | string | Agent color in UI (`"blue"`, `"green"`, etc.) |
-| `tools` | array/string | Tools available to this agent |
-
-### Codex Metadata
-
-Codex skills support a short description for UI:
-
-```json
-{
-  "name": "testing",
-  "description": "Comprehensive testing assistance skill",
-  "context": "./skills/testing.md",
-  "metadata": {
-    "short-description": "Help with tests"
-  }
-}
-```
-
-| Key | Type | Description |
-|-----|------|-------------|
-| `short-description` | string | Shorter description for UI display |
-
-### Cross-Platform Example
-
-This plugin works on all platforms, using platform-specific metadata:
-
-```json
-{
-  "name": "universal-plugin",
-  "version": "1.0.0",
-  "description": "Works on all platforms",
-  "skills": [
-    {
-      "name": "code-review",
-      "description": "Automated code review",
-      "context": "./skills/review.md",
-      "metadata": {
-        "globs": "**/*.{ts,js,py}",
-        "alwaysApply": false,
-        "short-description": "Review code"
-      }
-    }
-  ],
-  "commands": [
-    {
-      "name": "lint",
-      "description": "Run linting",
-      "context": "./commands/lint.md",
-      "metadata": {
-        "applyTo": "**/*.py",
-        "argument_hint": "[files...]",
-        "allowed_tools": "Bash(lint:*)"
-      }
-    }
-  ]
-}
-```
-
-When installed:
-- **Cursor**: Uses `globs` and `alwaysApply` for the rule
-- **GitHub Copilot**: Uses `applyTo` for the instruction
-- **Claude Code**: Uses `argument_hint` and `allowed_tools` for the command
-- **Codex**: Uses `short-description` for the skill
-- **Antigravity**: Uses basic skill metadata (name, description)
 
 ## Best Practices
 
 1. **Use descriptive names** - Choose clear, meaningful names for skills and commands
-2. **Document thoroughly** - Include usage examples in context files
-3. **Handle platform differences** - Test on all target platforms
-4. **Pin dependencies** - Use specific version ranges for stability
-5. **Include metadata** - Add author and category information
-6. **Cross-platform metadata** - Include metadata for all target platforms; unused keys are ignored
+2. **Document thoroughly** - Include usage examples in content files
+3. **Share content** - Use `file()` to share content across platforms
+4. **Use templates** - Use `templatefile()` for platform-specific variations
+5. **Pin dependencies** - Use specific version ranges for stability
+6. **Test on all platforms** - Verify your plugin works on each target platform

@@ -1,125 +1,123 @@
 # Configuration
 
-Dex uses two configuration files:
+Dex uses HCL (HashiCorp Configuration Language) for configuration files:
 
-- `sdlc.json` - Project configuration
-- `sdlc.lock` - Lock file for deterministic installations
+- `dex.hcl` - Project configuration
+- `dex.lock` - Lock file for deterministic installations
 
-## sdlc.json Format
+## Project Configuration (dex.hcl)
 
-```json
-{
-  "agent": "claude-code",
-  "project_name": "my-project",
-  "plugins": {
-    "plugin-a": "^1.0.0",
-    "plugin-b": {
-      "version": "~2.0.0",
-      "registry": "custom"
-    },
-    "local-plugin": {
-      "source": "file:./plugins/local"
-    }
-  },
-  "registries": {
-    "default": "file:./registry",
-    "custom": "file:/path/to/custom/registry"
-  },
-  "default_registry": "default"
+The `dex.hcl` file defines your project settings, registries, and plugins.
+
+```hcl
+project {
+  name             = "my-project"
+  agentic_platform = "claude-code"
 }
-```
 
-### Fields
-
-#### `agent` (required)
-
-The target AI agent platform. Currently supported:
-- `claude-code` - Anthropic's Claude Code CLI
-- `cursor` - Cursor IDE (planned)
-- `codex` - OpenAI Codex (planned)
-- `antigravity` - Custom agents
-
-#### `project_name` (optional)
-
-Human-readable project name. Defaults to the directory name. Used in template rendering.
-
-#### `plugins`
-
-Dictionary of plugin specifications. Keys are plugin names, values can be:
-
-**Version string:**
-```json
-"plugin-name": "^1.0.0"
-```
-
-**Plugin spec object:**
-```json
-"plugin-name": {
-  "version": "^1.0.0",
-  "registry": "custom"
+registry "internal" {
+  path = "/path/to/internal-plugins"
 }
-```
 
-**Direct source:**
-```json
-"plugin-name": {
-  "source": "file:./local-plugin"
+registry "community" {
+  url = "https://plugins.example.com"
 }
-```
 
-#### `registries`
+plugin "python-tools" {
+  registry = "community"
+  version  = "^1.0.0"
 
-Named registry URLs. Supported formats:
-- `file:///absolute/path` - Absolute path
-- `file:./relative/path` - Relative path
-- `file:../sibling/path` - Parent-relative path
-
-#### `default_registry`
-
-Name of the default registry to use when a plugin doesn't specify one.
-
-## Registry Configuration
-
-A registry is a directory containing:
-
-```
-registry/
-├── registry.json           # Package index
-├── plugin-a-1.0.0.tar.gz  # Plugin tarballs
-├── plugin-a-1.1.0.tar.gz
-└── plugin-b-2.0.0.tar.gz
-```
-
-### registry.json Format
-
-```json
-{
-  "packages": {
-    "plugin-a": {
-      "versions": ["1.0.0", "1.1.0"],
-      "latest": "1.1.0"
-    },
-    "plugin-b": {
-      "versions": ["2.0.0"],
-      "latest": "2.0.0"
-    }
+  config = {
+    python_version = "3.12"
+    test_framework = "pytest"
   }
 }
+
+plugin "custom-plugin" {
+  source  = "git+https://github.com/user/custom-plugin.git"
+  version = "v2.0.0"
+}
 ```
 
-## Lock File (sdlc.lock)
+### Project Block
 
-The lock file ensures deterministic installations:
+| Attribute | Required | Description |
+|-----------|----------|-------------|
+| `name` | no | Project name (defaults to directory name) |
+| `agentic_platform` | yes | Target AI platform |
+
+### Supported Platforms
+
+| Platform | Value |
+|----------|-------|
+| Claude Code | `claude-code` |
+| Cursor | `cursor` |
+| GitHub Copilot | `github-copilot` |
+
+### Registry Block
+
+Registries define where to fetch plugins from.
+
+| Attribute | Required | Description |
+|-----------|----------|-------------|
+| `name` | yes | Registry identifier (block label) |
+| `path` | conditional | Local filesystem path |
+| `url` | conditional | Remote URL |
+
+**Supported registry formats:**
+
+| Format | Example | Description |
+|--------|---------|-------------|
+| Local | `path = "/path/to/plugins"` | Local filesystem directory |
+| HTTPS | `url = "https://registry.example.com"` | Remote HTTP registry |
+| Git | `source = "git+https://github.com/org/repo.git"` | Git repository (in plugin block) |
+| S3 | `url = "s3://bucket/prefix"` | AWS S3 bucket |
+| Azure | `url = "az://container/prefix"` | Azure Blob Storage |
+
+### Plugin Block
+
+| Attribute | Required | Description |
+|-----------|----------|-------------|
+| `name` | yes | Plugin identifier (block label) |
+| `source` | conditional | Direct source URL |
+| `registry` | conditional | Registry name to fetch from |
+| `version` | no | Version constraint |
+| `config` | no | Plugin configuration values |
+
+**Plugin source options:**
+
+```hcl
+# From a named registry
+plugin "my-plugin" {
+  registry = "community"
+  version  = "^1.0.0"
+}
+
+# From a git repository
+plugin "my-plugin" {
+  source  = "git+https://github.com/owner/repo.git"
+  version = "v1.0.0"
+}
+
+# From local filesystem
+plugin "my-plugin" {
+  source = "file:///path/to/plugin"
+}
+```
+
+## Lock File (dex.lock)
+
+The lock file ensures deterministic installations by recording exact versions and checksums:
 
 ```json
 {
   "version": "1.0",
-  "agent": "claude-code",
+  "platform": "claude-code",
   "plugins": {
-    "plugin-a": {
-      "version": "1.1.0",
-      "resolved": "file:///path/to/registry/plugin-a-1.1.0.tar.gz",
-      "integrity": "sha512-...",
+    "python-tools": {
+      "version": "1.2.0",
+      "resolved": "https://registry.example.com/python-tools-1.2.0.tar.gz",
+      "integrity": "sha512-abc123...",
       "dependencies": {}
     }
   }
@@ -142,7 +140,7 @@ The lock file ensures deterministic installations:
 To update all plugins to their latest compatible versions:
 
 ```bash
-rm sdlc.lock
+rm dex.lock
 dex install
 ```
 
@@ -165,13 +163,33 @@ Dex supports standard semver version specifiers:
 | `<2.0.0` | Less than |
 | `latest` | Latest available version |
 
-### Caret Ranges
+### Caret Ranges (^)
+
+Allows changes that do not modify the left-most non-zero digit:
 
 - `^1.2.3` → `>=1.2.3 <2.0.0`
 - `^0.2.3` → `>=0.2.3 <0.3.0`
 - `^0.0.3` → `>=0.0.3 <0.0.4`
 
-### Tilde Ranges
+### Tilde Ranges (~)
+
+Allows patch-level changes:
 
 - `~1.2.3` → `>=1.2.3 <1.3.0`
 - `~0.2.3` → `>=0.2.3 <0.3.0`
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `DEX_DEBUG` | Enable debug output |
+
+## File Locations
+
+| File | Description |
+|------|-------------|
+| `dex.hcl` | Project configuration |
+| `dex.lock` | Lock file |
+| `.dex/` | Dex internal directory |
+| `.dex/manifest.json` | Tracks installed files |
+| `.dex/cache/` | Plugin cache (gitignored) |

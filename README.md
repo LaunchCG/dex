@@ -1,215 +1,149 @@
-Dex
-===
-Dex is an AI Context Manager for AI-augmented development tools (e.g. Claude Code, Cursor, etc)
-that provides a standardized way to define, distribute, and install capabilities across multiple AI
-agent platforms.
+# Dex
 
+Dex is a universal package manager for AI coding agents. It provides a standardized way to define, distribute, and install capabilities (skills, commands, rules, MCP servers) across multiple AI agent platforms using a single package format.
 
-### Core Principles
+## Platform Support
 
-- **Write Once, Deploy Everywhere**: Plugins are defined in a platform-agnostic format
-- **Non-Prescriptive**: Authors declare components; adapters handle platform specifics
-- **Composable**: Plugins can depend on and reference other plugins
-- **Extensible**: Support for scripts, configs, MCP servers, and arbitrary files
-- **Context-Aware**: Templating engine for platform and environment-specific variations
+| Resource Type | Claude Code | Cursor | GitHub Copilot |
+|---------------|:-----------:|:------:|:--------------:|
+| Skills | `claude_skill` | - | `copilot_skill` |
+| Commands | `claude_command` | `cursor_command` | - |
+| Prompts | - | - | `copilot_prompt` |
+| Agents | `claude_subagent` | - | `copilot_agent` |
+| Rules (merged) | `claude_rule` | `cursor_rule` | `copilot_instruction` |
+| Rules (standalone) | `claude_rules` | `cursor_rules` | `copilot_instructions` |
+| Settings | `claude_settings` | - | - |
+| MCP Servers | `claude_mcp_server` | `cursor_mcp_server` | `copilot_mcp_server` |
 
+## Installation
 
-### Supported Platforms
-
-| Feature | Claude Code | Cursor | GitHub Copilot | Codex | Antigravity |
-|---------|:-----------:|:------:|:--------------:|:-----:|:-----------:|
-| Skills | ✓ | - | ✓ | ✓ | ✓ |
-| Commands | ✓ | ✓ | - | - | - |
-| Sub-agents | ✓ | - | ✓ | - | - |
-| Rules | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Instructions | - | - | ✓ | - | - |
-| Prompts | - | - | ✓ | - | - |
-| Agent File | ✓ | - | - | ✓ | - |
-| MCP Servers | ✓ | ✓ | ✓ | ✓ | - |
-| Files | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Template Files | ✓ | ✓ | ✓ | ✓ | ✓ |
-
-**Notes:**
-- Agent File: Content injected into `CLAUDE.md` (Claude Code) or `AGENTS.md` (Codex) with markers
-- Antigravity MCP: Configured through UI only, not project-level config files
-- Files: Static files bundled with components (scripts, schemas, configs)
-- Template Files: Jinja2-rendered files for dynamic configuration
-
-See [docs/plugins.md](docs/plugins.md) for detailed platform mapping and file locations
-
-
-### Installation
-
-Run dex directly using `uvx` without installing:
+Build from source using Go:
 
 ```bash
-uvx --from git+https://github.com/launchcg/dex dex <command>
+# Clone the repository
+git clone https://github.com/launchcg/dex.git
+cd dex
+
+# Build the binary
+make build
+
+# (Optional) Install to GOPATH/bin
+make install
 ```
 
-Or install globally:
-
-```bash
-uv tool install git+https://github.com/launchcg/dex
-```
-
-
-### Quick Start
+## Quick Start
 
 ```bash
 # Initialize a project for a specific AI agent
-uvx --from git+https://github.com/launchcg/dex dex init --agent claude-code
+dex init --platform claude-code
 
 # Install a plugin from GitHub
-uvx --from git+https://github.com/launchcg/dex dex install --source git+https://github.com/owner/my-plugin.git
+dex install git+https://github.com/owner/my-plugin.git
 
 # Install from a local directory (for development)
-uvx --from git+https://github.com/launchcg/dex dex install --source /path/to/my-plugin
-
-# Install and save to dex.yaml
-uvx --from git+https://github.com/launchcg/dex dex install --source git+https://github.com/owner/my-plugin.git --save
-
-# Remove a plugin
-uvx --from git+https://github.com/launchcg/dex dex uninstall my-plugin
-
-# Remove and delete from dex.yaml
-uvx --from git+https://github.com/launchcg/dex dex uninstall my-plugin --remove
+dex install file:///path/to/my-plugin
 
 # List installed plugins
-uvx --from git+https://github.com/launchcg/dex dex list
+dex list
+
+# Uninstall a plugin
+dex uninstall my-plugin
 ```
 
+## Package Format (package.hcl)
 
-### Creating a Plugin
+Plugins are defined using HCL (HashiCorp Configuration Language). This format enables content sharing across platforms using `file()` and platform-specific variations using `templatefile()`.
 
-A plugin is a directory with a `package.json` manifest:
+### Multi-Platform Example
 
-```
-my-plugin/
-├── package.json          # Plugin manifest
-├── skills/               # Skill context files
-│   └── code-review.md
-├── rules/                # Rule context files
-│   └── code-style.md
-└── commands/             # Command context files
-    └── lint.md
-```
+This example shows a code review plugin that targets both Claude Code and GitHub Copilot, demonstrating content de-duplication:
 
-**package.json:**
-```json
-{
-  "name": "my-plugin",
-  "version": "1.0.0",
-  "description": "A useful plugin",
-  "skills": [
-    {
-      "name": "code-review",
-      "description": "Automated code review",
-      "context": "./skills/code-review.md",
-      "files": [
-        {"src": "scripts/setup.sh"},
-        {"src": "configs/settings.json", "dest": "config.json"}
-      ],
-      "template_files": [
-        {"src": "templates/review-config.py.j2", "dest": "config.py"}
-      ]
-    }
-  ],
-  "rules": [
-    {
-      "name": "code-style",
-      "description": "Code style guidelines",
-      "context": "./rules/code-style.md",
-      "glob": "**/*.py",
-      "paths": ["src/**/*.py"]
-    }
-  ]
+```hcl
+package {
+  name        = "code-review-tools"
+  version     = "1.0.0"
+  description = "Code review capabilities for AI coding agents"
+  platforms   = ["claude-code", "github-copilot"]
+}
+
+# Shared content via file() - written once, used by both platforms
+claude_skill "code-review" {
+  name        = "code-review"
+  description = "Thorough code review capability"
+  content     = file("content/code-review.md")  # Shared!
+}
+
+copilot_skill "code-review" {
+  name        = "code-review"
+  description = "Thorough code review capability"
+  content     = file("content/code-review.md")  # Same shared content!
+}
+
+# Platform-specific variations via templatefile()
+claude_command "review" {
+  name        = "review"
+  description = "Run code review on specified files"
+  content     = templatefile("commands/review.md.tmpl", {
+    tool_name = "Read"
+  })
+}
+
+copilot_prompt "review" {
+  name        = "review"
+  description = "Run code review on specified files"
+  content     = templatefile("commands/review.md.tmpl", {
+    tool_name = "fetch"
+  })
 }
 ```
 
-**File target format:**
-- `src`: Path relative to plugin root (required)
-- `dest`: Destination filename, defaults to basename of `src` (optional)
-
-### Installed Directory Structure
-
-When installed for Claude Code, skills are directories containing `SKILL.md` and any associated files:
-
-```
-project/
-└── .claude/
-    ├── skills/
-    │   └── my-plugin-code-review/
-    │       ├── SKILL.md           # Skill context with frontmatter
-    │       ├── scripts/           # Associated files preserved
-    │       │   └── setup.sh
-    │       └── configs/
-    │           └── settings.json
-    └── rules/
-        └── my-rule.md             # Rule with optional paths frontmatter
-```
-
-Other platforms have different structures - see [docs/plugins.md](docs/plugins.md) for details.
-
-
-### Platform-Specific Context Files
-
-Use file naming conventions to provide different content for different platforms:
+### Directory Structure
 
 ```
 my-plugin/
-├── context/
-│   ├── skill.md                  # Default
-│   ├── skill.claude_code.md      # Claude Code override
-│   └── skill.cursor.md           # Cursor override
+├── package.hcl           # Plugin manifest
+├── content/
+│   └── code-review.md    # Shared skill content
+└── commands/
+    └── review.md.tmpl    # Template with platform variables
 ```
 
-Dex automatically resolves to the platform-specific version during installation.
-
-
-### Template Variables
-
-Context files support Jinja2 templating, enabling shared content with client-specific customizations:
+### Template Example (commands/review.md.tmpl)
 
 ```markdown
-# Code Review Skill
+# Code Review
 
-Plugin: {{ plugin.name }} v{{ plugin.version }}
+Use the {{ .tool_name }} tool to examine the specified files.
 
-## Common Guidelines
-
-These guidelines apply to all platforms:
-- Follow consistent naming conventions
-- Write clear commit messages
-- Include tests for new features
-
-{% if agent.name == 'claude-code' %}
-## Claude Code Instructions
-
-Use the Task tool for complex multi-step operations.
-Prefer the Edit tool over Bash for file modifications.
-{% elif agent.name == 'cursor' %}
-## Cursor Instructions
-
-Use @codebase to search across the project.
-Apply changes incrementally with Composer.
-{% elif agent.name == 'codex' %}
-## Codex Instructions
-
-Reference the AGENTS.md file for project conventions.
-{% endif %}
-
-{% if platform.os == 'windows' %}
-Use PowerShell for shell commands.
-{% else %}
-Use Bash for shell commands.
-{% endif %}
+Review for:
+1. Bugs and edge cases
+2. Security vulnerabilities
+3. Performance issues
+4. Code style improvements
 ```
 
-This approach lets you:
-- **De-duplicate** common content across all clients
-- **Customize** instructions for each client's unique capabilities
-- **Adapt** to the user's operating system
+## Project Configuration (dex.hcl)
 
-For completely different content per platform, use [platform-specific files](#platform-specific-context-files) instead.
+Configure which plugins are installed in your project:
 
-See [docs/plugins.md](docs/plugins.md) for all available variables and platform-specific metadata.
+```hcl
+project {
+  name             = "my-webapp"
+  agentic_platform = "claude-code"
+}
+
+plugin "code-review-tools" {
+  source = "git+https://github.com/owner/code-review-tools.git"
+}
+
+plugin "python-tools" {
+  source = "git+https://github.com/owner/python-tools.git"
+  config = {
+    python_version = "3.12"
+  }
+}
+```
+
+## Documentation
+
+See [docs/resources.md](docs/resources.md) for the complete reference on all resource types, HCL functions, and configuration options.

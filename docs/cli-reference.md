@@ -96,7 +96,7 @@ dex install [PLUGINS...] [OPTIONS]
 |--------|-------|-------------|---------|
 | `--source` | `-s` | Direct source path (file://) | - |
 | `--registry` | `-r` | Registry to use (overrides default) | - |
-| `--save` | `-S` | Save installed plugins to dex.yaml | `false` |
+| `--save` | `-S` | Save installed plugins to dex.hcl | `false` |
 | `--no-lock` | - | Don't update lock file | `false` |
 | `--force` | `-f` | Overwrite existing files even if not managed by dex | `false` |
 | `--path` | `-p` | Project directory | Current directory |
@@ -108,7 +108,7 @@ By default, Dex will refuse to overwrite files that exist but aren't tracked in 
 **Examples:**
 
 ```bash
-# Install all plugins from dex.yaml
+# Install all plugins from dex.hcl
 dex install
 
 # Install specific plugin
@@ -117,7 +117,7 @@ dex install my-plugin
 # Install with version specifier
 dex install my-plugin@^1.0.0
 
-# Install and save to dex.yaml
+# Install and save to dex.hcl
 dex install my-plugin@^1.0.0 --save
 
 # Install from a specific registry
@@ -189,7 +189,7 @@ dex uninstall PLUGINS... [OPTIONS]
 
 | Option | Short | Description | Default |
 |--------|-------|-------------|---------|
-| `--remove` | `-r` | Also remove from dex.yaml (drop the dependency) | `false` |
+| `--remove` | `-r` | Also remove from dex.hcl (drop the dependency) | `false` |
 | `--path` | `-p` | Project directory | Current directory |
 
 **Behavior:**
@@ -197,19 +197,19 @@ dex uninstall PLUGINS... [OPTIONS]
 Without `--remove`:
 - Deletes installed files tracked in the manifest
 - Cleans up MCP servers
-- Keeps the plugin in dex.yaml (can reinstall with `dex install`)
+- Keeps the plugin in dex.hcl (can reinstall with `dex install`)
 
 With `--remove`:
 - Does all of the above
-- Also removes the plugin from dex.yaml
+- Also removes the plugin from dex.hcl
 
 **Examples:**
 
 ```bash
-# Uninstall a plugin (keep in dex.yaml for later reinstall)
+# Uninstall a plugin (keep in dex.hcl for later reinstall)
 dex uninstall my-plugin
 
-# Uninstall and remove from dex.yaml
+# Uninstall and remove from dex.hcl
 dex uninstall my-plugin --remove
 
 # Uninstall multiple plugins
@@ -372,7 +372,7 @@ dex update-ignore --print
 
 | File | Description |
 |------|-------------|
-| `dex.yaml` | Project configuration |
+| `dex.hcl` | Project configuration |
 | `dex.lock` | Lock file |
 | `.dex/` | Dex internal directory |
 | `.dex/manifest.json` | Manifest tracking installed files |

@@ -2,39 +2,27 @@
 
 ## Prerequisites
 
-- Python 3.11 or higher
-- pip or uv package manager
-
-## Install via pip
-
-```bash
-pip install dex
-```
-
-## Install via uv (Recommended)
-
-[uv](https://github.com/astral-sh/uv) is a fast Python package installer:
-
-```bash
-uv pip install dex
-```
+- Go 1.21 or higher
+- Git
 
 ## Install from Source
 
 ```bash
-git clone https://github.com/dex-dev/dex.git
+git clone https://github.com/launchcg/dex.git
 cd dex
-pip install -e .
+make build
 ```
 
-## Development Installation
+The binary is created at `bin/dex`.
 
-For development with all test dependencies:
+## Install to PATH (Optional)
 
 ```bash
-git clone https://github.com/dex-dev/dex.git
-cd dex
-pip install -e ".[dev]"
+# Install to $GOPATH/bin
+make install
+
+# Or install to ~/.bin
+make install-user
 ```
 
 ## Verify Installation
@@ -47,37 +35,46 @@ This should display the installed Dex version.
 
 ## Shell Completion
 
-Dex is built with Typer, which supports shell completion. To enable:
+Dex uses Cobra, which supports shell completion:
 
 **Bash:**
 ```bash
-dex --install-completion bash
+dex completion bash > /etc/bash_completion.d/dex
+# Or for user-level:
+dex completion bash > ~/.bash_completion.d/dex
 ```
 
 **Zsh:**
 ```bash
-dex --install-completion zsh
+dex completion zsh > "${fpath[1]}/_dex"
 ```
 
 **Fish:**
 ```bash
-dex --install-completion fish
+dex completion fish > ~/.config/fish/completions/dex.fish
+```
+
+**PowerShell:**
+```powershell
+dex completion powershell > dex.ps1
 ```
 
 ## Upgrading
 
-```bash
-pip install --upgrade dex
-```
-
-Or with uv:
+Pull the latest changes and rebuild:
 
 ```bash
-uv pip install --upgrade dex
+cd dex
+git pull
+make build
 ```
 
 ## Uninstalling
 
+Remove the binary:
+
 ```bash
-pip uninstall dex
+rm $(which dex)
+# Or if installed via make install:
+rm $GOPATH/bin/dex
 ```
