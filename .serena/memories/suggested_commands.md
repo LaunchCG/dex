@@ -2,26 +2,28 @@
 
 ## Testing
 ```bash
-./test.sh           # Run all tests
-uv run pytest       # Run pytest directly
-uv run pytest -k "test_name"  # Run specific test
+go test ./...           # Run all tests
+go test ./internal/...  # Run internal package tests
+go test -v ./...        # Run with verbose output
+go test -cover ./...    # Run with coverage
 ```
 
-## Linting
+## Building
 ```bash
-./lint.sh           # Run all linters
-uv run ruff check . # Ruff lint check
-uv run black . --check  # Black format check
-uv run mypy .       # Type checking
-```
-
-## Formatting
-```bash
-uv run black .      # Format with black
-uv run isort .      # Sort imports
+go build -o dex ./cmd/dex  # Build the CLI binary
 ```
 
 ## Running the CLI
 ```bash
-uv run dex --help  # Run the CLI
+./dex --help               # Show help
+./dex init                 # Initialize a new project
+./dex install              # Install plugins
+./dex uninstall <plugin>   # Uninstall a plugin
+./dex list                 # List installed plugins
+```
+
+## Linting
+```bash
+go fmt ./...              # Format code
+go vet ./...              # Run vet
 ```
