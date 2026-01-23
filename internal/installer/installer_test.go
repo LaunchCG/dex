@@ -1620,3 +1620,466 @@ func TestExecutor_ApplyAgentFileContent_CopilotPath(t *testing.T) {
 	_, err = os.Stat(filepath.Join(tmpDir, "CLAUDE.md"))
 	assert.True(t, os.IsNotExist(err), "CLAUDE.md should not exist for Copilot")
 }
+
+// Tests for dependency management features
+
+func TestInstaller_FindDependents(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create dex.hcl
+	dexHCL := `
+project {
+  name = "test-project"
+  agentic_platform = "claude-code"
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(dexHCL), 0644)
+	require.NoError(t, err)
+
+	// Create lock file with dependencies
+	lockContent := `{
+  "version": "1.0",
+  "agent": "claude-code",
+  "plugins": {
+    "app": {
+      "version": "1.0.0",
+      "resolved": "file:///tmp/app",
+      "integrity": "",
+      "dependencies": {
+        "utils": "^1.0.0",
+        "core": "^1.0.0"
+      }
+    },
+    "utils": {
+      "version": "1.0.0",
+      "resolved": "file:///tmp/utils",
+      "integrity": "",
+      "dependencies": {
+        "core": "^1.0.0"
+      }
+    },
+    "core": {
+      "version": "1.0.0",
+      "resolved": "file:///tmp/core",
+      "integrity": "",
+      "dependencies": {}
+    }
+  }
+}`
+	err = os.WriteFile(filepath.Join(tmpDir, "dex.lock"), []byte(lockContent), 0644)
+	require.NoError(t, err)
+
+	inst, err := NewInstaller(tmpDir)
+	require.NoError(t, err)
+
+	// core is depended on by both app and utils
+	coreDeps := inst.FindDependents("core")
+	assert.Len(t, coreDeps, 2)
+	assert.Contains(t, coreDeps, "app")
+	assert.Contains(t, coreDeps, "utils")
+
+	// utils is depended on by app
+	utilsDeps := inst.FindDependents("utils")
+	assert.Len(t, utilsDeps, 1)
+	assert.Contains(t, utilsDeps, "app")
+
+	// app has no dependents
+	appDeps := inst.FindDependents("app")
+	assert.Empty(t, appDeps)
+
+	// non-existent package
+	nonExistentDeps := inst.FindDependents("nonexistent")
+	assert.Empty(t, nonExistentDeps)
+}
+
+func TestInstaller_FindOrphans(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create dex.hcl with only app declared
+	dexHCL := `
+project {
+  name = "test-project"
+  agentic_platform = "claude-code"
+}
+
+plugin "app" {
+  source = "file:///tmp/app"
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(dexHCL), 0644)
+	require.NoError(t, err)
+
+	// Create lock file - utils and core are transitive deps, not explicit
+	lockContent := `{
+  "version": "1.0",
+  "agent": "claude-code",
+  "plugins": {
+    "app": {
+      "version": "1.0.0",
+      "resolved": "file:///tmp/app",
+      "integrity": "",
+      "dependencies": {
+        "utils": "^1.0.0"
+      }
+    },
+    "utils": {
+      "version": "1.0.0",
+      "resolved": "file:///tmp/utils",
+      "integrity": "",
+      "dependencies": {}
+    },
+    "orphan-pkg": {
+      "version": "1.0.0",
+      "resolved": "file:///tmp/orphan",
+      "integrity": "",
+      "dependencies": {}
+    }
+  }
+}`
+	err = os.WriteFile(filepath.Join(tmpDir, "dex.lock"), []byte(lockContent), 0644)
+	require.NoError(t, err)
+
+	inst, err := NewInstaller(tmpDir)
+	require.NoError(t, err)
+
+	// orphan-pkg is not in dex.hcl and not a dependency of anything
+	orphans := inst.FindOrphans(nil)
+	assert.Len(t, orphans, 1)
+	assert.Contains(t, orphans, "orphan-pkg")
+
+	// When excluding app, utils becomes orphaned too
+	orphansExcludingApp := inst.FindOrphans([]string{"app"})
+	assert.Len(t, orphansExcludingApp, 2)
+	assert.Contains(t, orphansExcludingApp, "orphan-pkg")
+	assert.Contains(t, orphansExcludingApp, "utils")
+}
+
+func TestUpdateResult_Fields(t *testing.T) {
+	result := &UpdateResult{
+		Name:       "test-pkg",
+		OldVersion: "1.0.0",
+		NewVersion: "1.1.0",
+		Skipped:    false,
+		Reason:     "updated from 1.0.0 to 1.1.0",
+	}
+
+	assert.Equal(t, "test-pkg", result.Name)
+	assert.Equal(t, "1.0.0", result.OldVersion)
+	assert.Equal(t, "1.1.0", result.NewVersion)
+	assert.False(t, result.Skipped)
+	assert.Equal(t, "updated from 1.0.0 to 1.1.0", result.Reason)
+}
+
+// TestInstaller_FindDependents_TransitiveChain tests finding dependents in a linear chain.
+// Dependency chain: app -> middleware -> utils -> core
+// When we uninstall core, we need to find utils, then middleware, then app.
+func TestInstaller_FindDependents_TransitiveChain(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	dexHCL := `
+project {
+  name = "test-project"
+  agentic_platform = "claude-code"
+}
+
+plugin "app" {
+  source = "file:///tmp/app"
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(dexHCL), 0644)
+	require.NoError(t, err)
+
+	// Linear chain: app -> middleware -> utils -> core
+	lockContent := `{
+  "version": "1.0",
+  "agent": "claude-code",
+  "plugins": {
+    "app": {
+      "version": "1.0.0",
+      "resolved": "file:///tmp/app",
+      "integrity": "",
+      "dependencies": {
+        "middleware": "^1.0.0"
+      }
+    },
+    "middleware": {
+      "version": "1.0.0",
+      "resolved": "file:///tmp/middleware",
+      "integrity": "",
+      "dependencies": {
+        "utils": "^1.0.0"
+      }
+    },
+    "utils": {
+      "version": "1.0.0",
+      "resolved": "file:///tmp/utils",
+      "integrity": "",
+      "dependencies": {
+        "core": "^1.0.0"
+      }
+    },
+    "core": {
+      "version": "1.0.0",
+      "resolved": "file:///tmp/core",
+      "integrity": "",
+      "dependencies": {}
+    }
+  }
+}`
+	err = os.WriteFile(filepath.Join(tmpDir, "dex.lock"), []byte(lockContent), 0644)
+	require.NoError(t, err)
+
+	inst, err := NewInstaller(tmpDir)
+	require.NoError(t, err)
+
+	// Direct dependents of core is just utils
+	coreDeps := inst.FindDependents("core")
+	assert.Len(t, coreDeps, 1)
+	assert.Contains(t, coreDeps, "utils")
+
+	// Direct dependents of utils is just middleware
+	utilsDeps := inst.FindDependents("utils")
+	assert.Len(t, utilsDeps, 1)
+	assert.Contains(t, utilsDeps, "middleware")
+
+	// Direct dependents of middleware is just app
+	middlewareDeps := inst.FindDependents("middleware")
+	assert.Len(t, middlewareDeps, 1)
+	assert.Contains(t, middlewareDeps, "app")
+
+	// To find ALL transitive dependents, caller must iterate
+	// This simulates what the uninstall command does
+	allDependents := findAllTransitiveDependents(inst, "core")
+	assert.Len(t, allDependents, 3)
+	assert.Contains(t, allDependents, "utils")
+	assert.Contains(t, allDependents, "middleware")
+	assert.Contains(t, allDependents, "app")
+}
+
+// TestInstaller_FindDependents_DiamondDependency tests diamond dependency pattern.
+// Diamond: app -> (frontend, backend) -> shared-lib
+// Both frontend and backend depend on shared-lib.
+func TestInstaller_FindDependents_DiamondDependency(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	dexHCL := `
+project {
+  name = "test-project"
+  agentic_platform = "claude-code"
+}
+
+plugin "app" {
+  source = "file:///tmp/app"
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(dexHCL), 0644)
+	require.NoError(t, err)
+
+	// Diamond: app -> frontend -> shared-lib
+	//          app -> backend  -> shared-lib
+	lockContent := `{
+  "version": "1.0",
+  "agent": "claude-code",
+  "plugins": {
+    "app": {
+      "version": "1.0.0",
+      "resolved": "file:///tmp/app",
+      "integrity": "",
+      "dependencies": {
+        "frontend": "^1.0.0",
+        "backend": "^1.0.0"
+      }
+    },
+    "frontend": {
+      "version": "1.0.0",
+      "resolved": "file:///tmp/frontend",
+      "integrity": "",
+      "dependencies": {
+        "shared-lib": "^1.0.0"
+      }
+    },
+    "backend": {
+      "version": "1.0.0",
+      "resolved": "file:///tmp/backend",
+      "integrity": "",
+      "dependencies": {
+        "shared-lib": "^1.0.0"
+      }
+    },
+    "shared-lib": {
+      "version": "1.0.0",
+      "resolved": "file:///tmp/shared-lib",
+      "integrity": "",
+      "dependencies": {}
+    }
+  }
+}`
+	err = os.WriteFile(filepath.Join(tmpDir, "dex.lock"), []byte(lockContent), 0644)
+	require.NoError(t, err)
+
+	inst, err := NewInstaller(tmpDir)
+	require.NoError(t, err)
+
+	// shared-lib is depended on by both frontend and backend
+	sharedDeps := inst.FindDependents("shared-lib")
+	assert.Len(t, sharedDeps, 2)
+	assert.Contains(t, sharedDeps, "frontend")
+	assert.Contains(t, sharedDeps, "backend")
+
+	// Transitive: uninstalling shared-lib should cascade to frontend, backend, and app
+	allDependents := findAllTransitiveDependents(inst, "shared-lib")
+	assert.Len(t, allDependents, 3)
+	assert.Contains(t, allDependents, "frontend")
+	assert.Contains(t, allDependents, "backend")
+	assert.Contains(t, allDependents, "app")
+}
+
+// TestInstaller_FindDependents_ComplexGraph tests a complex dependency graph.
+// Graph:
+//
+//	app-a -> lib-x -> core
+//	app-a -> lib-y -> core
+//	app-b -> lib-y -> core
+//	app-b -> lib-z
+//
+// Uninstalling core should cascade to: lib-x, lib-y, app-a, app-b
+func TestInstaller_FindDependents_ComplexGraph(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	dexHCL := `
+project {
+  name = "test-project"
+  agentic_platform = "claude-code"
+}
+
+plugin "app-a" {
+  source = "file:///tmp/app-a"
+}
+
+plugin "app-b" {
+  source = "file:///tmp/app-b"
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(dexHCL), 0644)
+	require.NoError(t, err)
+
+	lockContent := `{
+  "version": "1.0",
+  "agent": "claude-code",
+  "plugins": {
+    "app-a": {
+      "version": "1.0.0",
+      "resolved": "file:///tmp/app-a",
+      "integrity": "",
+      "dependencies": {
+        "lib-x": "^1.0.0",
+        "lib-y": "^1.0.0"
+      }
+    },
+    "app-b": {
+      "version": "1.0.0",
+      "resolved": "file:///tmp/app-b",
+      "integrity": "",
+      "dependencies": {
+        "lib-y": "^1.0.0",
+        "lib-z": "^1.0.0"
+      }
+    },
+    "lib-x": {
+      "version": "1.0.0",
+      "resolved": "file:///tmp/lib-x",
+      "integrity": "",
+      "dependencies": {
+        "core": "^1.0.0"
+      }
+    },
+    "lib-y": {
+      "version": "1.0.0",
+      "resolved": "file:///tmp/lib-y",
+      "integrity": "",
+      "dependencies": {
+        "core": "^1.0.0"
+      }
+    },
+    "lib-z": {
+      "version": "1.0.0",
+      "resolved": "file:///tmp/lib-z",
+      "integrity": "",
+      "dependencies": {}
+    },
+    "core": {
+      "version": "1.0.0",
+      "resolved": "file:///tmp/core",
+      "integrity": "",
+      "dependencies": {}
+    }
+  }
+}`
+	err = os.WriteFile(filepath.Join(tmpDir, "dex.lock"), []byte(lockContent), 0644)
+	require.NoError(t, err)
+
+	inst, err := NewInstaller(tmpDir)
+	require.NoError(t, err)
+
+	// Direct dependents of core: lib-x, lib-y
+	coreDeps := inst.FindDependents("core")
+	assert.Len(t, coreDeps, 2)
+	assert.Contains(t, coreDeps, "lib-x")
+	assert.Contains(t, coreDeps, "lib-y")
+
+	// lib-y is used by both app-a and app-b
+	libYDeps := inst.FindDependents("lib-y")
+	assert.Len(t, libYDeps, 2)
+	assert.Contains(t, libYDeps, "app-a")
+	assert.Contains(t, libYDeps, "app-b")
+
+	// lib-z is only used by app-b
+	libZDeps := inst.FindDependents("lib-z")
+	assert.Len(t, libZDeps, 1)
+	assert.Contains(t, libZDeps, "app-b")
+
+	// Transitive: uninstalling core cascades to lib-x, lib-y, app-a, app-b
+	allDependents := findAllTransitiveDependents(inst, "core")
+	assert.Len(t, allDependents, 4)
+	assert.Contains(t, allDependents, "lib-x")
+	assert.Contains(t, allDependents, "lib-y")
+	assert.Contains(t, allDependents, "app-a")
+	assert.Contains(t, allDependents, "app-b")
+
+	// Uninstalling lib-z only affects app-b
+	libZAllDeps := findAllTransitiveDependents(inst, "lib-z")
+	assert.Len(t, libZAllDeps, 1)
+	assert.Contains(t, libZAllDeps, "app-b")
+}
+
+// findAllTransitiveDependents is a helper that simulates the uninstall cascade logic.
+// It finds all packages that transitively depend on the given package.
+func findAllTransitiveDependents(inst *Installer, pkg string) []string {
+	queue := []string{pkg}
+	checked := make(map[string]bool)
+	added := make(map[string]bool)
+	var all []string
+
+	for len(queue) > 0 {
+		name := queue[0]
+		queue = queue[1:]
+
+		if checked[name] {
+			continue
+		}
+		checked[name] = true
+
+		dependents := inst.FindDependents(name)
+		for _, dep := range dependents {
+			if !added[dep] {
+				added[dep] = true
+				all = append(all, dep)
+			}
+			if !checked[dep] {
+				queue = append(queue, dep)
+			}
+		}
+	}
+
+	return all
+}

@@ -17,6 +17,9 @@ type PackageConfig struct {
 	// Variables defines user-configurable variables
 	Variables []VariableBlock `hcl:"variable,block"`
 
+	// Dependencies defines package dependencies
+	Dependencies []DependencyBlock `hcl:"dependency,block"`
+
 	// Claude resources - each type is a separate field for HCL parsing
 	Skills     []resource.ClaudeSkill     `hcl:"claude_skill,block"`
 	Commands   []resource.ClaudeCommand   `hcl:"claude_command,block"`
@@ -93,11 +96,41 @@ type VariableBlock struct {
 	Env string `hcl:"env,optional"`
 }
 
+// DependencyBlock defines a package dependency.
+// Dependencies are other packages that must be installed before this package.
+//
+// Syntax in package.hcl:
+//
+//	dependency "other-plugin" {
+//	  version = "^2.0.0"
+//	}
+//
+//	dependency "another" {
+//	  version  = ">=1.0.0"
+//	  registry = "custom"
+//	}
+type DependencyBlock struct {
+	// Name is the dependency package name (from label)
+	Name string `hcl:"name,label"`
+
+	// Version is the version constraint (e.g., "^1.0.0", ">=2.0.0")
+	Version string `hcl:"version,attr"`
+
+	// Registry is optional registry name to use for this dependency
+	Registry string `hcl:"registry,optional"`
+
+	// Source is optional direct source URL
+	Source string `hcl:"source,optional"`
+}
+
 // PackageResourcesConfig is used to parse *.pkg.hcl files that contain only
 // resource definitions without a package {} block.
 type PackageResourcesConfig struct {
 	// Variables defines user-configurable variables
 	Variables []VariableBlock `hcl:"variable,block"`
+
+	// Dependencies defines package dependencies
+	Dependencies []DependencyBlock `hcl:"dependency,block"`
 
 	// Claude resources
 	Skills     []resource.ClaudeSkill     `hcl:"claude_skill,block"`
@@ -210,6 +243,9 @@ func (p *PackageConfig) mergeResourcesFrom(other *PackageResourcesConfig) {
 
 	// Variables can also be merged from additional files
 	p.Variables = append(p.Variables, other.Variables...)
+
+	// Dependencies can also be merged from additional files
+	p.Dependencies = append(p.Dependencies, other.Dependencies...)
 }
 
 // buildResources populates the Resources slice from the typed resource fields.

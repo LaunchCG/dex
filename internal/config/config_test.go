@@ -1244,3 +1244,115 @@ claude_mcp_server "env-server" {
 	assert.Len(t, config.MCPServers, 1)
 	assert.Contains(t, config.MCPServers[0].Args, "env-value")
 }
+
+// Tests for dependency block parsing
+
+func TestLoadPackage_WithDependencies(t *testing.T) {
+	tmpDir := t.TempDir()
+	hclContent := `
+package {
+  name    = "my-plugin"
+  version = "1.0.0"
+}
+
+dependency "core-lib" {
+  version = "^2.0.0"
+}
+
+dependency "utils" {
+  version  = ">=1.0.0"
+  registry = "internal"
+}
+
+dependency "external" {
+  version = "~1.5.0"
+  source  = "git+https://github.com/example/external"
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "package.hcl"), []byte(hclContent), 0644)
+	require.NoError(t, err)
+
+	config, err := LoadPackage(tmpDir)
+	require.NoError(t, err)
+	assert.NotNil(t, config)
+
+	// Check dependencies were parsed
+	assert.Len(t, config.Dependencies, 3)
+
+	// Check first dependency
+	assert.Equal(t, "core-lib", config.Dependencies[0].Name)
+	assert.Equal(t, "^2.0.0", config.Dependencies[0].Version)
+	assert.Empty(t, config.Dependencies[0].Registry)
+	assert.Empty(t, config.Dependencies[0].Source)
+
+	// Check second dependency
+	assert.Equal(t, "utils", config.Dependencies[1].Name)
+	assert.Equal(t, ">=1.0.0", config.Dependencies[1].Version)
+	assert.Equal(t, "internal", config.Dependencies[1].Registry)
+	assert.Empty(t, config.Dependencies[1].Source)
+
+	// Check third dependency
+	assert.Equal(t, "external", config.Dependencies[2].Name)
+	assert.Equal(t, "~1.5.0", config.Dependencies[2].Version)
+	assert.Empty(t, config.Dependencies[2].Registry)
+	assert.Equal(t, "git+https://github.com/example/external", config.Dependencies[2].Source)
+}
+
+func TestLoadPackage_NoDependencies(t *testing.T) {
+	tmpDir := t.TempDir()
+	hclContent := `
+package {
+  name    = "simple-plugin"
+  version = "1.0.0"
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "package.hcl"), []byte(hclContent), 0644)
+	require.NoError(t, err)
+
+	config, err := LoadPackage(tmpDir)
+	require.NoError(t, err)
+	assert.NotNil(t, config)
+	assert.Empty(t, config.Dependencies)
+}
+
+func TestLoadPackage_DependenciesFromPkgHCL(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Main package.hcl
+	mainHCL := `
+package {
+  name    = "main-plugin"
+  version = "1.0.0"
+}
+
+dependency "core" {
+  version = "^1.0.0"
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "package.hcl"), []byte(mainHCL), 0644)
+	require.NoError(t, err)
+
+	// Additional deps.pkg.hcl
+	depsHCL := `
+dependency "extra" {
+  version = "^2.0.0"
+}
+`
+	err = os.WriteFile(filepath.Join(tmpDir, "deps.pkg.hcl"), []byte(depsHCL), 0644)
+	require.NoError(t, err)
+
+	config, err := LoadPackage(tmpDir)
+	require.NoError(t, err)
+	assert.NotNil(t, config)
+
+	// Should have dependencies from both files
+	assert.Len(t, config.Dependencies, 2)
+
+	// Check both dependencies are present
+	depNames := make(map[string]bool)
+	for _, dep := range config.Dependencies {
+		depNames[dep.Name] = true
+	}
+	assert.True(t, depNames["core"])
+	assert.True(t, depNames["extra"])
+}

@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/dex-tools/dex/internal/adapter"
 	"github.com/dex-tools/dex/internal/config"
@@ -20,6 +21,8 @@ import (
 	"github.com/dex-tools/dex/internal/lockfile"
 	"github.com/dex-tools/dex/internal/manifest"
 	"github.com/dex-tools/dex/internal/registry"
+	"github.com/dex-tools/dex/internal/resolver"
+	"github.com/dex-tools/dex/pkg/version"
 )
 
 // Installer handles plugin installation for a project.
@@ -280,6 +283,13 @@ func (i *Installer) installPlugin(spec PluginSpec) (*InstalledPlugin, error) {
 		}
 	}
 
+	// Install dependencies first
+	if len(pkgConfig.Dependencies) > 0 {
+		if err := i.installDependencies(pkgConfig.Dependencies, pluginName); err != nil {
+			return nil, err
+		}
+	}
+
 	// Resolve variable values
 	vars, err := i.resolveVariables(pkgConfig, spec.Config)
 	if err != nil {
@@ -313,12 +323,17 @@ func (i *Installer) installPlugin(spec PluginSpec) (*InstalledPlugin, error) {
 		return nil, errors.NewInstallError(pluginName, "install", err)
 	}
 
-	// Update lock file
+	// Update lock file with dependencies
 	if !i.noLock {
+		deps := make(map[string]string)
+		for _, dep := range pkgConfig.Dependencies {
+			deps[dep.Name] = dep.Version
+		}
 		i.lock.Set(pluginName, &lockfile.LockedPlugin{
-			Version:   resolved.Version,
-			Resolved:  resolved.URL,
-			Integrity: resolved.Integrity,
+			Version:      resolved.Version,
+			Resolved:     resolved.URL,
+			Integrity:    resolved.Integrity,
+			Dependencies: deps,
 		})
 	}
 
@@ -330,6 +345,59 @@ func (i *Installer) installPlugin(spec PluginSpec) (*InstalledPlugin, error) {
 		Version: resolved.Version,
 		Source:  spec.Source,
 	}, nil
+}
+
+// installDependencies installs the dependencies of a package.
+func (i *Installer) installDependencies(deps []config.DependencyBlock, parentName string) error {
+	for _, dep := range deps {
+		// Skip if already installed with a compatible version
+		if locked := i.lock.Get(dep.Name); locked != nil {
+			// Check if locked version satisfies the constraint
+			lockedVer, err := version.Parse(locked.Version)
+			if err == nil {
+				constraint, err := version.ParseConstraint(dep.Version)
+				if err == nil && constraint.Match(lockedVer) {
+					// Already installed with compatible version
+					continue
+				}
+			}
+		}
+
+		// Determine registry for this dependency
+		registryName := dep.Registry
+		source := dep.Source
+
+		// If not specified, try to find from project config or use parent's registry
+		if registryName == "" && source == "" {
+			// Check if this dependency is declared in project plugins
+			for _, p := range i.project.Plugins {
+				if p.Name == dep.Name {
+					registryName = p.Registry
+					source = p.Source
+					break
+				}
+			}
+
+			// If still not found, use the first available registry
+			if registryName == "" && source == "" && len(i.project.Registries) > 0 {
+				registryName = i.project.Registries[0].Name
+			}
+		}
+
+		fmt.Printf("  → Installing dependency %s@%s for %s\n", dep.Name, dep.Version, parentName)
+
+		// Install the dependency
+		_, err := i.installPlugin(PluginSpec{
+			Name:     dep.Name,
+			Version:  dep.Version,
+			Source:   source,
+			Registry: registryName,
+		})
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("failed to install dependency %s", dep.Name))
+		}
+	}
+	return nil
 }
 
 // installProjectResources installs resources defined directly in dex.hcl.
@@ -566,4 +634,220 @@ func (i *Installer) uninstallPlugin(name string) error {
 	}
 
 	return nil
+}
+
+// FindDependents returns packages that depend on the given package.
+func (i *Installer) FindDependents(name string) []string {
+	var dependents []string
+	for pluginName, locked := range i.lock.Plugins {
+		if pluginName == name {
+			continue
+		}
+		for dep := range locked.Dependencies {
+			if dep == name {
+				dependents = append(dependents, pluginName)
+				break
+			}
+		}
+	}
+	sort.Strings(dependents)
+	return dependents
+}
+
+// FindOrphans returns dependencies that are no longer needed by any package.
+// The excluding parameter specifies packages that should be considered as already removed.
+func (i *Installer) FindOrphans(excluding []string) []string {
+	// Build set of excluded packages
+	excludeSet := make(map[string]bool)
+	for _, name := range excluding {
+		excludeSet[name] = true
+	}
+
+	// Build set of explicitly declared plugins (from project config)
+	explicit := make(map[string]bool)
+	for _, p := range i.project.Plugins {
+		explicit[p.Name] = true
+	}
+
+	// Build set of all needed dependencies
+	needed := make(map[string]bool)
+	for pluginName, locked := range i.lock.Plugins {
+		if excludeSet[pluginName] {
+			continue
+		}
+		for dep := range locked.Dependencies {
+			needed[dep] = true
+		}
+	}
+
+	// Find installed packages that are not needed and not explicit
+	var orphans []string
+	for pluginName := range i.lock.Plugins {
+		if excludeSet[pluginName] {
+			continue
+		}
+		if !needed[pluginName] && !explicit[pluginName] {
+			orphans = append(orphans, pluginName)
+		}
+	}
+	sort.Strings(orphans)
+	return orphans
+}
+
+// UpdateResult contains information about an update operation.
+type UpdateResult struct {
+	// Name is the plugin name
+	Name string
+	// OldVersion is the previously installed version
+	OldVersion string
+	// NewVersion is the version after update
+	NewVersion string
+	// Skipped indicates whether the update was skipped
+	Skipped bool
+	// Reason explains why the update was skipped or performed
+	Reason string
+}
+
+// Update updates specified plugins to newer versions.
+// If names is empty, updates all plugins.
+// If dryRun is true, only reports what would be updated without making changes.
+func (i *Installer) Update(names []string, dryRun bool) ([]UpdateResult, error) {
+	// If no names specified, update all locked packages that are in project config
+	if len(names) == 0 {
+		for _, p := range i.project.Plugins {
+			if i.lock.Has(p.Name) {
+				names = append(names, p.Name)
+			}
+		}
+	}
+
+	var results []UpdateResult
+
+	for _, name := range names {
+		result, err := i.updatePlugin(name, dryRun)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, *result)
+	}
+
+	// Save files if not dry run
+	if !dryRun {
+		if err := i.manifest.Save(); err != nil {
+			return nil, errors.Wrap(err, "failed to save manifest")
+		}
+		if !i.noLock {
+			i.lock.Agent = i.project.Project.AgenticPlatform
+			if err := i.lock.Save(); err != nil {
+				return nil, errors.Wrap(err, "failed to save lock file")
+			}
+		}
+	}
+
+	return results, nil
+}
+
+// updatePlugin updates a single plugin.
+func (i *Installer) updatePlugin(name string, dryRun bool) (*UpdateResult, error) {
+	result := &UpdateResult{Name: name}
+
+	// Get current locked version
+	locked := i.lock.Get(name)
+	if locked == nil {
+		result.Skipped = true
+		result.Reason = "not installed"
+		return result, nil
+	}
+	result.OldVersion = locked.Version
+
+	// Get constraint from project config
+	var constraint string
+	var spec PluginSpec
+	for _, p := range i.project.Plugins {
+		if p.Name == name {
+			constraint = p.Version
+			spec = PluginSpec{
+				Name:     p.Name,
+				Version:  p.Version,
+				Source:   p.Source,
+				Registry: p.Registry,
+				Config:   p.Config,
+			}
+			break
+		}
+	}
+
+	if constraint == "" {
+		constraint = "latest"
+	}
+
+	// Resolve the registry
+	reg, err := i.resolveRegistry(spec)
+	if err != nil {
+		return nil, errors.NewInstallError(name, "resolve", err)
+	}
+
+	// Get all available versions
+	pkgInfo, err := reg.GetPackageInfo(name)
+	if err != nil {
+		return nil, errors.NewInstallError(name, "resolve", err)
+	}
+
+	// Parse constraint and find best matching version
+	c, err := version.ParseConstraint(constraint)
+	if err != nil {
+		return nil, errors.NewInstallError(name, "resolve",
+			fmt.Errorf("invalid version constraint %q: %w", constraint, err))
+	}
+
+	// Parse available versions
+	var versions []*version.Version
+	for _, v := range pkgInfo.Versions {
+		if parsed, err := version.Parse(v); err == nil {
+			versions = append(versions, parsed)
+		}
+	}
+
+	// Find best matching version
+	best := c.FindBest(versions)
+	if best == nil {
+		result.Skipped = true
+		result.Reason = fmt.Sprintf("no version matches constraint %q", constraint)
+		return result, nil
+	}
+
+	// Compare with current version
+	current, err := version.Parse(locked.Version)
+	if err != nil {
+		current = nil
+	}
+
+	if current != nil && !best.GreaterThan(current) {
+		result.Skipped = true
+		result.NewVersion = locked.Version
+		result.Reason = "already at latest compatible version"
+		return result, nil
+	}
+
+	result.NewVersion = best.String()
+
+	if dryRun {
+		result.Reason = fmt.Sprintf("would update from %s to %s", locked.Version, best.String())
+		return result, nil
+	}
+
+	// Perform the update by reinstalling with the new version
+	spec.Version = best.String()
+	_, err = i.installPlugin(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	result.Reason = fmt.Sprintf("updated from %s to %s", locked.Version, best.String())
+	return result, nil
+}
+
+// GetResolver returns a new resolver instance for dependency operations.
+func (i *Installer) GetResolver() *resolver.Resolver {
+	return resolver.NewResolver(i.project, i.lock)
 }
