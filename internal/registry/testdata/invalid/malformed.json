@@ -1,0 +1,5 @@
+{
+  "name": "invalid-registry"
+  "version": "1.0"  // missing comma, this is invalid JSON
+  "packages": {}
+}

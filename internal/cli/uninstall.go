@@ -48,8 +48,9 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 	}
 
 	if removeFromConfig {
-		// TODO: Implement removing from config file
-		fmt.Println(cyan("Note: --remove flag (remove from config) is not yet implemented"))
+		// Intentionally not implemented: uninstall removes files but doesn't modify dex.hcl.
+		// Users can manually edit dex.hcl if they want to remove the plugin permanently.
+		fmt.Println(cyan("Note: --remove flag is reserved for future use"))
 	}
 
 	fmt.Printf("%s Uninstallation complete\n", green("✓"))

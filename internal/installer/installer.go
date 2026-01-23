@@ -51,6 +51,18 @@ type PluginSpec struct {
 	Config map[string]string
 }
 
+// InstalledPlugin contains information about an installed plugin.
+type InstalledPlugin struct {
+	// Name is the plugin name from package.hcl
+	Name string
+
+	// Version is the resolved version
+	Version string
+
+	// Source is the source URL used
+	Source string
+}
+
 // NewInstaller creates a new installer for the given project root.
 // It loads the project configuration, manifest, and lock file.
 func NewInstaller(projectRoot string) (*Installer, error) {
@@ -121,38 +133,42 @@ func (i *Installer) WithNoLock(noLock bool) *Installer {
 
 // Install installs the specified plugins.
 // If specs is empty, installs all plugins from project config using lock file versions.
-func (i *Installer) Install(specs []PluginSpec) error {
+// Returns information about installed plugins for use with --save flag.
+func (i *Installer) Install(specs []PluginSpec) ([]InstalledPlugin, error) {
 	if len(specs) == 0 {
-		return i.InstallAll()
+		return nil, i.InstallAll()
 	}
 
+	var installed []InstalledPlugin
 	for _, spec := range specs {
-		if err := i.installPlugin(spec); err != nil {
-			return err
+		info, err := i.installPlugin(spec)
+		if err != nil {
+			return nil, err
 		}
+		installed = append(installed, *info)
 	}
 
 	// Save manifest and lock file
 	if err := i.manifest.Save(); err != nil {
-		return errors.Wrap(err, "failed to save manifest")
+		return nil, errors.Wrap(err, "failed to save manifest")
 	}
 
 	if !i.noLock {
 		// Set the agent platform in lock file
 		i.lock.Agent = i.project.Project.AgenticPlatform
 		if err := i.lock.Save(); err != nil {
-			return errors.Wrap(err, "failed to save lock file")
+			return nil, errors.Wrap(err, "failed to save lock file")
 		}
 	}
 
-	return nil
+	return installed, nil
 }
 
 // InstallAll installs all plugins from the project config.
 // Uses lock file versions if available, otherwise resolves latest.
 func (i *Installer) InstallAll() error {
-	if len(i.project.Plugins) == 0 {
-		fmt.Println("No plugins defined in config")
+	if len(i.project.Plugins) == 0 && len(i.project.Resources) == 0 {
+		fmt.Println("No plugins or resources defined in config")
 		return nil
 	}
 
@@ -177,9 +193,14 @@ func (i *Installer) InstallAll() error {
 
 	// Call installPlugin directly to avoid recursion through Install
 	for _, spec := range specs {
-		if err := i.installPlugin(spec); err != nil {
+		if _, err := i.installPlugin(spec); err != nil {
 			return err
 		}
+	}
+
+	// Install resources defined directly in dex.hcl
+	if err := i.installProjectResources(); err != nil {
+		return err
 	}
 
 	// Save manifest and lock file
@@ -198,17 +219,17 @@ func (i *Installer) InstallAll() error {
 }
 
 // installPlugin installs a single plugin.
-func (i *Installer) installPlugin(spec PluginSpec) error {
+func (i *Installer) installPlugin(spec PluginSpec) (*InstalledPlugin, error) {
 	// Resolve the registry to use
 	reg, err := i.resolveRegistry(spec)
 	if err != nil {
-		return errors.NewInstallError(spec.Name, "resolve", err)
+		return nil, errors.NewInstallError(spec.Name, "resolve", err)
 	}
 
 	// Resolve the version
 	resolved, err := reg.ResolvePackage(spec.Name, spec.Version)
 	if err != nil {
-		return errors.NewInstallError(spec.Name, "resolve", err)
+		return nil, errors.NewInstallError(spec.Name, "resolve", err)
 	}
 
 	// Use resolved package name (important when spec.Name is empty for direct sources)
@@ -220,27 +241,27 @@ func (i *Installer) installPlugin(spec PluginSpec) error {
 	// Create temp directory for fetching
 	tempDir, err := os.MkdirTemp("", "dex-install-*")
 	if err != nil {
-		return errors.NewInstallError(pluginName, "fetch", err)
+		return nil, errors.NewInstallError(pluginName, "fetch", err)
 	}
 	defer os.RemoveAll(tempDir)
 
 	// Fetch the package
 	pluginDir, err := reg.FetchPackage(resolved, tempDir)
 	if err != nil {
-		return errors.NewInstallError(pluginName, "fetch", err)
+		return nil, errors.NewInstallError(pluginName, "fetch", err)
 	}
 
 	// Load and validate package config
 	pkgConfig, err := config.LoadPackage(pluginDir)
 	if err != nil {
-		return errors.NewInstallError(pluginName, "parse", err)
+		return nil, errors.NewInstallError(pluginName, "parse", err)
 	}
 
 	// Get the actual plugin name from the package
 	pluginName = pkgConfig.Package.Name
 
 	if err := pkgConfig.Validate(); err != nil {
-		return errors.NewInstallError(pluginName, "validate", err)
+		return nil, errors.NewInstallError(pluginName, "validate", err)
 	}
 
 	// Check platform compatibility
@@ -253,7 +274,7 @@ func (i *Installer) installPlugin(spec PluginSpec) error {
 			}
 		}
 		if !compatible {
-			return errors.NewInstallError(pluginName, "validate",
+			return nil, errors.NewInstallError(pluginName, "validate",
 				fmt.Errorf("plugin %q does not support platform %q",
 					pluginName, i.project.Project.AgenticPlatform))
 		}
@@ -262,7 +283,7 @@ func (i *Installer) installPlugin(spec PluginSpec) error {
 	// Resolve variable values
 	vars, err := i.resolveVariables(pkgConfig, spec.Config)
 	if err != nil {
-		return errors.NewInstallError(pluginName, "configure", err)
+		return nil, errors.NewInstallError(pluginName, "configure", err)
 	}
 
 	// Create executor
@@ -279,7 +300,7 @@ func (i *Installer) installPlugin(spec PluginSpec) error {
 		}
 		plan, err := i.adapter.PlanInstallation(res, pkgConfig, pluginDir, i.projectRoot)
 		if err != nil {
-			return errors.NewInstallError(pluginName, "plan", err)
+			return nil, errors.NewInstallError(pluginName, "plan", err)
 		}
 		allPlans = append(allPlans, plan)
 	}
@@ -289,7 +310,7 @@ func (i *Installer) installPlugin(spec PluginSpec) error {
 
 	// Execute the merged plan
 	if err := executor.Execute(mergedPlan, vars); err != nil {
-		return errors.NewInstallError(pluginName, "install", err)
+		return nil, errors.NewInstallError(pluginName, "install", err)
 	}
 
 	// Update lock file
@@ -302,6 +323,67 @@ func (i *Installer) installPlugin(spec PluginSpec) error {
 	}
 
 	fmt.Printf("  ✓ Installed %s@%s\n", pluginName, resolved.Version)
+
+	// Return installed plugin info
+	return &InstalledPlugin{
+		Name:    pluginName,
+		Version: resolved.Version,
+		Source:  spec.Source,
+	}, nil
+}
+
+// installProjectResources installs resources defined directly in dex.hcl.
+func (i *Installer) installProjectResources() error {
+	// Skip if no resources are defined in the project config
+	if len(i.project.Resources) == 0 {
+		return nil
+	}
+
+	// Create a synthetic package config for project-level resources
+	// This is used by adapters that expect package metadata
+	projectPkg := &config.PackageConfig{
+		Package: config.PackageBlock{
+			Name:    "project",
+			Version: "0.0.0",
+		},
+	}
+	if i.project.Project.Name != "" {
+		projectPkg.Package.Name = i.project.Project.Name
+	}
+
+	// Create executor
+	executor := NewExecutor(i.projectRoot, i.manifest, i.force)
+
+	// Filter and plan resources
+	targetPlatform := i.project.Project.AgenticPlatform
+	var allPlans []*adapter.Plan
+	for _, res := range i.project.Resources {
+		// Skip resources that don't match the target platform
+		if res.Platform() != targetPlatform {
+			continue
+		}
+		// Use projectRoot as the source directory for file references
+		plan, err := i.adapter.PlanInstallation(res, projectPkg, i.projectRoot, i.projectRoot)
+		if err != nil {
+			return errors.Wrap(err, "failed to plan project resource installation")
+		}
+		allPlans = append(allPlans, plan)
+	}
+
+	// Skip if no resources match the platform
+	if len(allPlans) == 0 {
+		return nil
+	}
+
+	// Merge all plans
+	mergedPlan := adapter.MergePlans(allPlans...)
+
+	// Execute the merged plan with resolved project variables
+	if err := executor.Execute(mergedPlan, i.project.ResolvedVars); err != nil {
+		return errors.Wrap(err, "failed to install project resources")
+	}
+
+	fmt.Printf("  ✓ Installed project resources\n")
 	return nil
 }
 

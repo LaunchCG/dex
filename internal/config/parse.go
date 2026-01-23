@@ -69,6 +69,98 @@ func NewPackageEvalContext(packageDir string) *hcl.EvalContext {
 	}
 }
 
+// NewProjectEvalContext creates an HCL evaluation context for dex.hcl files.
+// It includes the env() function and a var object containing resolved variable values.
+// This enables var.NAME syntax for referencing variables in the config.
+func NewProjectEvalContext(resolvedVars map[string]string) *hcl.EvalContext {
+	// Convert resolved vars to cty values
+	ctyVars := make(map[string]cty.Value)
+	for name, value := range resolvedVars {
+		ctyVars[name] = cty.StringVal(value)
+	}
+
+	return &hcl.EvalContext{
+		Functions: map[string]function.Function{
+			"env": envFunction(),
+		},
+		Variables: map[string]cty.Value{
+			"var": cty.ObjectVal(ctyVars),
+		},
+	}
+}
+
+// variableBlockSchema defines the HCL schema for extracting variable blocks.
+var variableBlockSchema = &hcl.BodySchema{
+	Blocks: []hcl.BlockHeaderSchema{
+		{Type: "variable", LabelNames: []string{"name"}},
+	},
+}
+
+// extractAndResolveProjectVariables extracts variable blocks from an HCL body
+// and resolves their values from environment variables and defaults.
+// Returns the list of variables, resolved values map, and any errors.
+func extractAndResolveProjectVariables(body hcl.Body) ([]ProjectVariableBlock, map[string]string, hcl.Body, error) {
+	content, remain, diags := body.PartialContent(variableBlockSchema)
+	if diags.HasErrors() {
+		return nil, nil, nil, fmt.Errorf("failed to extract variable blocks: %s", diags.Error())
+	}
+
+	var variables []ProjectVariableBlock
+	resolvedVars := make(map[string]string)
+
+	// Basic eval context for decoding variable blocks (only env function, no vars yet)
+	basicCtx := NewEvalContext()
+
+	for _, block := range content.Blocks {
+		if block.Type != "variable" {
+			continue
+		}
+
+		var varBlock ProjectVariableBlock
+		varBlock.Name = block.Labels[0]
+
+		// Decode variable block attributes
+		diags := gohcl.DecodeBody(block.Body, basicCtx, &varBlock)
+		if diags.HasErrors() {
+			return nil, nil, nil, fmt.Errorf("failed to decode variable %q: %s", varBlock.Name, diags.Error())
+		}
+
+		// Resolve the variable value
+		value, err := resolveProjectVariable(&varBlock)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		variables = append(variables, varBlock)
+		resolvedVars[varBlock.Name] = value
+	}
+
+	return variables, resolvedVars, remain, nil
+}
+
+// resolveProjectVariable resolves the value for a project variable.
+// Resolution order: env var (if specified) -> default -> error if required -> empty string
+func resolveProjectVariable(v *ProjectVariableBlock) (string, error) {
+	// Check environment variable first
+	if v.Env != "" {
+		if val, ok := os.LookupEnv(v.Env); ok {
+			return val, nil
+		}
+	}
+
+	// Use default if available
+	if v.Default != "" {
+		return v.Default, nil
+	}
+
+	// If required and no value found, return error
+	if v.Required {
+		return "", fmt.Errorf("required variable %q has no value (set via env var %q or default)", v.Name, v.Env)
+	}
+
+	return "", nil
+}
+
 // fileFunction returns an HCL function that reads file contents.
 // Usage in HCL: file("relative/path/to/file.md")
 // Paths are resolved relative to the package directory.

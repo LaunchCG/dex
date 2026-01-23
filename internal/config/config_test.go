@@ -843,3 +843,404 @@ Active: true
 Tags: go hcl template `
 	assert.Equal(t, expected, result.Value)
 }
+
+// Tests for project variables (var.X syntax)
+
+func TestLoadProject_WithVariables(t *testing.T) {
+	tmpDir := t.TempDir()
+	hclContent := `
+variable "ORG_NAME" {
+  description = "Organization name"
+  default     = "my-org"
+}
+
+variable "API_KEY" {
+  description = "API key"
+  default     = "default-key"
+}
+
+project {
+  name             = "test-project"
+  agentic_platform = "claude-code"
+}
+
+plugin "test-plugin" {
+  source = "file:///path/to/plugin"
+  config = {
+    org = var.ORG_NAME
+    key = var.API_KEY
+  }
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(hclContent), 0644)
+	require.NoError(t, err)
+
+	config, err := LoadProject(tmpDir)
+	require.NoError(t, err)
+	assert.NotNil(t, config)
+
+	// Check variables were parsed
+	assert.Len(t, config.Variables, 2)
+	assert.Equal(t, "ORG_NAME", config.Variables[0].Name)
+	assert.Equal(t, "my-org", config.Variables[0].Default)
+	assert.Equal(t, "API_KEY", config.Variables[1].Name)
+
+	// Check resolved vars
+	assert.Equal(t, "my-org", config.ResolvedVars["ORG_NAME"])
+	assert.Equal(t, "default-key", config.ResolvedVars["API_KEY"])
+
+	// Check plugin config uses interpolated values
+	assert.Len(t, config.Plugins, 1)
+	assert.Equal(t, "my-org", config.Plugins[0].Config["org"])
+	assert.Equal(t, "default-key", config.Plugins[0].Config["key"])
+}
+
+func TestLoadProject_VariableFromEnv(t *testing.T) {
+	// Set environment variable
+	os.Setenv("TEST_PROJECT_VAR", "env-value")
+	defer os.Unsetenv("TEST_PROJECT_VAR")
+
+	tmpDir := t.TempDir()
+	hclContent := `
+variable "MY_VAR" {
+  description = "Test variable"
+  env         = "TEST_PROJECT_VAR"
+  default     = "default-value"
+}
+
+project {
+  name             = "test-project"
+  agentic_platform = "claude-code"
+}
+
+plugin "test-plugin" {
+  source = "file:///path/to/plugin"
+  config = {
+    value = var.MY_VAR
+  }
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(hclContent), 0644)
+	require.NoError(t, err)
+
+	config, err := LoadProject(tmpDir)
+	require.NoError(t, err)
+
+	// Environment variable should take precedence over default
+	assert.Equal(t, "env-value", config.ResolvedVars["MY_VAR"])
+	assert.Equal(t, "env-value", config.Plugins[0].Config["value"])
+}
+
+func TestLoadProject_RequiredVariableWithEnv(t *testing.T) {
+	// Set environment variable
+	os.Setenv("TEST_REQUIRED_VAR", "required-value")
+	defer os.Unsetenv("TEST_REQUIRED_VAR")
+
+	tmpDir := t.TempDir()
+	hclContent := `
+variable "REQUIRED_VAR" {
+  description = "Required variable"
+  env         = "TEST_REQUIRED_VAR"
+  required    = true
+}
+
+project {
+  name             = "test-project"
+  agentic_platform = "claude-code"
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(hclContent), 0644)
+	require.NoError(t, err)
+
+	config, err := LoadProject(tmpDir)
+	require.NoError(t, err)
+	assert.Equal(t, "required-value", config.ResolvedVars["REQUIRED_VAR"])
+}
+
+func TestLoadProject_RequiredVariableMissing(t *testing.T) {
+	// Ensure the env var is not set
+	os.Unsetenv("NONEXISTENT_REQUIRED_VAR")
+
+	tmpDir := t.TempDir()
+	hclContent := `
+variable "MISSING_VAR" {
+  description = "Required variable without value"
+  env         = "NONEXISTENT_REQUIRED_VAR"
+  required    = true
+}
+
+project {
+  name             = "test-project"
+  agentic_platform = "claude-code"
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(hclContent), 0644)
+	require.NoError(t, err)
+
+	config, err := LoadProject(tmpDir)
+	assert.Nil(t, config)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "required variable")
+	assert.Contains(t, err.Error(), "MISSING_VAR")
+}
+
+func TestProjectConfig_Validate_DuplicateVariableName(t *testing.T) {
+	config := &ProjectConfig{
+		Project: ProjectBlock{
+			Name:            "test-project",
+			AgenticPlatform: "claude-code",
+		},
+		Variables: []ProjectVariableBlock{
+			{Name: "VAR1", Default: "value1"},
+			{Name: "VAR1", Default: "value2"}, // Duplicate
+		},
+	}
+
+	err := config.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate variable name: VAR1")
+}
+
+func TestProjectConfig_Validate_RequiredWithDefault(t *testing.T) {
+	config := &ProjectConfig{
+		Project: ProjectBlock{
+			Name:            "test-project",
+			AgenticPlatform: "claude-code",
+		},
+		Variables: []ProjectVariableBlock{
+			{Name: "VAR1", Required: true, Default: "value"}, // Required with default
+		},
+	}
+
+	err := config.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "is marked required but has a default value")
+}
+
+func TestProjectConfig_Validate_EmptyVariableName(t *testing.T) {
+	config := &ProjectConfig{
+		Project: ProjectBlock{
+			Name:            "test-project",
+			AgenticPlatform: "claude-code",
+		},
+		Variables: []ProjectVariableBlock{
+			{Default: "value"}, // Missing name
+		},
+	}
+
+	err := config.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "variable name is required")
+}
+
+func TestLoadProject_VariableOptionalNoValue(t *testing.T) {
+	// Ensure the env var is not set
+	os.Unsetenv("NONEXISTENT_OPTIONAL_VAR")
+
+	tmpDir := t.TempDir()
+	hclContent := `
+variable "OPTIONAL_VAR" {
+  description = "Optional variable"
+  env         = "NONEXISTENT_OPTIONAL_VAR"
+}
+
+project {
+  name             = "test-project"
+  agentic_platform = "claude-code"
+}
+
+plugin "test-plugin" {
+  source = "file:///path/to/plugin"
+  config = {
+    value = var.OPTIONAL_VAR
+  }
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(hclContent), 0644)
+	require.NoError(t, err)
+
+	config, err := LoadProject(tmpDir)
+	require.NoError(t, err)
+
+	// Optional variable with no value should be empty string
+	assert.Equal(t, "", config.ResolvedVars["OPTIONAL_VAR"])
+	assert.Equal(t, "", config.Plugins[0].Config["value"])
+}
+
+func TestNewProjectEvalContext(t *testing.T) {
+	resolvedVars := map[string]string{
+		"VAR1": "value1",
+		"VAR2": "value2",
+	}
+
+	ctx := NewProjectEvalContext(resolvedVars)
+	assert.NotNil(t, ctx)
+	assert.NotNil(t, ctx.Functions)
+	assert.Contains(t, ctx.Functions, "env")
+	assert.NotNil(t, ctx.Variables)
+	assert.Contains(t, ctx.Variables, "var")
+
+	// Verify the var object contains the expected values
+	varObj := ctx.Variables["var"]
+	assert.True(t, varObj.Type().IsObjectType())
+	val1 := varObj.GetAttr("VAR1")
+	assert.Equal(t, "value1", val1.AsString())
+	val2 := varObj.GetAttr("VAR2")
+	assert.Equal(t, "value2", val2.AsString())
+}
+
+func TestLoadProject_EndToEnd_VariableInterpolation(t *testing.T) {
+	// Set environment variable for one of the vars
+	os.Setenv("E2E_PAT_VAR", "secret-pat-from-env")
+	defer os.Unsetenv("E2E_PAT_VAR")
+
+	tmpDir := t.TempDir()
+	hclContent := `
+variable "ORG_NAME" {
+  description = "Organization name"
+  default     = "my-default-org"
+}
+
+variable "PAT" {
+  description = "Personal access token"
+  env         = "E2E_PAT_VAR"
+  default     = "default-pat"
+}
+
+variable "EMPTY_VAR" {
+  description = "Variable without default or env"
+}
+
+project {
+  name             = "test-project"
+  agentic_platform = "claude-code"
+}
+
+plugin "azure-devops" {
+  source = "file:///tmp/azure-devops"
+  config = {
+    org       = var.ORG_NAME
+    pat       = var.PAT
+    empty_val = var.EMPTY_VAR
+  }
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(hclContent), 0644)
+	require.NoError(t, err)
+
+	config, err := LoadProject(tmpDir)
+	require.NoError(t, err)
+
+	// Verify project metadata
+	assert.Equal(t, "test-project", config.Project.Name)
+	assert.Equal(t, "claude-code", config.Project.AgenticPlatform)
+
+	// Verify variables were extracted
+	assert.Len(t, config.Variables, 3)
+
+	// Find ORG_NAME variable
+	var orgVar *ProjectVariableBlock
+	for i := range config.Variables {
+		if config.Variables[i].Name == "ORG_NAME" {
+			orgVar = &config.Variables[i]
+			break
+		}
+	}
+	require.NotNil(t, orgVar)
+	assert.Equal(t, "my-default-org", orgVar.Default)
+	assert.Equal(t, "Organization name", orgVar.Description)
+
+	// Verify resolved values
+	assert.Equal(t, "my-default-org", config.ResolvedVars["ORG_NAME"], "ORG_NAME should resolve to default")
+	assert.Equal(t, "secret-pat-from-env", config.ResolvedVars["PAT"], "PAT should resolve from env var")
+	assert.Equal(t, "", config.ResolvedVars["EMPTY_VAR"], "EMPTY_VAR should be empty string")
+
+	// Verify plugin config was interpolated correctly
+	assert.Len(t, config.Plugins, 1)
+	plugin := config.Plugins[0]
+	assert.Equal(t, "azure-devops", plugin.Name)
+	assert.Equal(t, "my-default-org", plugin.Config["org"], "Plugin org should be interpolated from var.ORG_NAME")
+	assert.Equal(t, "secret-pat-from-env", plugin.Config["pat"], "Plugin pat should be interpolated from var.PAT")
+	assert.Equal(t, "", plugin.Config["empty_val"], "Plugin empty_val should be empty string")
+
+	// Verify validation passes
+	err = config.Validate()
+	assert.NoError(t, err)
+}
+
+func TestLoadProject_WithResources(t *testing.T) {
+	tmpDir := t.TempDir()
+	hclContent := `
+variable "MCP_COMMAND" {
+  default = "npx"
+}
+
+variable "MCP_ARG" {
+  env     = "TEST_MCP_ARG"
+  default = "default-arg"
+}
+
+project {
+  name             = "resource-test"
+  agentic_platform = "claude-code"
+}
+
+claude_mcp_server "test-server" {
+  type    = "command"
+  command = var.MCP_COMMAND
+  args    = ["--arg", var.MCP_ARG]
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(hclContent), 0644)
+	require.NoError(t, err)
+
+	config, err := LoadProject(tmpDir)
+	require.NoError(t, err)
+
+	// Check variables were parsed
+	assert.Len(t, config.Variables, 2)
+	assert.Equal(t, "default-arg", config.ResolvedVars["MCP_ARG"])
+
+	// Check resources were parsed with interpolated values
+	assert.Len(t, config.Resources, 1)
+	assert.Len(t, config.MCPServers, 1)
+	assert.Equal(t, "test-server", config.MCPServers[0].Name)
+	assert.Equal(t, "npx", config.MCPServers[0].Command)
+	assert.Contains(t, config.MCPServers[0].Args, "--arg")
+	assert.Contains(t, config.MCPServers[0].Args, "default-arg")
+}
+
+func TestLoadProject_ResourcesWithEnvVarInterpolation(t *testing.T) {
+	// Set env var
+	os.Setenv("TEST_RESOURCE_VAR", "env-value")
+	defer os.Unsetenv("TEST_RESOURCE_VAR")
+
+	tmpDir := t.TempDir()
+	hclContent := `
+variable "SERVER_ARG" {
+  env     = "TEST_RESOURCE_VAR"
+  default = "default-value"
+}
+
+project {
+  name             = "env-resource-test"
+  agentic_platform = "claude-code"
+}
+
+claude_mcp_server "env-server" {
+  type    = "command"
+  command = "node"
+  args    = [var.SERVER_ARG]
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(hclContent), 0644)
+	require.NoError(t, err)
+
+	config, err := LoadProject(tmpDir)
+	require.NoError(t, err)
+
+	// Env var should override default
+	assert.Equal(t, "env-value", config.ResolvedVars["SERVER_ARG"])
+	assert.Len(t, config.MCPServers, 1)
+	assert.Contains(t, config.MCPServers[0].Args, "env-value")
+}

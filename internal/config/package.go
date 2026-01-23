@@ -93,15 +93,51 @@ type VariableBlock struct {
 	Env string `hcl:"env,optional"`
 }
 
-// LoadPackage loads a package.hcl file from the given directory.
-// It parses the HCL file, evaluates expressions, and returns the configuration.
+// PackageResourcesConfig is used to parse *.pkg.hcl files that contain only
+// resource definitions without a package {} block.
+type PackageResourcesConfig struct {
+	// Variables defines user-configurable variables
+	Variables []VariableBlock `hcl:"variable,block"`
+
+	// Claude resources
+	Skills     []resource.ClaudeSkill     `hcl:"claude_skill,block"`
+	Commands   []resource.ClaudeCommand   `hcl:"claude_command,block"`
+	Subagents  []resource.ClaudeSubagent  `hcl:"claude_subagent,block"`
+	Rules      []resource.ClaudeRule      `hcl:"claude_rule,block"`
+	RulesFiles []resource.ClaudeRules     `hcl:"claude_rules,block"`
+	Settings   []resource.ClaudeSettings  `hcl:"claude_settings,block"`
+	MCPServers []resource.ClaudeMCPServer `hcl:"claude_mcp_server,block"`
+
+	// GitHub Copilot resources - merged
+	CopilotInstruction []resource.CopilotInstruction `hcl:"copilot_instruction,block"`
+	CopilotMCPServers  []resource.CopilotMCPServer   `hcl:"copilot_mcp_server,block"`
+
+	// GitHub Copilot resources - standalone
+	CopilotInstructions []resource.CopilotInstructions `hcl:"copilot_instructions,block"`
+	CopilotPrompts      []resource.CopilotPrompt       `hcl:"copilot_prompt,block"`
+	CopilotAgents       []resource.CopilotAgent        `hcl:"copilot_agent,block"`
+	CopilotSkills       []resource.CopilotSkill        `hcl:"copilot_skill,block"`
+
+	// Cursor resources - merged
+	CursorRules_     []resource.CursorRule      `hcl:"cursor_rule,block"`
+	CursorMCPServers []resource.CursorMCPServer `hcl:"cursor_mcp_server,block"`
+
+	// Cursor resources - standalone
+	CursorRules    []resource.CursorRules   `hcl:"cursor_rules,block"`
+	CursorCommands []resource.CursorCommand `hcl:"cursor_command,block"`
+}
+
+// LoadPackage loads package.hcl and all *.pkg.hcl files from the given directory.
+// The main package.hcl is required and contains the package {} block with metadata.
+// Additional *.pkg.hcl files are optional and contain only resource definitions.
+// All resources from all files are merged into the final configuration.
 func LoadPackage(dir string) (*PackageConfig, error) {
-	filename := filepath.Join(dir, "package.hcl")
+	mainFile := filepath.Join(dir, "package.hcl")
 
 	parser := NewParser()
-	file, diags := parser.ParseFile(filename)
+	file, diags := parser.ParseFile(mainFile)
 	if diags.HasErrors() {
-		return nil, fmt.Errorf("failed to parse %s: %s", filename, diags.Error())
+		return nil, fmt.Errorf("failed to parse %s: %s", mainFile, diags.Error())
 	}
 
 	// Create evaluation context with file() function for this directory
@@ -110,13 +146,70 @@ func LoadPackage(dir string) (*PackageConfig, error) {
 	var config PackageConfig
 	diags = DecodeBody(file.Body, ctx, &config)
 	if diags.HasErrors() {
-		return nil, fmt.Errorf("failed to decode %s: %s", filename, diags.Error())
+		return nil, fmt.Errorf("failed to decode %s: %s", mainFile, diags.Error())
+	}
+
+	// Load additional *.pkg.hcl files and merge resources
+	matches, err := filepath.Glob(filepath.Join(dir, "*.pkg.hcl"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to glob *.pkg.hcl files: %w", err)
+	}
+
+	for _, match := range matches {
+		additionalFile, diags := parser.ParseFile(match)
+		if diags.HasErrors() {
+			return nil, fmt.Errorf("failed to parse %s: %s", match, diags.Error())
+		}
+
+		// Use PackageResourcesConfig for *.pkg.hcl files (no package block required)
+		var additionalConfig PackageResourcesConfig
+		diags = DecodeBody(additionalFile.Body, ctx, &additionalConfig)
+		if diags.HasErrors() {
+			return nil, fmt.Errorf("failed to decode %s: %s", match, diags.Error())
+		}
+
+		// Merge resources from additional file into main config
+		config.mergeResourcesFrom(&additionalConfig)
 	}
 
 	// Build unified Resources slice from typed fields
 	config.buildResources()
 
 	return &config, nil
+}
+
+// mergeResourcesFrom merges resources from a PackageResourcesConfig into this config.
+// Used to merge *.pkg.hcl files that contain only resources.
+func (p *PackageConfig) mergeResourcesFrom(other *PackageResourcesConfig) {
+	// Claude resources
+	p.Skills = append(p.Skills, other.Skills...)
+	p.Commands = append(p.Commands, other.Commands...)
+	p.Subagents = append(p.Subagents, other.Subagents...)
+	p.Rules = append(p.Rules, other.Rules...)
+	p.RulesFiles = append(p.RulesFiles, other.RulesFiles...)
+	p.Settings = append(p.Settings, other.Settings...)
+	p.MCPServers = append(p.MCPServers, other.MCPServers...)
+
+	// GitHub Copilot resources - merged
+	p.CopilotInstruction = append(p.CopilotInstruction, other.CopilotInstruction...)
+	p.CopilotMCPServers = append(p.CopilotMCPServers, other.CopilotMCPServers...)
+
+	// GitHub Copilot resources - standalone
+	p.CopilotInstructions = append(p.CopilotInstructions, other.CopilotInstructions...)
+	p.CopilotPrompts = append(p.CopilotPrompts, other.CopilotPrompts...)
+	p.CopilotAgents = append(p.CopilotAgents, other.CopilotAgents...)
+	p.CopilotSkills = append(p.CopilotSkills, other.CopilotSkills...)
+
+	// Cursor resources - merged
+	p.CursorRules_ = append(p.CursorRules_, other.CursorRules_...)
+	p.CursorMCPServers = append(p.CursorMCPServers, other.CursorMCPServers...)
+
+	// Cursor resources - standalone
+	p.CursorRules = append(p.CursorRules, other.CursorRules...)
+	p.CursorCommands = append(p.CursorCommands, other.CursorCommands...)
+
+	// Variables can also be merged from additional files
+	p.Variables = append(p.Variables, other.Variables...)
 }
 
 // buildResources populates the Resources slice from the typed resource fields.

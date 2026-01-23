@@ -135,6 +135,53 @@ type VersionError struct {
 	Message    string   // Additional context message
 }
 
+// PackError represents an error during plugin packing.
+// It includes the directory being packed and the phase where the error occurred.
+type PackError struct {
+	Dir   string // Directory being packed
+	Phase string // Phase: "read", "validate", "compress"
+	Err   error  // Underlying error
+}
+
+// Error returns a human-readable error message describing the pack failure.
+func (e *PackError) Error() string {
+	if e.Err != nil {
+		return fmt.Sprintf("pack error for %s during %s: %v", e.Dir, e.Phase, e.Err)
+	}
+	return fmt.Sprintf("pack error for %s during %s", e.Dir, e.Phase)
+}
+
+// Unwrap returns the underlying error for use with errors.Is and errors.As.
+func (e *PackError) Unwrap() error {
+	return e.Err
+}
+
+// PublishError represents an error during plugin publishing.
+// It includes the tarball, registry, and the phase where the error occurred.
+type PublishError struct {
+	Tarball  string // Tarball being published
+	Registry string // Target registry URL
+	Phase    string // Phase: "connect", "upload", "index", "validate"
+	Err      error  // Underlying error
+}
+
+// Error returns a human-readable error message describing the publish failure.
+func (e *PublishError) Error() string {
+	what := e.Tarball
+	if what == "" {
+		what = "package"
+	}
+	if e.Err != nil {
+		return fmt.Sprintf("publish error for %s to %s during %s: %v", what, e.Registry, e.Phase, e.Err)
+	}
+	return fmt.Sprintf("publish error for %s to %s during %s", what, e.Registry, e.Phase)
+}
+
+// Unwrap returns the underlying error for use with errors.Is and errors.As.
+func (e *PublishError) Unwrap() error {
+	return e.Err
+}
+
 // Error returns a human-readable error message describing the version resolution failure.
 func (e *VersionError) Error() string {
 	var sb strings.Builder
@@ -212,6 +259,27 @@ func NewVersionError(plugin, constraint string, available []string, msg string) 
 		Constraint: constraint,
 		Available:  available,
 		Message:    msg,
+	}
+}
+
+// NewPackError creates a new PackError with the given parameters.
+// Common phases are: "read", "validate", "compress".
+func NewPackError(dir, phase string, err error) *PackError {
+	return &PackError{
+		Dir:   dir,
+		Phase: phase,
+		Err:   err,
+	}
+}
+
+// NewPublishError creates a new PublishError with the given parameters.
+// Common phases are: "connect", "upload", "index", "validate".
+func NewPublishError(tarball, registry, phase string, err error) *PublishError {
+	return &PublishError{
+		Tarball:  tarball,
+		Registry: registry,
+		Phase:    phase,
+		Err:      err,
 	}
 }
 

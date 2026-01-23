@@ -8,6 +8,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
+	"github.com/dex-tools/dex/internal/config"
 	"github.com/dex-tools/dex/internal/installer"
 )
 
@@ -97,14 +98,27 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if err := inst.Install(specs); err != nil {
+	installed, err := inst.Install(specs)
+	if err != nil {
 		return err
 	}
 
 	// Handle --save flag (add to config file)
-	if save && len(specs) > 0 {
-		// TODO: Implement saving to config file
-		fmt.Println(cyan("Note: --save flag is not yet implemented"))
+	if save && len(installed) > 0 {
+		for _, plugin := range installed {
+			source := plugin.Source
+			if source == "" {
+				// If source was derived from a --source flag, use that
+				source = specs[0].Source
+			}
+			if source != "" {
+				if err := config.AddPlugin(projectPath, plugin.Name, source, plugin.Version); err != nil {
+					fmt.Printf("%s Failed to save plugin %s to config: %v\n", color.YellowString("⚠"), plugin.Name, err)
+				} else {
+					fmt.Printf("  %s Saved %s to dex.hcl\n", green("✓"), plugin.Name)
+				}
+			}
+		}
 	}
 
 	fmt.Printf("%s Installation complete\n", green("✓"))

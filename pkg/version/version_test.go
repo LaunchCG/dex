@@ -728,3 +728,264 @@ func TestMustParseConstraint_Panics(t *testing.T) {
 		MustParseConstraint("")
 	})
 }
+
+// =============================================================================
+// Edge Case Tests for Version Resolution
+// =============================================================================
+
+func TestConstraint_FindBest_WithPrerelease(t *testing.T) {
+	c, err := ParseConstraint("^1.0.0")
+	require.NoError(t, err)
+
+	// Prereleases should be included in comparison
+	versions := []*Version{
+		MustParse("1.0.0-alpha"),
+		MustParse("1.0.0-beta"),
+		MustParse("1.0.0"),
+		MustParse("1.0.1"),
+	}
+
+	best := c.FindBest(versions)
+	require.NotNil(t, best)
+	// Should get 1.0.1 (highest stable)
+	assert.Equal(t, "1.0.1", best.String())
+}
+
+func TestConstraint_FindBest_OnlyPrereleases(t *testing.T) {
+	c, err := ParseConstraint("^1.0.0")
+	require.NoError(t, err)
+
+	// Only prereleases available - semver prereleases don't match caret constraints
+	versions := []*Version{
+		MustParse("1.0.0-alpha"),
+		MustParse("1.0.0-beta"),
+		MustParse("1.0.0-rc.1"),
+	}
+
+	best := c.FindBest(versions)
+	// By semver spec, prereleases typically don't match ^1.0.0
+	// So FindBest returns nil when only prereleases are available
+	assert.Nil(t, best, "prereleases should not match ^1.0.0 constraint")
+}
+
+func TestConstraint_FindBest_MixedZeroVersions(t *testing.T) {
+	// Test 0.x version handling (special semver behavior)
+	c, err := ParseConstraint("^0.2.0")
+	require.NoError(t, err)
+
+	versions := []*Version{
+		MustParse("0.1.0"),
+		MustParse("0.2.0"),
+		MustParse("0.2.5"),
+		MustParse("0.3.0"), // Should NOT match ^0.2.0
+	}
+
+	best := c.FindBest(versions)
+	require.NotNil(t, best)
+	assert.Equal(t, "0.2.5", best.String())
+}
+
+func TestConstraint_FindBest_TildeWithPartialVersions(t *testing.T) {
+	c, err := ParseConstraint("~1.2")
+	require.NoError(t, err)
+
+	versions := []*Version{
+		MustParse("1.1.9"),
+		MustParse("1.2.0"),
+		MustParse("1.2.5"),
+		MustParse("1.3.0"),
+	}
+
+	best := c.FindBest(versions)
+	require.NotNil(t, best)
+	// ~1.2 should match 1.2.x
+	assert.Equal(t, "1.2.5", best.String())
+}
+
+func TestConstraint_ExactMatch_Prerelease(t *testing.T) {
+	c, err := ParseConstraint("1.0.0-beta.1")
+	require.NoError(t, err)
+
+	v1 := MustParse("1.0.0-beta.1")
+	v2 := MustParse("1.0.0-beta.2")
+	v3 := MustParse("1.0.0")
+
+	assert.True(t, c.Match(v1), "exact match should work for prerelease")
+	assert.False(t, c.Match(v2), "different prerelease should not match")
+	assert.False(t, c.Match(v3), "release should not match prerelease constraint")
+}
+
+func TestVersionResolution_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name       string
+		constraint string
+		versions   []string
+		expected   string
+		shouldFail bool
+	}{
+		{
+			name:       "exact version exists",
+			constraint: "2.5.0",
+			versions:   []string{"1.0.0", "2.0.0", "2.5.0", "3.0.0"},
+			expected:   "2.5.0",
+		},
+		{
+			name:       "exact version not in list",
+			constraint: "2.5.0",
+			versions:   []string{"1.0.0", "2.0.0", "3.0.0"},
+			shouldFail: true,
+		},
+		{
+			name:       "caret with single version",
+			constraint: "^1.0.0",
+			versions:   []string{"1.0.0"},
+			expected:   "1.0.0",
+		},
+		{
+			name:       "tilde with single version",
+			constraint: "~1.0.0",
+			versions:   []string{"1.0.0"},
+			expected:   "1.0.0",
+		},
+		{
+			name:       "greater than with gap",
+			constraint: ">1.5.0",
+			versions:   []string{"1.0.0", "1.5.0", "2.0.0", "3.0.0"},
+			expected:   "3.0.0",
+		},
+		{
+			name:       "less than all available",
+			constraint: "<0.5.0",
+			versions:   []string{"1.0.0", "2.0.0"},
+			shouldFail: true,
+		},
+		{
+			name:       "caret 0.0.x - most restrictive",
+			constraint: "^0.0.3",
+			versions:   []string{"0.0.2", "0.0.3", "0.0.4", "0.1.0"},
+			expected:   "0.0.3", // ^0.0.x only matches that exact patch
+		},
+		{
+			name:       "latest matches any",
+			constraint: "latest",
+			versions:   []string{"0.1.0", "1.0.0", "2.0.0-beta"},
+			expected:   "2.0.0-beta",
+		},
+		{
+			name:       "empty list returns nil",
+			constraint: "^1.0.0",
+			versions:   []string{},
+			shouldFail: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := ParseConstraint(tt.constraint)
+			require.NoError(t, err)
+
+			var versions []*Version
+			for _, v := range tt.versions {
+				versions = append(versions, MustParse(v))
+			}
+
+			best := c.FindBest(versions)
+			if tt.shouldFail {
+				assert.Nil(t, best)
+			} else {
+				require.NotNil(t, best)
+				assert.Equal(t, tt.expected, best.String())
+			}
+		})
+	}
+}
+
+func TestVersion_Compare_BuildMetadataIgnored(t *testing.T) {
+	// Build metadata should be ignored in comparisons
+	v1 := MustParse("1.0.0+build.1")
+	v2 := MustParse("1.0.0+build.2")
+	v3 := MustParse("1.0.0")
+
+	assert.Equal(t, 0, v1.Compare(v2), "build metadata should be ignored")
+	assert.Equal(t, 0, v1.Compare(v3), "build metadata should be ignored")
+	assert.Equal(t, 0, v2.Compare(v3), "build metadata should be ignored")
+}
+
+func TestParse_LeadingZeros(t *testing.T) {
+	// Leading zeros in version numbers
+	v, err := Parse("01.02.03")
+	require.NoError(t, err)
+	assert.Equal(t, 1, v.Major)
+	assert.Equal(t, 2, v.Minor)
+	assert.Equal(t, 3, v.Patch)
+}
+
+func TestConstraint_SpaceHandling(t *testing.T) {
+	// Test that constraints with spaces are handled properly
+	tests := []struct {
+		input     string
+		shouldErr bool
+	}{
+		{"^1.0.0", false},
+		{" ^1.0.0", false},  // Leading space
+		{"^1.0.0 ", false},  // Trailing space
+		{" ^1.0.0 ", false}, // Both
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			_, err := ParseConstraint(tt.input)
+			if tt.shouldErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestSortStrings_InvalidVersionsFiltered(t *testing.T) {
+	// Ensure invalid versions are filtered out
+	input := []string{
+		"1.0.0",
+		"invalid",
+		"2.0.0",
+		"also-invalid",
+		"3.0.0",
+	}
+
+	result := SortStrings(input)
+	require.Len(t, result, 3)
+	assert.Equal(t, "1.0.0", result[0].String())
+	assert.Equal(t, "2.0.0", result[1].String())
+	assert.Equal(t, "3.0.0", result[2].String())
+}
+
+func TestVersion_Prerelease_ComplexIdentifiers(t *testing.T) {
+	tests := []struct {
+		v1      string
+		v2      string
+		wantCmp int
+	}{
+		// Numeric identifiers have lower precedence
+		{"1.0.0-1", "1.0.0-alpha", -1},
+		{"1.0.0-2", "1.0.0-1", 1},
+
+		// Alpha comes before beta
+		{"1.0.0-alpha", "1.0.0-beta", -1},
+
+		// Longer prerelease is greater when prefix matches
+		{"1.0.0-alpha", "1.0.0-alpha.1", -1},
+
+		// Multiple dot-separated identifiers
+		{"1.0.0-alpha.1.beta", "1.0.0-alpha.2", -1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.v1+" vs "+tt.v2, func(t *testing.T) {
+			v1 := MustParse(tt.v1)
+			v2 := MustParse(tt.v2)
+			assert.Equal(t, tt.wantCmp, v1.Compare(v2))
+		})
+	}
+}
