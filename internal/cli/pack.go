@@ -7,7 +7,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
-	"github.com/dex-tools/dex/internal/packer"
+	"github.com/launchcg/dex/internal/packer"
 )
 
 var packCmd = &cobra.Command{

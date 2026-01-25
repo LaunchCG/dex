@@ -8,8 +8,8 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/dex-tools/dex/internal/config"
-	"github.com/dex-tools/dex/internal/resource"
+	"github.com/launchcg/dex/internal/config"
+	"github.com/launchcg/dex/internal/resource"
 )
 
 // Adapter defines the interface for platform-specific adapters.

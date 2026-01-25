@@ -13,8 +13,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 
-	"github.com/dex-tools/dex/internal/errors"
-	"github.com/dex-tools/dex/internal/registry"
+	"github.com/launchcg/dex/internal/errors"
+	"github.com/launchcg/dex/internal/registry"
 )
 
 // AzurePublisher publishes packages to Azure Blob Storage.

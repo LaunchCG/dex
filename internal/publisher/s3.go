@@ -14,8 +14,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
-	"github.com/dex-tools/dex/internal/errors"
-	"github.com/dex-tools/dex/internal/registry"
+	"github.com/launchcg/dex/internal/errors"
+	"github.com/launchcg/dex/internal/registry"
 )
 
 // S3Publisher publishes packages to an S3 bucket.

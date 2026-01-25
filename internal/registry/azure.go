@@ -18,8 +18,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 
-	"github.com/dex-tools/dex/internal/errors"
-	"github.com/dex-tools/dex/pkg/version"
+	"github.com/launchcg/dex/internal/errors"
+	"github.com/launchcg/dex/pkg/version"
 )
 
 // AzureRegistry handles az:// sources.

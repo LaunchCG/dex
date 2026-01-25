@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dex-tools/dex/internal/resource"
+	"github.com/launchcg/dex/internal/resource"
 )
 
 // PackageConfig represents a plugin's package.hcl file.

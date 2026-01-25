@@ -3,10 +3,10 @@ package resolver
 import (
 	"fmt"
 
-	"github.com/dex-tools/dex/internal/config"
-	"github.com/dex-tools/dex/internal/lockfile"
-	"github.com/dex-tools/dex/internal/registry"
-	"github.com/dex-tools/dex/pkg/version"
+	"github.com/launchcg/dex/internal/config"
+	"github.com/launchcg/dex/internal/lockfile"
+	"github.com/launchcg/dex/internal/registry"
+	"github.com/launchcg/dex/pkg/version"
 )
 
 // Resolver handles dependency resolution for package installation.

@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dex-tools/dex/internal/config"
-	"github.com/dex-tools/dex/internal/resource"
+	"github.com/launchcg/dex/internal/config"
+	"github.com/launchcg/dex/internal/resource"
 )
 
 func TestGet_GithubCopilot(t *testing.T) {

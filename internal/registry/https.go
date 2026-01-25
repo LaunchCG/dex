@@ -27,8 +27,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dex-tools/dex/internal/errors"
-	"github.com/dex-tools/dex/pkg/version"
+	"github.com/launchcg/dex/internal/errors"
+	"github.com/launchcg/dex/pkg/version"
 )
 
 // HTTPSRegistry handles https:// sources.

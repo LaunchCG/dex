@@ -1,4 +1,4 @@
-module github.com/dex-tools/dex
+module github.com/launchcg/dex
 
 go 1.25.6
 

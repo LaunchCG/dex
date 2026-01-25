@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/dex-tools/dex/internal/config"
-	"github.com/dex-tools/dex/internal/resource"
+	"github.com/launchcg/dex/internal/config"
+	"github.com/launchcg/dex/internal/resource"
 )
 
 // CursorAdapter implements the Adapter interface for Cursor.

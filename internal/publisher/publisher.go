@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/dex-tools/dex/internal/errors"
-	"github.com/dex-tools/dex/internal/registry"
-	"github.com/dex-tools/dex/pkg/version"
+	"github.com/launchcg/dex/internal/errors"
+	"github.com/launchcg/dex/internal/registry"
+	"github.com/launchcg/dex/pkg/version"
 )
 
 // Publisher is the interface for publishing packages to registries.

@@ -15,14 +15,14 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/dex-tools/dex/internal/adapter"
-	"github.com/dex-tools/dex/internal/config"
-	"github.com/dex-tools/dex/internal/errors"
-	"github.com/dex-tools/dex/internal/lockfile"
-	"github.com/dex-tools/dex/internal/manifest"
-	"github.com/dex-tools/dex/internal/registry"
-	"github.com/dex-tools/dex/internal/resolver"
-	"github.com/dex-tools/dex/pkg/version"
+	"github.com/launchcg/dex/internal/adapter"
+	"github.com/launchcg/dex/internal/config"
+	"github.com/launchcg/dex/internal/errors"
+	"github.com/launchcg/dex/internal/lockfile"
+	"github.com/launchcg/dex/internal/manifest"
+	"github.com/launchcg/dex/internal/registry"
+	"github.com/launchcg/dex/internal/resolver"
+	"github.com/launchcg/dex/pkg/version"
 )
 
 // Installer handles plugin installation for a project.

@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dex-tools/dex/internal/registry"
+	"github.com/launchcg/dex/internal/registry"
 )
 
 func TestLocalPublisher(t *testing.T) {

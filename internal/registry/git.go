@@ -15,8 +15,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/storage/memory"
 
-	"github.com/dex-tools/dex/internal/errors"
-	"github.com/dex-tools/dex/pkg/version"
+	"github.com/launchcg/dex/internal/errors"
+	"github.com/launchcg/dex/pkg/version"
 )
 
 // GitRef represents a parsed Git reference.

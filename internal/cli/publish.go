@@ -6,7 +6,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
-	"github.com/dex-tools/dex/internal/publisher"
+	"github.com/launchcg/dex/internal/publisher"
 )
 
 var publishCmd = &cobra.Command{

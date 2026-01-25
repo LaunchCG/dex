@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dex-tools/dex/internal/adapter"
-	"github.com/dex-tools/dex/internal/manifest"
+	"github.com/launchcg/dex/internal/adapter"
+	"github.com/launchcg/dex/internal/manifest"
 )
 
 // Executor executes installation plans by creating directories, writing files,

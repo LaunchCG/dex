@@ -7,9 +7,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/dex-tools/dex/internal/config"
-	"github.com/dex-tools/dex/internal/resource"
-	"github.com/dex-tools/dex/internal/template"
+	"github.com/launchcg/dex/internal/config"
+	"github.com/launchcg/dex/internal/resource"
+	"github.com/launchcg/dex/internal/template"
 )
 
 // CopilotAdapter implements the Adapter interface for GitHub Copilot.

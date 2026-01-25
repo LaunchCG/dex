@@ -8,8 +8,8 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
-	"github.com/dex-tools/dex/internal/lockfile"
-	"github.com/dex-tools/dex/internal/manifest"
+	"github.com/launchcg/dex/internal/lockfile"
+	"github.com/launchcg/dex/internal/manifest"
 )
 
 var infoCmd = &cobra.Command{

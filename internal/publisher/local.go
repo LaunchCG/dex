@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dex-tools/dex/internal/errors"
-	"github.com/dex-tools/dex/internal/registry"
+	"github.com/launchcg/dex/internal/errors"
+	"github.com/launchcg/dex/internal/registry"
 )
 
 // LocalPublisher publishes packages to a local filesystem registry.

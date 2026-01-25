@@ -10,7 +10,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
-	"github.com/dex-tools/dex/internal/installer"
+	"github.com/launchcg/dex/internal/installer"
 )
 
 var uninstallCmd = &cobra.Command{
