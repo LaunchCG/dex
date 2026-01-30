@@ -1,16 +1,16 @@
 // Package registry provides clients for fetching plugins from various sources.
 //
 // This package implements support for multiple registry protocols:
-//   - file:// - Local filesystem access
-//   - git+https://, git+ssh:// - Git repository cloning
-//   - https:// - HTTP/HTTPS downloads
-//   - s3:// - Amazon S3
-//   - az:// - Azure Blob Storage
+//   - file:// - Local filesystem access (package.hcl)
+//   - git+https://, git+ssh:// - Git repository cloning (package.hcl or registry.json)
+//   - https:// - HTTP/HTTPS downloads (registry.json or .tar.gz)
+//   - s3:// - Amazon S3 (registry.json or .tar.gz)
+//   - az:// - Azure Blob Storage (registry.json or .tar.gz)
 //
-// Each protocol supports three modes:
-//   - Registry mode: registry.json index with multiple packages
-//   - Package mode: single package with package.json/package.hcl
-//   - Direct tarball: URL ends with .tar.gz (auto-detected)
+// Source modes:
+//   - Registry mode: registry.json index with multiple packages (all protocols except file://)
+//   - Package mode: single package with package.hcl (file:// and git:// only)
+//   - Direct tarball: URL ends with .tar.gz (https://, s3://, az://)
 package registry
 
 import (
@@ -26,7 +26,7 @@ const (
 	ModeAuto SourceMode = iota
 	// ModeRegistry expects a registry.json index file
 	ModeRegistry
-	// ModePackage expects a single package with package.json/package.hcl
+	// ModePackage expects a single package with package.hcl (file:// and git:// only)
 	ModePackage
 )
 

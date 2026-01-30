@@ -15,6 +15,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/storage/memory"
 
+	pkgConfig "github.com/launchcg/dex/internal/config"
 	"github.com/launchcg/dex/internal/errors"
 	"github.com/launchcg/dex/pkg/version"
 )
@@ -92,7 +93,7 @@ func (r *GitRegistry) Ref() GitRef {
 // GetPackageInfo returns package info by cloning/fetching the repo.
 // For git repos, we list tags as versions.
 func (r *GitRegistry) GetPackageInfo(name string) (*PackageInfo, error) {
-	// Clone the repo to get package.json or registry.json
+	// Clone the repo to get package.hcl or registry.json
 	clonePath, err := r.cloneToCache()
 	if err != nil {
 		return nil, errors.NewRegistryError(r.repoURL, "clone", err)
@@ -130,32 +131,21 @@ func (r *GitRegistry) getPackageFromRegistry(clonePath, name string) (*PackageIn
 	}, nil
 }
 
-// getPackageFromManifest extracts package info from package.json.
+// getPackageFromManifest extracts package info from package.hcl.
 func (r *GitRegistry) getPackageFromManifest(clonePath, name string) (*PackageInfo, error) {
-	packageFile := filepath.Join(clonePath, "package.json")
-	data, err := os.ReadFile(packageFile)
+	// Load package.hcl using config.LoadPackage
+	pkgCfg, err := pkgConfig.LoadPackage(clonePath)
 	if err != nil {
-		return nil, errors.NewNotFoundError("package.json", r.repoURL)
-	}
-
-	// Parse package.json for metadata
-	var pkg struct {
-		Name        string `json:"name"`
-		Version     string `json:"version"`
-		Description string `json:"description"`
-	}
-	if err := json.Unmarshal(data, &pkg); err != nil {
-		return nil, errors.NewRegistryError(r.repoURL, "fetch",
-			fmt.Errorf("failed to parse package.json: %w", err))
+		return nil, errors.NewNotFoundError("package.hcl", r.repoURL)
 	}
 
 	// Verify name matches if provided
-	if name != "" && pkg.Name != "" && !NamesMatch(name, pkg.Name) {
+	if name != "" && pkgCfg.Package.Name != "" && !NamesMatch(name, pkgCfg.Package.Name) {
 		return nil, errors.NewNotFoundError("package", name)
 	}
 
-	// Use name from package.json, fall back to provided name
-	pkgName := pkg.Name
+	// Use name from package.hcl, fall back to provided name
+	pkgName := pkgCfg.Package.Name
 	if pkgName == "" {
 		pkgName = name
 	}
@@ -184,9 +174,9 @@ func (r *GitRegistry) getPackageFromManifest(clonePath, name string) (*PackageIn
 		versions[i] = v.String()
 	}
 
-	// If no tags found, use version from package.json
-	if len(versions) == 0 && pkg.Version != "" {
-		versions = []string{pkg.Version}
+	// If no tags found, use version from package.hcl
+	if len(versions) == 0 && pkgCfg.Package.Version != "" {
+		versions = []string{pkgCfg.Package.Version}
 	}
 
 	latest := ""
@@ -198,7 +188,7 @@ func (r *GitRegistry) getPackageFromManifest(clonePath, name string) (*PackageIn
 		Name:        pkgName,
 		Versions:    versions,
 		Latest:      latest,
-		Description: pkg.Description,
+		Description: pkgCfg.Package.Description,
 	}, nil
 }
 

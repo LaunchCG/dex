@@ -138,19 +138,8 @@ func TestHTTPSRegistry_GetPackageInfo_RegistryMode(t *testing.T) {
 }
 
 func TestHTTPSRegistry_GetPackageInfo_PackageMode(t *testing.T) {
-	// Create a test server that serves package.json
-	packageJSON := map[string]interface{}{
-		"name":        "standalone-plugin",
-		"version":     "3.0.0",
-		"description": "A standalone plugin",
-	}
-
+	// HTTPS sources no longer support package mode - they should return an error
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/package.json" {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(packageJSON)
-			return
-		}
 		http.NotFound(w, r)
 	}))
 	defer server.Close()
@@ -158,24 +147,10 @@ func TestHTTPSRegistry_GetPackageInfo_PackageMode(t *testing.T) {
 	reg, err := NewHTTPSRegistry(server.URL, ModePackage)
 	require.NoError(t, err)
 
-	t.Run("get package info", func(t *testing.T) {
-		info, err := reg.GetPackageInfo("standalone-plugin")
-		require.NoError(t, err)
-		assert.Equal(t, "standalone-plugin", info.Name)
-		assert.Equal(t, []string{"3.0.0"}, info.Versions)
-		assert.Equal(t, "3.0.0", info.Latest)
-		assert.Equal(t, "A standalone plugin", info.Description)
-	})
-
-	t.Run("wrong package name", func(t *testing.T) {
-		_, err := reg.GetPackageInfo("wrong-name")
+	t.Run("package mode not supported", func(t *testing.T) {
+		_, err := reg.GetPackageInfo("any-plugin")
 		assert.Error(t, err)
-	})
-
-	t.Run("empty name returns package info", func(t *testing.T) {
-		info, err := reg.GetPackageInfo("")
-		require.NoError(t, err)
-		assert.Equal(t, "standalone-plugin", info.Name)
+		assert.Contains(t, err.Error(), "do not support package mode")
 	})
 }
 
@@ -387,14 +362,9 @@ func TestHTTPSRegistry_ListPackages(t *testing.T) {
 		assert.Contains(t, packages, "plugin-c")
 	})
 
-	t.Run("package mode", func(t *testing.T) {
-		packageJSON := map[string]interface{}{
-			"name":    "standalone-plugin",
-			"version": "1.0.0",
-		}
-
+	t.Run("package mode not supported", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			json.NewEncoder(w).Encode(packageJSON)
+			http.NotFound(w, r)
 		}))
 		defer server.Close()
 
@@ -402,8 +372,9 @@ func TestHTTPSRegistry_ListPackages(t *testing.T) {
 		require.NoError(t, err)
 
 		packages, err := reg.ListPackages()
-		require.NoError(t, err)
-		assert.Equal(t, []string{"standalone-plugin"}, packages)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "do not support package mode")
+		assert.Nil(t, packages)
 	})
 
 	t.Run("direct tarball mode", func(t *testing.T) {

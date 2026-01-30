@@ -24,8 +24,7 @@ import (
 )
 
 // S3Registry handles s3:// sources.
-// It supports registry mode (registry.json), package mode (package.json),
-// and direct tarball URLs.
+// It supports registry mode (registry.json) and direct tarball URLs.
 //
 // Authentication uses the AWS SDK default credential chain:
 //   - Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
@@ -110,7 +109,8 @@ func (r *S3Registry) GetPackageInfo(name string) (*PackageInfo, error) {
 	}
 
 	if r.mode == ModePackage {
-		return r.getPackageFromPackageJSON(name)
+		return nil, errors.NewRegistryError(r.url, "fetch",
+			fmt.Errorf("S3 sources do not support package mode; use registry mode or direct tarball URL"))
 	}
 
 	// Registry mode
@@ -133,42 +133,6 @@ func (r *S3Registry) getPackageFromTarball(name string) (*PackageInfo, error) {
 		Name:     r.tarballInfo.Name,
 		Versions: []string{r.tarballInfo.Version},
 		Latest:   r.tarballInfo.Version,
-	}, nil
-}
-
-// getPackageFromPackageJSON fetches and parses package.json for single-package mode.
-func (r *S3Registry) getPackageFromPackageJSON(name string) (*PackageInfo, error) {
-	key := r.prefix + "/package.json"
-	if r.prefix == "" {
-		key = "package.json"
-	}
-
-	data, err := r.downloadObject(key)
-	if err != nil {
-		return nil, errors.NewNotFoundError("package.json", r.url)
-	}
-
-	var pkg struct {
-		Name        string `json:"name"`
-		Version     string `json:"version"`
-		Description string `json:"description"`
-	}
-
-	if err := json.Unmarshal(data, &pkg); err != nil {
-		return nil, errors.NewRegistryError(r.url, "fetch",
-			fmt.Errorf("failed to parse package.json: %w", err))
-	}
-
-	// If a name is requested, check if it matches
-	if name != "" && !NamesMatch(name, pkg.Name) {
-		return nil, errors.NewNotFoundError("package", name)
-	}
-
-	return &PackageInfo{
-		Name:        pkg.Name,
-		Versions:    []string{pkg.Version},
-		Latest:      pkg.Version,
-		Description: pkg.Description,
 	}, nil
 }
 
@@ -308,11 +272,8 @@ func (r *S3Registry) ListPackages() ([]string, error) {
 	}
 
 	if r.mode == ModePackage {
-		info, err := r.getPackageFromPackageJSON("")
-		if err != nil {
-			return nil, err
-		}
-		return []string{info.Name}, nil
+		return nil, errors.NewRegistryError(r.url, "list",
+			fmt.Errorf("S3 sources do not support package mode; use registry mode or direct tarball URL"))
 	}
 
 	// Registry mode

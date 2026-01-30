@@ -32,8 +32,7 @@ import (
 )
 
 // HTTPSRegistry handles https:// sources.
-// It supports registry mode (registry.json), package mode (package.json),
-// and direct tarball URLs.
+// It supports registry mode (registry.json) and direct tarball URLs.
 type HTTPSRegistry struct {
 	baseURL         string
 	mode            SourceMode
@@ -94,7 +93,6 @@ func (r *HTTPSRegistry) Protocol() string {
 
 // GetPackageInfo returns package info based on the mode.
 // - Direct tarball: extracts name/version from filename
-// - Package mode: fetches and parses package.json
 // - Registry mode: fetches registry.json and looks up the package
 func (r *HTTPSRegistry) GetPackageInfo(name string) (*PackageInfo, error) {
 	if r.isDirectTarball {
@@ -102,7 +100,8 @@ func (r *HTTPSRegistry) GetPackageInfo(name string) (*PackageInfo, error) {
 	}
 
 	if r.mode == ModePackage {
-		return r.getPackageFromPackageJSON(name)
+		return nil, errors.NewRegistryError(r.baseURL, "fetch",
+			fmt.Errorf("HTTPS sources do not support package mode; use registry mode or direct tarball URL"))
 	}
 
 	// Registry mode
@@ -125,49 +124,6 @@ func (r *HTTPSRegistry) getPackageFromTarball(name string) (*PackageInfo, error)
 		Name:     r.tarballInfo.Name,
 		Versions: []string{r.tarballInfo.Version},
 		Latest:   r.tarballInfo.Version,
-	}, nil
-}
-
-// getPackageFromPackageJSON fetches and parses package.json for single-package mode.
-func (r *HTTPSRegistry) getPackageFromPackageJSON(name string) (*PackageInfo, error) {
-	packageURL := r.baseURL + "/package.json"
-
-	resp, err := r.client.Get(packageURL)
-	if err != nil {
-		return nil, errors.NewRegistryError(r.baseURL, "fetch", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, errors.NewNotFoundError("package.json", r.baseURL)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.NewRegistryError(r.baseURL, "fetch",
-			fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status))
-	}
-
-	var pkg struct {
-		Name        string `json:"name"`
-		Version     string `json:"version"`
-		Description string `json:"description"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&pkg); err != nil {
-		return nil, errors.NewRegistryError(r.baseURL, "fetch",
-			fmt.Errorf("failed to parse package.json: %w", err))
-	}
-
-	// If a name is requested, check if it matches
-	if name != "" && !NamesMatch(name, pkg.Name) {
-		return nil, errors.NewNotFoundError("package", name)
-	}
-
-	return &PackageInfo{
-		Name:        pkg.Name,
-		Versions:    []string{pkg.Version},
-		Latest:      pkg.Version,
-		Description: pkg.Description,
 	}, nil
 }
 
@@ -287,7 +243,7 @@ func (r *HTTPSRegistry) FetchPackage(resolved *ResolvedPackage, destDir string) 
 }
 
 // ListPackages returns all available package names.
-// For direct tarballs and package mode, returns a single package.
+// For direct tarballs, returns a single package.
 // For registry mode, fetches and parses registry.json.
 func (r *HTTPSRegistry) ListPackages() ([]string, error) {
 	if r.isDirectTarball {
@@ -298,11 +254,8 @@ func (r *HTTPSRegistry) ListPackages() ([]string, error) {
 	}
 
 	if r.mode == ModePackage {
-		info, err := r.getPackageFromPackageJSON("")
-		if err != nil {
-			return nil, err
-		}
-		return []string{info.Name}, nil
+		return nil, errors.NewRegistryError(r.baseURL, "list",
+			fmt.Errorf("HTTPS sources do not support package mode; use registry mode or direct tarball URL"))
 	}
 
 	// Registry mode

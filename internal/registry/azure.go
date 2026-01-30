@@ -23,8 +23,7 @@ import (
 )
 
 // AzureRegistry handles az:// sources.
-// It supports registry mode (registry.json), package mode (package.json),
-// and direct tarball URLs.
+// It supports registry mode (registry.json) and direct tarball URLs.
 //
 // Authentication uses the Azure SDK default credential chain:
 //   - Environment variables (AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET)
@@ -113,7 +112,8 @@ func (r *AzureRegistry) GetPackageInfo(name string) (*PackageInfo, error) {
 	}
 
 	if r.mode == ModePackage {
-		return r.getPackageFromPackageJSON(name)
+		return nil, errors.NewRegistryError(r.url, "fetch",
+			fmt.Errorf("Azure sources do not support package mode; use registry mode or direct tarball URL"))
 	}
 
 	// Registry mode
@@ -136,42 +136,6 @@ func (r *AzureRegistry) getPackageFromTarball(name string) (*PackageInfo, error)
 		Name:     r.tarballInfo.Name,
 		Versions: []string{r.tarballInfo.Version},
 		Latest:   r.tarballInfo.Version,
-	}, nil
-}
-
-// getPackageFromPackageJSON fetches and parses package.json for single-package mode.
-func (r *AzureRegistry) getPackageFromPackageJSON(name string) (*PackageInfo, error) {
-	blobPath := r.prefix + "/package.json"
-	if r.prefix == "" {
-		blobPath = "package.json"
-	}
-
-	data, err := r.downloadBlob(blobPath)
-	if err != nil {
-		return nil, errors.NewNotFoundError("package.json", r.url)
-	}
-
-	var pkg struct {
-		Name        string `json:"name"`
-		Version     string `json:"version"`
-		Description string `json:"description"`
-	}
-
-	if err := json.Unmarshal(data, &pkg); err != nil {
-		return nil, errors.NewRegistryError(r.url, "fetch",
-			fmt.Errorf("failed to parse package.json: %w", err))
-	}
-
-	// If a name is requested, check if it matches
-	if name != "" && !NamesMatch(name, pkg.Name) {
-		return nil, errors.NewNotFoundError("package", name)
-	}
-
-	return &PackageInfo{
-		Name:        pkg.Name,
-		Versions:    []string{pkg.Version},
-		Latest:      pkg.Version,
-		Description: pkg.Description,
 	}, nil
 }
 
@@ -311,11 +275,8 @@ func (r *AzureRegistry) ListPackages() ([]string, error) {
 	}
 
 	if r.mode == ModePackage {
-		info, err := r.getPackageFromPackageJSON("")
-		if err != nil {
-			return nil, err
-		}
-		return []string{info.Name}, nil
+		return nil, errors.NewRegistryError(r.url, "list",
+			fmt.Errorf("Azure sources do not support package mode; use registry mode or direct tarball URL"))
 	}
 
 	// Registry mode
