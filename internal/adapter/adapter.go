@@ -12,6 +12,13 @@ import (
 	"github.com/launchcg/dex/internal/resource"
 )
 
+// InstallContext provides context for resource installation,
+// including the package name and namespace settings.
+type InstallContext struct {
+	PackageName string
+	Namespace   bool
+}
+
 // Adapter defines the interface for platform-specific adapters.
 // Each adapter handles installation of resources for a specific AI agent platform.
 type Adapter interface {
@@ -35,7 +42,8 @@ type Adapter interface {
 
 	// PlanInstallation creates an installation plan for a resource.
 	// The plan describes what files to create and what configurations to merge.
-	PlanInstallation(res resource.Resource, pkg *config.PackageConfig, pluginDir, projectRoot string) (*Plan, error)
+	// The ctx parameter provides namespace settings and package information.
+	PlanInstallation(res resource.Resource, pkg *config.PackageConfig, pluginDir, projectRoot string, ctx *InstallContext) (*Plan, error)
 
 	// GenerateFrontmatter generates YAML frontmatter for a resource.
 	// Different resource types have different frontmatter fields.

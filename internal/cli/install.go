@@ -27,6 +27,7 @@ func init() {
 	installCmd.Flags().Bool("no-lock", false, "Don't update lock file")
 	installCmd.Flags().BoolP("force", "f", false, "Overwrite non-managed files")
 	installCmd.Flags().StringP("path", "p", ".", "Project directory")
+	installCmd.Flags().Bool("namespace", false, "Namespace resources with package name (e.g., pkg-name-resource)")
 }
 
 // parsePluginSpec parses a plugin specification in name@version format.
@@ -46,6 +47,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	save, _ := cmd.Flags().GetBool("save")
 	noLock, _ := cmd.Flags().GetBool("no-lock")
 	force, _ := cmd.Flags().GetBool("force")
+	namespace, _ := cmd.Flags().GetBool("namespace")
 	projectPath, _ := cmd.Flags().GetString("path")
 
 	// Create installer
@@ -55,7 +57,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	}
 
 	// Configure installer options
-	inst.WithForce(force).WithNoLock(noLock)
+	inst.WithForce(force).WithNoLock(noLock).WithNamespace(namespace)
 
 	// Parse plugin specs from args
 	var specs []installer.PluginSpec

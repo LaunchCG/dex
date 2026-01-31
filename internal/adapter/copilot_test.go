@@ -51,7 +51,7 @@ func TestCopilotAdapter_PlanInstruction(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(inst, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(inst, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: false})
 	require.NoError(t, err)
 	require.NotNil(t, plan)
 
@@ -80,7 +80,7 @@ func TestCopilotAdapter_PlanMCPServer_Stdio(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(server, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(server, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: false})
 	require.NoError(t, err)
 	require.NotNil(t, plan)
 
@@ -117,7 +117,7 @@ func TestCopilotAdapter_PlanMCPServer_HTTP(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(server, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(server, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: false})
 	require.NoError(t, err)
 
 	expectedMCPEntries := map[string]any{
@@ -149,7 +149,7 @@ func TestCopilotAdapter_PlanMCPServer_SSE(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(server, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(server, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: false})
 	require.NoError(t, err)
 
 	expectedMCPEntries := map[string]any{
@@ -182,7 +182,7 @@ func TestCopilotAdapter_PlanMCPServer_EnvFile(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(server, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(server, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: false})
 	require.NoError(t, err)
 
 	expectedMCPEntries := map[string]any{
@@ -215,7 +215,7 @@ func TestCopilotAdapter_PlanInstructions(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(inst, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(inst, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: true})
 	require.NoError(t, err)
 	require.NotNil(t, plan)
 
@@ -248,7 +248,7 @@ func TestCopilotAdapter_PlanInstructions_NoApplyTo(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(inst, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(inst, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: false})
 	require.NoError(t, err)
 	require.Len(t, plan.Files, 1)
 
@@ -279,7 +279,7 @@ func TestCopilotAdapter_PlanPrompt(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(prompt, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(prompt, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: true})
 	require.NoError(t, err)
 	require.NotNil(t, plan)
 
@@ -316,7 +316,7 @@ func TestCopilotAdapter_PlanPrompt_Minimal(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(prompt, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(prompt, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: false})
 	require.NoError(t, err)
 	require.Len(t, plan.Files, 1)
 
@@ -349,7 +349,7 @@ func TestCopilotAdapter_PlanAgent(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(agent, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(agent, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: true})
 	require.NoError(t, err)
 	require.NotNil(t, plan)
 
@@ -389,7 +389,7 @@ func TestCopilotAdapter_PlanAgent_Minimal(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(agent, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(agent, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: false})
 	require.NoError(t, err)
 	require.Len(t, plan.Files, 1)
 
@@ -416,7 +416,7 @@ func TestCopilotAdapter_PlanSkill(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(skill, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(skill, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: true})
 	require.NoError(t, err)
 	require.NotNil(t, plan)
 	assert.Equal(t, "my-plugin", plan.PluginName)
@@ -461,7 +461,7 @@ func TestCopilotAdapter_PlanSkill_WithFiles(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(skill, pkg, tmpDir, "/project")
+	plan, err := adapter.PlanInstallation(skill, pkg, tmpDir, "/project", &InstallContext{PackageName: "my-plugin", Namespace: true})
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{filepath.Join(".github", "skills", "my-plugin-test-skill")}, plan.Directories)
@@ -504,7 +504,7 @@ func TestCopilotAdapter_PlanInstallation_UnsupportedType(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(unknown, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(unknown, pkg, "/plugin", "/project", nil)
 	assert.Nil(t, plan)
 	require.Error(t, err)
 	assert.Equal(t, "unsupported resource type for github-copilot adapter: *adapter.mockUnknownResource", err.Error())

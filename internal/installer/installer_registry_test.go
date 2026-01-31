@@ -460,8 +460,8 @@ plugin "skill-plugin" {
 	require.NoError(t, err)
 
 	// Verify skill file was created
-	// Skills are installed to .claude/skills/{plugin}-{skill-name}/SKILL.md
-	skillContent, err := os.ReadFile(filepath.Join(projectDir, ".claude", "skills", "skill-plugin-my-skill", "SKILL.md"))
+	// Skills are installed to .claude/skills/{skill-name}/SKILL.md (non-namespaced by default)
+	skillContent, err := os.ReadFile(filepath.Join(projectDir, ".claude", "skills", "my-skill", "SKILL.md"))
 	require.NoError(t, err)
 	assert.Contains(t, string(skillContent), "A test skill")
 	assert.Contains(t, string(skillContent), "You are a helpful assistant")
@@ -509,8 +509,8 @@ plugin "command-plugin" {
 	require.NoError(t, err)
 
 	// Verify command file was created
-	// Commands are installed to .claude/commands/{plugin}-{name}.md
-	cmdContent, err := os.ReadFile(filepath.Join(projectDir, ".claude", "commands", "command-plugin-my-command.md"))
+	// Commands are installed to .claude/commands/{name}.md (non-namespaced by default)
+	cmdContent, err := os.ReadFile(filepath.Join(projectDir, ".claude", "commands", "my-command.md"))
 	require.NoError(t, err)
 	assert.Contains(t, string(cmdContent), "A test command")
 	assert.Contains(t, string(cmdContent), "Execute this command")

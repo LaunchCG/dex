@@ -70,7 +70,7 @@ func TestClaudeAdapter_PlanSkill(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(skill, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(skill, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: true})
 	require.NoError(t, err)
 	assert.NotNil(t, plan)
 	assert.Equal(t, "my-plugin", plan.PluginName)
@@ -104,7 +104,7 @@ func TestClaudeAdapter_PlanCommand(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(cmd, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(cmd, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: true})
 	require.NoError(t, err)
 	assert.NotNil(t, plan)
 
@@ -138,7 +138,7 @@ func TestClaudeAdapter_PlanSubagent(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(agent, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(agent, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: true})
 	require.NoError(t, err)
 	assert.NotNil(t, plan)
 
@@ -171,7 +171,7 @@ func TestClaudeAdapter_PlanRule(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(rule, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(rule, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: true})
 	require.NoError(t, err)
 	assert.NotNil(t, plan)
 
@@ -197,7 +197,7 @@ func TestClaudeAdapter_PlanRules(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(rules, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(rules, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: true})
 	require.NoError(t, err)
 	assert.NotNil(t, plan)
 
@@ -229,7 +229,7 @@ func TestClaudeAdapter_PlanSettings(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(settings, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(settings, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: true})
 	require.NoError(t, err)
 	assert.NotNil(t, plan)
 
@@ -256,7 +256,7 @@ func TestClaudeAdapter_PlanMCPServer(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(server, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(server, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: false})
 	require.NoError(t, err)
 	assert.NotNil(t, plan)
 
@@ -291,7 +291,7 @@ func TestClaudeAdapter_PlanInstallation_UnsupportedType(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(unknown, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(unknown, pkg, "/plugin", "/project", nil)
 	assert.Nil(t, plan)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported resource type")
@@ -857,7 +857,7 @@ func TestClaudeAdapter_PlanSkill_WithFiles(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(skill, pkg, tmpDir, "/project")
+	plan, err := adapter.PlanInstallation(skill, pkg, tmpDir, "/project", &InstallContext{PackageName: "my-plugin", Namespace: true})
 	require.NoError(t, err)
 
 	// Should have SKILL.md and helper.sh
@@ -894,7 +894,7 @@ func TestClaudeAdapter_PlanSkill_ContentNotTemplated(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(skill, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(skill, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: true})
 	require.NoError(t, err)
 	require.Len(t, plan.Files, 1)
 
@@ -932,7 +932,7 @@ func TestClaudeAdapter_PlanSkill_WithTemplateFiles(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(skill, pkg, tmpDir, "/project")
+	plan, err := adapter.PlanInstallation(skill, pkg, tmpDir, "/project", &InstallContext{PackageName: "my-plugin", Namespace: true})
 	require.NoError(t, err)
 
 	// Should have SKILL.md and config.yaml
@@ -970,7 +970,7 @@ func TestClaudeAdapter_PlanRule_ContentNotTemplated(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(rule, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(rule, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: true})
 	require.NoError(t, err)
 
 	// Content should be passed through as-is, not templated

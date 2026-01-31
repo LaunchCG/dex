@@ -132,7 +132,7 @@ func TestResolver_detectConflicts_WithConflict(t *testing.T) {
 
 	graph := NewDepGraph()
 	graph.AddDependency("app", "lib", "^2.0.0") // app wants lib ^2.0.0
-	graph.GetNode("lib").Version = "1.5.0"       // but lib is 1.5.0
+	graph.GetNode("lib").Version = "1.5.0"      // but lib is 1.5.0
 
 	resolved := map[string]*ResolvedDep{
 		"app": {Name: "app", Version: "1.0.0"},

@@ -20,6 +20,9 @@ type PackageConfig struct {
 	// Dependencies defines package dependencies
 	Dependencies []DependencyBlock `hcl:"dependency,block"`
 
+	// Unified MCP servers (work across all platforms)
+	UnifiedMCPServers []resource.MCPServer `hcl:"mcp_server,block"`
+
 	// Claude resources - each type is a separate field for HCL parsing
 	Skills     []resource.ClaudeSkill     `hcl:"claude_skill,block"`
 	Commands   []resource.ClaudeCommand   `hcl:"claude_command,block"`
@@ -132,6 +135,9 @@ type PackageResourcesConfig struct {
 	// Dependencies defines package dependencies
 	Dependencies []DependencyBlock `hcl:"dependency,block"`
 
+	// Unified MCP servers (work across all platforms)
+	UnifiedMCPServers []resource.MCPServer `hcl:"mcp_server,block"`
+
 	// Claude resources
 	Skills     []resource.ClaudeSkill     `hcl:"claude_skill,block"`
 	Commands   []resource.ClaudeCommand   `hcl:"claude_command,block"`
@@ -214,6 +220,9 @@ func LoadPackage(dir string) (*PackageConfig, error) {
 // mergeResourcesFrom merges resources from a PackageResourcesConfig into this config.
 // Used to merge *.pkg.hcl files that contain only resources.
 func (p *PackageConfig) mergeResourcesFrom(other *PackageResourcesConfig) {
+	// Unified MCP servers
+	p.UnifiedMCPServers = append(p.UnifiedMCPServers, other.UnifiedMCPServers...)
+
 	// Claude resources
 	p.Skills = append(p.Skills, other.Skills...)
 	p.Commands = append(p.Commands, other.Commands...)
@@ -251,6 +260,11 @@ func (p *PackageConfig) mergeResourcesFrom(other *PackageResourcesConfig) {
 // buildResources populates the Resources slice from the typed resource fields.
 func (p *PackageConfig) buildResources() {
 	p.Resources = nil
+
+	// Unified MCP servers
+	for i := range p.UnifiedMCPServers {
+		p.Resources = append(p.Resources, &p.UnifiedMCPServers[i])
+	}
 
 	// Claude resources
 	for i := range p.Skills {

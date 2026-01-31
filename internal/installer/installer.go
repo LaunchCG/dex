@@ -34,6 +34,7 @@ type Installer struct {
 	lock        *lockfile.LockFile
 	force       bool // Overwrite non-managed files
 	noLock      bool // Don't update lock file
+	namespace   bool // Namespace resources with package name
 }
 
 // PluginSpec specifies a plugin to install.
@@ -132,6 +133,35 @@ func (i *Installer) WithForce(force bool) *Installer {
 func (i *Installer) WithNoLock(noLock bool) *Installer {
 	i.noLock = noLock
 	return i
+}
+
+// WithNamespace enables namespacing for installed resources.
+func (i *Installer) WithNamespace(namespace bool) *Installer {
+	i.namespace = namespace
+	return i
+}
+
+// shouldNamespacePackage determines if a package should be namespaced
+// based on the install flag, global config, or package-specific config.
+func (i *Installer) shouldNamespacePackage(packageName string) bool {
+	// Flag takes precedence
+	if i.namespace {
+		return true
+	}
+
+	// Check global namespace_all config
+	if i.project.Project.NamespaceAll {
+		return true
+	}
+
+	// Check package-specific namespace config
+	for _, pkg := range i.project.Project.NamespacePackages {
+		if pkg == packageName {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Install installs the specified plugins.
@@ -296,6 +326,15 @@ func (i *Installer) installPlugin(spec PluginSpec) (*InstalledPlugin, error) {
 		return nil, errors.NewInstallError(pluginName, "configure", err)
 	}
 
+	// Determine if namespacing should be enabled
+	shouldNamespace := i.shouldNamespacePackage(pluginName)
+
+	// Create install context
+	ctx := &adapter.InstallContext{
+		PackageName: pluginName,
+		Namespace:   shouldNamespace,
+	}
+
 	// Create executor
 	executor := NewExecutor(i.projectRoot, i.manifest, i.force)
 
@@ -305,10 +344,11 @@ func (i *Installer) installPlugin(spec PluginSpec) (*InstalledPlugin, error) {
 	var allPlans []*adapter.Plan
 	for _, res := range pkgConfig.Resources {
 		// Skip resources that don't match the target platform
-		if res.Platform() != targetPlatform {
+		// Universal resources (like unified MCP servers) work on all platforms
+		if res.Platform() != targetPlatform && res.Platform() != "universal" {
 			continue
 		}
-		plan, err := i.adapter.PlanInstallation(res, pkgConfig, pluginDir, i.projectRoot)
+		plan, err := i.adapter.PlanInstallation(res, pkgConfig, pluginDir, i.projectRoot, ctx)
 		if err != nil {
 			return nil, errors.NewInstallError(pluginName, "plan", err)
 		}
@@ -419,6 +459,15 @@ func (i *Installer) installProjectResources() error {
 		projectPkg.Package.Name = i.project.Project.Name
 	}
 
+	// Determine if namespacing should be enabled for project resources
+	shouldNamespace := i.shouldNamespacePackage(projectPkg.Package.Name)
+
+	// Create install context for project resources
+	ctx := &adapter.InstallContext{
+		PackageName: projectPkg.Package.Name,
+		Namespace:   shouldNamespace,
+	}
+
 	// Create executor
 	executor := NewExecutor(i.projectRoot, i.manifest, i.force)
 
@@ -427,11 +476,12 @@ func (i *Installer) installProjectResources() error {
 	var allPlans []*adapter.Plan
 	for _, res := range i.project.Resources {
 		// Skip resources that don't match the target platform
-		if res.Platform() != targetPlatform {
+		// Universal resources (like unified MCP servers) work on all platforms
+		if res.Platform() != targetPlatform && res.Platform() != "universal" {
 			continue
 		}
 		// Use projectRoot as the source directory for file references
-		plan, err := i.adapter.PlanInstallation(res, projectPkg, i.projectRoot, i.projectRoot)
+		plan, err := i.adapter.PlanInstallation(res, projectPkg, i.projectRoot, i.projectRoot, ctx)
 		if err != nil {
 			return errors.Wrap(err, "failed to plan project resource installation")
 		}

@@ -54,7 +54,7 @@ func TestCursorAdapter_PlanRule(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(rule, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(rule, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: false})
 	require.NoError(t, err)
 	require.NotNil(t, plan)
 
@@ -83,7 +83,7 @@ func TestCursorAdapter_PlanMCPServer_Stdio(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(server, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(server, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: false})
 	require.NoError(t, err)
 	require.NotNil(t, plan)
 
@@ -119,7 +119,7 @@ func TestCursorAdapter_PlanMCPServer_HTTP(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(server, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(server, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: false})
 	require.NoError(t, err)
 
 	expectedMCPEntries := map[string]any{
@@ -150,7 +150,7 @@ func TestCursorAdapter_PlanMCPServer_SSE(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(server, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(server, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: false})
 	require.NoError(t, err)
 
 	expectedMCPEntries := map[string]any{
@@ -182,7 +182,7 @@ func TestCursorAdapter_PlanMCPServer_EnvFile(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(server, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(server, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: false})
 	require.NoError(t, err)
 
 	expectedMCPEntries := map[string]any{
@@ -216,7 +216,7 @@ func TestCursorAdapter_PlanRules(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(rules, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(rules, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: true})
 	require.NoError(t, err)
 	require.NotNil(t, plan)
 
@@ -253,7 +253,7 @@ func TestCursorAdapter_PlanRules_AlwaysApply(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(rules, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(rules, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: false})
 	require.NoError(t, err)
 	require.Len(t, plan.Files, 1)
 
@@ -281,7 +281,7 @@ func TestCursorAdapter_PlanRules_Minimal(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(rules, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(rules, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: false})
 	require.NoError(t, err)
 	require.Len(t, plan.Files, 1)
 
@@ -308,7 +308,7 @@ func TestCursorAdapter_PlanCommand(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(cmd, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(cmd, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: true})
 	require.NoError(t, err)
 	require.NotNil(t, plan)
 
@@ -334,7 +334,7 @@ func TestCursorAdapter_PlanInstallation_UnsupportedType(t *testing.T) {
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(unknown, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(unknown, pkg, "/plugin", "/project", nil)
 	assert.Nil(t, plan)
 	require.Error(t, err)
 	assert.Equal(t, "unsupported resource type for cursor adapter: *adapter.mockUnknownResource", err.Error())
@@ -803,7 +803,7 @@ Rule body here.`,
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(rules, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(rules, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: false})
 	require.NoError(t, err)
 	require.Len(t, plan.Files, 1)
 
@@ -830,7 +830,7 @@ Command body here.`,
 		},
 	}
 
-	plan, err := adapter.PlanInstallation(cmd, pkg, "/plugin", "/project")
+	plan, err := adapter.PlanInstallation(cmd, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: false})
 	require.NoError(t, err)
 	require.Len(t, plan.Files, 1)
 

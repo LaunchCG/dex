@@ -61,6 +61,12 @@ type ProjectBlock struct {
 
 	// AgenticPlatform specifies the target AI agent platform (e.g., "claude-code", "cursor")
 	AgenticPlatform string `hcl:"agentic_platform,attr"`
+
+	// NamespaceAll enables namespacing for all installed packages
+	NamespaceAll bool `hcl:"namespace_all,optional"`
+
+	// NamespacePackages lists specific packages to namespace
+	NamespacePackages []string `hcl:"namespace_packages,optional"`
 }
 
 // RegistryBlock defines a plugin registry source.

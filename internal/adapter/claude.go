@@ -51,22 +51,31 @@ func (a *ClaudeAdapter) RulesDir(root string) string {
 }
 
 // PlanInstallation dispatches to the appropriate planner based on resource type.
-func (a *ClaudeAdapter) PlanInstallation(res resource.Resource, pkg *config.PackageConfig, pluginDir, projectRoot string) (*Plan, error) {
+func (a *ClaudeAdapter) PlanInstallation(res resource.Resource, pkg *config.PackageConfig, pluginDir, projectRoot string, ctx *InstallContext) (*Plan, error) {
 	switch r := res.(type) {
+	// Unified MCP server (translate to Claude-specific)
+	case *resource.MCPServer:
+		claudeServer := resource.TranslateToClaudeMCPServer(r)
+		if claudeServer == nil {
+			// Server is disabled for Claude platform
+			return &Plan{}, nil
+		}
+		return a.planMCPServer(claudeServer, pkg, pluginDir, projectRoot, ctx)
+
 	case *resource.ClaudeSkill:
-		return a.planSkill(r, pkg, pluginDir, projectRoot)
+		return a.planSkill(r, pkg, pluginDir, projectRoot, ctx)
 	case *resource.ClaudeCommand:
-		return a.planCommand(r, pkg, pluginDir, projectRoot)
+		return a.planCommand(r, pkg, pluginDir, projectRoot, ctx)
 	case *resource.ClaudeSubagent:
-		return a.planSubagent(r, pkg, pluginDir, projectRoot)
+		return a.planSubagent(r, pkg, pluginDir, projectRoot, ctx)
 	case *resource.ClaudeRule:
-		return a.planRule(r, pkg, pluginDir, projectRoot)
+		return a.planRule(r, pkg, pluginDir, projectRoot, ctx)
 	case *resource.ClaudeRules:
-		return a.planRules(r, pkg, pluginDir, projectRoot)
+		return a.planRules(r, pkg, pluginDir, projectRoot, ctx)
 	case *resource.ClaudeSettings:
-		return a.planSettings(r, pkg, pluginDir, projectRoot)
+		return a.planSettings(r, pkg, pluginDir, projectRoot, ctx)
 	case *resource.ClaudeMCPServer:
-		return a.planMCPServer(r, pkg, pluginDir, projectRoot)
+		return a.planMCPServer(r, pkg, pluginDir, projectRoot, ctx)
 	default:
 		return nil, fmt.Errorf("unsupported resource type for claude-code adapter: %T", res)
 	}
@@ -233,11 +242,16 @@ func hasFrontmatter(content string) bool {
 
 // planSkill creates an installation plan for a Claude skill.
 // Skills are installed to .claude/skills/{plugin}-{skill-name}/SKILL.md
-func (a *ClaudeAdapter) planSkill(skill *resource.ClaudeSkill, pkg *config.PackageConfig, pluginDir, root string) (*Plan, error) {
+func (a *ClaudeAdapter) planSkill(skill *resource.ClaudeSkill, pkg *config.PackageConfig, pluginDir, root string, ctx *InstallContext) (*Plan, error) {
 	plan := NewPlan(pkg.Package.Name)
 
-	// Create skill directory: .claude/skills/{plugin}-{skill}/
-	skillDirName := fmt.Sprintf("%s-%s", pkg.Package.Name, skill.Name)
+	// Create skill directory with optional namespacing
+	var skillDirName string
+	if ctx != nil && ctx.Namespace {
+		skillDirName = fmt.Sprintf("%s-%s", pkg.Package.Name, skill.Name)
+	} else {
+		skillDirName = skill.Name
+	}
 	skillDir := filepath.Join(".claude", "skills", skillDirName)
 	plan.AddDirectory(skillDir)
 
@@ -268,8 +282,8 @@ func (a *ClaudeAdapter) planSkill(skill *resource.ClaudeSkill, pkg *config.Packa
 }
 
 // planCommand creates an installation plan for a Claude command.
-// Commands are installed to .claude/commands/{plugin}-{command}.md
-func (a *ClaudeAdapter) planCommand(cmd *resource.ClaudeCommand, pkg *config.PackageConfig, pluginDir, root string) (*Plan, error) {
+// Commands are installed to .claude/commands/{{plugin}-}{command}.md (namespaced or not)
+func (a *ClaudeAdapter) planCommand(cmd *resource.ClaudeCommand, pkg *config.PackageConfig, pluginDir, root string, ctx *InstallContext) (*Plan, error) {
 	plan := NewPlan(pkg.Package.Name)
 
 	// Create commands directory
@@ -285,8 +299,13 @@ func (a *ClaudeAdapter) planCommand(cmd *resource.ClaudeCommand, pkg *config.Pac
 		content = frontmatter + cmd.Content
 	}
 
-	// Add command file: .claude/commands/{plugin}-{command}.md
-	fileName := fmt.Sprintf("%s-%s.md", pkg.Package.Name, cmd.Name)
+	// Add command file with optional namespacing
+	var fileName string
+	if ctx != nil && ctx.Namespace {
+		fileName = fmt.Sprintf("%s-%s.md", pkg.Package.Name, cmd.Name)
+	} else {
+		fileName = fmt.Sprintf("%s.md", cmd.Name)
+	}
 	cmdFile := filepath.Join(commandsDir, fileName)
 	plan.AddFile(cmdFile, content, "")
 
@@ -294,8 +313,8 @@ func (a *ClaudeAdapter) planCommand(cmd *resource.ClaudeCommand, pkg *config.Pac
 }
 
 // planSubagent creates an installation plan for a Claude subagent.
-// Subagents are installed to .claude/agents/{plugin}-{agent}.md
-func (a *ClaudeAdapter) planSubagent(agent *resource.ClaudeSubagent, pkg *config.PackageConfig, pluginDir, root string) (*Plan, error) {
+// Subagents are installed to .claude/agents/{{plugin}-}{agent}.md (namespaced or not)
+func (a *ClaudeAdapter) planSubagent(agent *resource.ClaudeSubagent, pkg *config.PackageConfig, pluginDir, root string, ctx *InstallContext) (*Plan, error) {
 	plan := NewPlan(pkg.Package.Name)
 
 	// Create agents directory
@@ -311,8 +330,13 @@ func (a *ClaudeAdapter) planSubagent(agent *resource.ClaudeSubagent, pkg *config
 		content = frontmatter + agent.Content
 	}
 
-	// Add agent file: .claude/agents/{plugin}-{agent}.md
-	fileName := fmt.Sprintf("%s-%s.md", pkg.Package.Name, agent.Name)
+	// Add agent file with optional namespacing
+	var fileName string
+	if ctx != nil && ctx.Namespace {
+		fileName = fmt.Sprintf("%s-%s.md", pkg.Package.Name, agent.Name)
+	} else {
+		fileName = fmt.Sprintf("%s.md", agent.Name)
+	}
 	agentFile := filepath.Join(agentsDir, fileName)
 	plan.AddFile(agentFile, content, "")
 
@@ -321,7 +345,7 @@ func (a *ClaudeAdapter) planSubagent(agent *resource.ClaudeSubagent, pkg *config
 
 // planRule creates an installation plan for a Claude rule (singular).
 // Rules are merged into CLAUDE.md with markers.
-func (a *ClaudeAdapter) planRule(rule *resource.ClaudeRule, pkg *config.PackageConfig, pluginDir, root string) (*Plan, error) {
+func (a *ClaudeAdapter) planRule(rule *resource.ClaudeRule, pkg *config.PackageConfig, pluginDir, root string, ctx *InstallContext) (*Plan, error) {
 	plan := NewPlan(pkg.Package.Name)
 
 	// Rules are merged into CLAUDE.md via AgentFileContent
@@ -332,8 +356,8 @@ func (a *ClaudeAdapter) planRule(rule *resource.ClaudeRule, pkg *config.PackageC
 }
 
 // planRules creates an installation plan for Claude rules (plural).
-// Rules files are installed to .claude/rules/{plugin}-{rule}.md
-func (a *ClaudeAdapter) planRules(rules *resource.ClaudeRules, pkg *config.PackageConfig, pluginDir, root string) (*Plan, error) {
+// Rules files are installed to .claude/rules/{{plugin}-}{rule}.md (namespaced or not)
+func (a *ClaudeAdapter) planRules(rules *resource.ClaudeRules, pkg *config.PackageConfig, pluginDir, root string, ctx *InstallContext) (*Plan, error) {
 	plan := NewPlan(pkg.Package.Name)
 
 	// Create rules directory
@@ -351,8 +375,13 @@ func (a *ClaudeAdapter) planRules(rules *resource.ClaudeRules, pkg *config.Packa
 		content = frontmatter + rules.Content
 	}
 
-	// Add rules file: .claude/rules/{plugin}-{rule}.md
-	fileName := fmt.Sprintf("%s-%s.md", pkg.Package.Name, rules.Name)
+	// Add rules file with optional namespacing
+	var fileName string
+	if ctx != nil && ctx.Namespace {
+		fileName = fmt.Sprintf("%s-%s.md", pkg.Package.Name, rules.Name)
+	} else {
+		fileName = fmt.Sprintf("%s.md", rules.Name)
+	}
 	rulesFile := filepath.Join(rulesDir, fileName)
 	plan.AddFile(rulesFile, content, "")
 
@@ -361,7 +390,7 @@ func (a *ClaudeAdapter) planRules(rules *resource.ClaudeRules, pkg *config.Packa
 
 // planSettings creates an installation plan for Claude settings.
 // Settings are merged into .claude/settings.json
-func (a *ClaudeAdapter) planSettings(settings *resource.ClaudeSettings, pkg *config.PackageConfig, pluginDir, root string) (*Plan, error) {
+func (a *ClaudeAdapter) planSettings(settings *resource.ClaudeSettings, pkg *config.PackageConfig, pluginDir, root string, ctx *InstallContext) (*Plan, error) {
 	plan := NewPlan(pkg.Package.Name)
 
 	// Settings are merged via SettingsEntries
@@ -371,12 +400,26 @@ func (a *ClaudeAdapter) planSettings(settings *resource.ClaudeSettings, pkg *con
 }
 
 // planMCPServer creates an installation plan for a Claude MCP server.
-// MCP servers are merged into .mcp.json
-func (a *ClaudeAdapter) planMCPServer(server *resource.ClaudeMCPServer, pkg *config.PackageConfig, pluginDir, root string) (*Plan, error) {
+// MCP servers are merged into .mcp.json with optional namespacing
+func (a *ClaudeAdapter) planMCPServer(server *resource.ClaudeMCPServer, pkg *config.PackageConfig, pluginDir, root string, ctx *InstallContext) (*Plan, error) {
 	plan := NewPlan(pkg.Package.Name)
 
+	// Apply namespacing to server name if requested
+	serverName := server.Name
+	if ctx != nil && ctx.Namespace {
+		serverName = fmt.Sprintf("%s-%s", pkg.Package.Name, server.Name)
+	}
+
+	// Create a copy of the server with the potentially namespaced name
+	namespacedServer := *server
+	namespacedServer.Name = serverName
+
 	// MCP servers are merged via MCPEntries
-	plan.MCPEntries = a.MergeMCPConfig(nil, pkg.Package.Name, []*resource.ClaudeMCPServer{server})
+	plan.MCPEntries = a.MergeMCPConfig(nil, pkg.Package.Name, []*resource.ClaudeMCPServer{&namespacedServer})
+
+	// Set Claude-specific MCP config path and key
+	plan.MCPPath = ".mcp.json"
+	plan.MCPKey = "mcpServers"
 
 	return plan, nil
 }
