@@ -200,9 +200,14 @@ func (i *Installer) Install(specs []PluginSpec) ([]InstalledPlugin, error) {
 // InstallAll installs all plugins from the project config.
 // Uses lock file versions if available, otherwise resolves latest.
 func (i *Installer) InstallAll() error {
-	if len(i.project.Plugins) == 0 && len(i.project.Resources) == 0 {
-		fmt.Println("No plugins or resources defined in config")
+	if len(i.project.Plugins) == 0 && len(i.project.Resources) == 0 && i.project.Project.AgentInstructions == "" {
+		fmt.Println("No plugins, resources, or agent instructions defined in config")
 		return nil
+	}
+
+	// Install project-level agent instructions first (before any plugins)
+	if err := i.installProjectAgentInstructions(); err != nil {
+		return err
 	}
 
 	var specs []PluginSpec
@@ -502,6 +507,46 @@ func (i *Installer) installProjectResources() error {
 	}
 
 	fmt.Printf("  ✓ Installed project resources\n")
+	return nil
+}
+
+// installProjectAgentInstructions installs project-level agent instructions.
+// These appear at the top of agent files (CLAUDE.md, AGENTS.md, etc.) before any plugin sections.
+func (i *Installer) installProjectAgentInstructions() error {
+	// Determine the agent file path based on platform
+	var agentPath string
+	switch i.project.Project.AgenticPlatform {
+	case "claude-code":
+		agentPath = "CLAUDE.md"
+	case "cursor":
+		agentPath = "AGENTS.md"
+	case "github-copilot":
+		agentPath = filepath.Join(".github", "copilot-instructions.md")
+	default:
+		// Default to CLAUDE.md for unknown platforms
+		agentPath = "CLAUDE.md"
+	}
+
+	// Create executor
+	executor := NewExecutor(i.projectRoot, i.manifest, i.force)
+
+	// Always apply project instructions (even if empty) to handle removal case
+	// The merge function will properly remove project content when instructions are empty
+	if err := executor.applyProjectAgentInstructions(i.project.Project.AgentInstructions, agentPath); err != nil {
+		return errors.Wrap(err, "failed to apply project agent instructions")
+	}
+
+	// Track in manifest only if we have content
+	if i.project.Project.AgentInstructions != "" {
+		i.manifest.TrackAgentContent("__project__")
+	} else {
+		// Remove tracking if instructions are empty
+		plugin := i.manifest.GetPlugin("__project__")
+		if plugin != nil {
+			plugin.HasAgentContent = false
+		}
+	}
+
 	return nil
 }
 

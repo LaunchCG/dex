@@ -67,6 +67,11 @@ type ProjectBlock struct {
 
 	// NamespacePackages lists specific packages to namespace
 	NamespacePackages []string `hcl:"namespace_packages,optional"`
+
+	// AgentInstructions contains project-level instructions that appear at the top
+	// of agent files (CLAUDE.md, AGENTS.md, copilot-instructions.md) before any
+	// plugin-contributed content. This content is owned by the project, not plugins.
+	AgentInstructions string `hcl:"agent_instructions,optional"`
 }
 
 // RegistryBlock defines a plugin registry source.

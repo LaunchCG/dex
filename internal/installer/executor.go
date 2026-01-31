@@ -270,6 +270,38 @@ func (e *Executor) applyAgentFileContent(pluginName, content, agentPath string) 
 	return os.WriteFile(fullPath, []byte(merged), 0644)
 }
 
+// applyProjectAgentInstructions merges project-level instructions into the agent file.
+// Project instructions appear at the top without markers, before any plugin sections.
+// Uses agentPath if provided, otherwise defaults to "CLAUDE.md".
+func (e *Executor) applyProjectAgentInstructions(content, agentPath string) error {
+	// Default path
+	if agentPath == "" {
+		agentPath = "CLAUDE.md"
+	}
+
+	fullPath := filepath.Join(e.projectRoot, agentPath)
+
+	// Ensure directory exists
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+		return err
+	}
+
+	// Read existing content
+	existing := ""
+	data, err := os.ReadFile(fullPath)
+	if err == nil {
+		existing = string(data)
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+
+	// Merge project instructions with existing plugin sections
+	merged := MergeProjectAgentContent(existing, content)
+
+	// Write back
+	return os.WriteFile(fullPath, []byte(merged), 0644)
+}
+
 // processTemplate performs simple variable substitution on content.
 // Variables are in the format ${var_name} or {{var_name}}.
 func processTemplate(content string, vars map[string]string) string {

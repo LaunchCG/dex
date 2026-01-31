@@ -252,3 +252,32 @@ func MergeEnvMaps(base, overlay map[string]string) map[string]string {
 
 	return result
 }
+
+// MergeProjectAgentContent merges project-level instructions with plugin-contributed sections.
+// Project instructions appear at the top without markers.
+// Plugin sections are marked with <!-- dex:plugin-name --> ... <!-- /dex:plugin-name -->
+// Returns the merged content with project instructions first, then all plugin sections.
+func MergeProjectAgentContent(existing, projectInstructions string) string {
+	// Extract all plugin sections (anything between <!-- dex:* --> markers)
+	// Use a simpler pattern that matches any plugin section
+	markerPattern := regexp.MustCompile(`(?s)<!-- dex:[^>]+ -->.*?<!-- /dex:[^>]+ -->`)
+	pluginSections := markerPattern.FindAllString(existing, -1)
+
+	// Build the new content: project instructions + plugin sections
+	var result strings.Builder
+
+	// Add project instructions (if any)
+	if projectInstructions != "" {
+		result.WriteString(strings.TrimSpace(projectInstructions))
+	}
+
+	// Add plugin sections
+	for _, section := range pluginSections {
+		if result.Len() > 0 {
+			result.WriteString("\n\n")
+		}
+		result.WriteString(section)
+	}
+
+	return result.String()
+}
