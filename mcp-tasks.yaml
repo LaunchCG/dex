@@ -1,0 +1,57 @@
+version: "1.0"
+
+# Dex project tasks mapped to Makefile targets
+tasks:
+  build:
+    description: "Build the CLI binary to bin/dex"
+    command: "make build"
+    type: oneshot
+
+  test:
+    description: "Run all tests"
+    command: "make test"
+    type: oneshot
+
+  test-cover:
+    description: "Run tests with coverage report"
+    command: "make test-cover"
+    type: oneshot
+
+  lint:
+    description: "Run linter (fmt + vet)"
+    command: "make lint"
+    type: oneshot
+
+  fmt:
+    description: "Format code with go fmt"
+    command: "make fmt"
+    type: oneshot
+
+  vet:
+    description: "Run go vet"
+    command: "make vet"
+    type: oneshot
+
+  clean:
+    description: "Remove built binary and coverage files"
+    command: "make clean"
+    type: oneshot
+
+  install:
+    description: "Install binary to GOPATH/bin"
+    command: "make install"
+    type: oneshot
+
+  install-user:
+    description: "Install binary to ~/.bin"
+    command: "make install-user"
+    type: oneshot
+
+# Task groups organize related tasks
+task_groups:
+  ci:
+    description: "CI pipeline tasks"
+    tasks:
+      - lint
+      - test
+      - build
