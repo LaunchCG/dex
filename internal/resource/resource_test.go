@@ -509,6 +509,19 @@ func TestClaudeRules_Validate(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "valid rules with only file blocks",
+			rules: ClaudeRules{
+				Name:        "test-rules",
+				Description: "Test rules",
+				Content:     "", // No content
+				Files: []FileBlock{
+					{Src: "file1.md"},
+					{Src: "file2.md"},
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "missing name",
 			rules: ClaudeRules{
 				Description: "Test rules",
@@ -527,13 +540,13 @@ func TestClaudeRules_Validate(t *testing.T) {
 			errMsg:  "description is required",
 		},
 		{
-			name: "missing content",
+			name: "missing content and files",
 			rules: ClaudeRules{
 				Name:        "test-rules",
 				Description: "Test rules",
 			},
 			wantErr: true,
-			errMsg:  "content is required",
+			errMsg:  "must specify either content or file blocks",
 		},
 	}
 

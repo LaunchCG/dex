@@ -371,20 +371,23 @@ func (a *ClaudeAdapter) planRules(rules *resource.ClaudeRules, pkg *config.Packa
 	rulesDir := filepath.Join(".claude", "rules", rulesDirName)
 	plan.AddDirectory(rulesDir)
 
-	// Generate frontmatter and content for the main rules file
-	// Content is used as-is; use templatefile() in HCL for templating
-	// Skip frontmatter if content already has it
-	var content string
-	if hasFrontmatter(rules.Content) {
-		content = rules.Content
-	} else {
-		frontmatter := a.generateRulesFrontmatter(rules, pkg)
-		content = frontmatter + rules.Content
-	}
+	// Only create main rules file if content is provided
+	if rules.Content != "" {
+		// Generate frontmatter and content for the main rules file
+		// Content is used as-is; use templatefile() in HCL for templating
+		// Skip frontmatter if content already has it
+		var content string
+		if hasFrontmatter(rules.Content) {
+			content = rules.Content
+		} else {
+			frontmatter := a.generateRulesFrontmatter(rules, pkg)
+			content = frontmatter + rules.Content
+		}
 
-	// Add main rules file (named after the resource)
-	mainFile := filepath.Join(rulesDir, rules.Name+".md")
-	plan.AddFile(mainFile, content, "")
+		// Add main rules file (named after the resource)
+		mainFile := filepath.Join(rulesDir, rules.Name+".md")
+		plan.AddFile(mainFile, content, "")
+	}
 
 	// Copy nested files
 	if err := a.planFiles(plan, rules.GetFiles(), pluginDir, rulesDir); err != nil {

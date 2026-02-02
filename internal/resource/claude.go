@@ -363,8 +363,9 @@ func (r *ClaudeRules) Validate() error {
 	if r.Description == "" {
 		return fmt.Errorf("claude_rules %q: description is required", r.Name)
 	}
-	if r.Content == "" {
-		return fmt.Errorf("claude_rules %q: content is required", r.Name)
+	// Content is optional - can provide rules via file blocks only
+	if r.Content == "" && len(r.Files) == 0 && len(r.TemplateFiles) == 0 {
+		return fmt.Errorf("claude_rules %q: must specify either content or file blocks", r.Name)
 	}
 	return nil
 }
