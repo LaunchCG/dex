@@ -356,15 +356,22 @@ func (a *ClaudeAdapter) planRule(rule *resource.ClaudeRule, pkg *config.PackageC
 }
 
 // planRules creates an installation plan for Claude rules (plural).
-// Rules files are installed to .claude/rules/{{plugin}-}{rule}.md (namespaced or not)
+// Rules are installed to .claude/rules/{name}/ as a directory structure,
+// similar to skills, allowing for multiple related rule files.
 func (a *ClaudeAdapter) planRules(rules *resource.ClaudeRules, pkg *config.PackageConfig, pluginDir, root string, ctx *InstallContext) (*Plan, error) {
 	plan := NewPlan(pkg.Package.Name)
 
-	// Create rules directory
-	rulesDir := filepath.Join(".claude", "rules")
+	// Create rules subdirectory with optional namespacing
+	var rulesDirName string
+	if ctx != nil && ctx.Namespace {
+		rulesDirName = fmt.Sprintf("%s-%s", pkg.Package.Name, rules.Name)
+	} else {
+		rulesDirName = rules.Name
+	}
+	rulesDir := filepath.Join(".claude", "rules", rulesDirName)
 	plan.AddDirectory(rulesDir)
 
-	// Generate frontmatter and content
+	// Generate frontmatter and content for the main rules file
 	// Content is used as-is; use templatefile() in HCL for templating
 	// Skip frontmatter if content already has it
 	var content string
@@ -375,15 +382,19 @@ func (a *ClaudeAdapter) planRules(rules *resource.ClaudeRules, pkg *config.Packa
 		content = frontmatter + rules.Content
 	}
 
-	// Add rules file with optional namespacing
-	var fileName string
-	if ctx != nil && ctx.Namespace {
-		fileName = fmt.Sprintf("%s-%s.md", pkg.Package.Name, rules.Name)
-	} else {
-		fileName = fmt.Sprintf("%s.md", rules.Name)
+	// Add main rules file (named after the resource)
+	mainFile := filepath.Join(rulesDir, rules.Name+".md")
+	plan.AddFile(mainFile, content, "")
+
+	// Copy nested files
+	if err := a.planFiles(plan, rules.GetFiles(), pluginDir, rulesDir); err != nil {
+		return nil, fmt.Errorf("planning rules files: %w", err)
 	}
-	rulesFile := filepath.Join(rulesDir, fileName)
-	plan.AddFile(rulesFile, content, "")
+
+	// Handle template files
+	if err := a.planTemplateFiles(plan, rules.GetTemplateFiles(), pkg, pluginDir, rulesDir, root); err != nil {
+		return nil, fmt.Errorf("planning rules template files: %w", err)
+	}
 
 	return plan, nil
 }

@@ -35,6 +35,9 @@ type PluginManifest struct {
 
 	// HasAgentContent indicates if this plugin contributed to the agent file
 	HasAgentContent bool `json:"has_agent_content,omitempty"`
+
+	// MergedFiles are relative paths to merged configuration files (e.g., .mcp.json, .claude/settings.json)
+	MergedFiles []string `json:"merged_files,omitempty"`
 }
 
 // UntrackResult contains resources that were untracked.
@@ -44,6 +47,7 @@ type UntrackResult struct {
 	MCPServers      []string
 	SettingsValues  map[string][]string
 	HasAgentContent bool
+	MergedFiles     []string
 }
 
 // Load loads a manifest from the project root.
@@ -124,6 +128,12 @@ func (m *Manifest) TrackAgentContent(pluginName string) {
 	pm.HasAgentContent = true
 }
 
+// TrackMergedFile records a merged configuration file for a plugin.
+func (m *Manifest) TrackMergedFile(pluginName, filePath string) {
+	pm := m.getOrCreate(pluginName)
+	pm.MergedFiles = uniqueStrings(append(pm.MergedFiles, filePath))
+}
+
 // Untrack removes a plugin and returns its tracked resources.
 func (m *Manifest) Untrack(pluginName string) *UntrackResult {
 	pm, ok := m.Plugins[pluginName]
@@ -137,6 +147,7 @@ func (m *Manifest) Untrack(pluginName string) *UntrackResult {
 		MCPServers:      pm.MCPServers,
 		SettingsValues:  pm.SettingsValues,
 		HasAgentContent: pm.HasAgentContent,
+		MergedFiles:     pm.MergedFiles,
 	}
 
 	delete(m.Plugins, pluginName)
@@ -162,13 +173,14 @@ func (m *Manifest) InstalledPlugins() []string {
 	return m.GetPluginNames()
 }
 
-// AllFiles returns all tracked files across all plugins.
+// AllFiles returns all tracked files across all plugins, including merged files.
 func (m *Manifest) AllFiles() []string {
 	var files []string
 	for _, pm := range m.Plugins {
 		files = append(files, pm.Files...)
+		files = append(files, pm.MergedFiles...)
 	}
-	return files
+	return uniqueStrings(files)
 }
 
 // AllDirectories returns all tracked directories across all plugins.
@@ -204,6 +216,21 @@ func (m *Manifest) IsSettingsValueUsedByOthers(excludePlugin, key, value string)
 				if v == value {
 					return true
 				}
+			}
+		}
+	}
+	return false
+}
+
+// IsMergedFileUsedByOthers checks if a merged file is used by plugins other than the specified one.
+func (m *Manifest) IsMergedFileUsedByOthers(excludePlugin, filePath string) bool {
+	for pluginName, pm := range m.Plugins {
+		if pluginName == excludePlugin {
+			continue
+		}
+		for _, f := range pm.MergedFiles {
+			if f == filePath {
+				return true
 			}
 		}
 	}

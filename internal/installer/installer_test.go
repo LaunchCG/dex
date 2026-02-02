@@ -2083,3 +2083,253 @@ func findAllTransitiveDependents(inst *Installer, pkg string) []string {
 
 	return all
 }
+
+// Tests for merged file tracking
+
+func TestExecutor_TracksMCPConfigFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	m := newTestManifest(t, tmpDir)
+	executor := NewExecutor(tmpDir, m, false)
+
+	plan := &adapter.Plan{
+		PluginName: "test-plugin",
+		MCPEntries: map[string]any{
+			"mcpServers": map[string]any{
+				"test-server": map[string]any{
+					"command": "test-cmd",
+				},
+			},
+		},
+	}
+
+	err := executor.Execute(plan, nil)
+	require.NoError(t, err)
+
+	// Verify .mcp.json is tracked as a merged file
+	plugin := m.GetPlugin("test-plugin")
+	require.NotNil(t, plugin)
+	assert.Contains(t, plugin.MergedFiles, ".mcp.json")
+
+	// Verify it's included in AllFiles
+	allFiles := m.AllFiles()
+	assert.Contains(t, allFiles, ".mcp.json")
+}
+
+func TestExecutor_TracksSettingsFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	m := newTestManifest(t, tmpDir)
+	executor := NewExecutor(tmpDir, m, false)
+
+	plan := &adapter.Plan{
+		PluginName: "test-plugin",
+		SettingsEntries: map[string]any{
+			"allow": []any{"Bash(npm:*)"},
+		},
+	}
+
+	err := executor.Execute(plan, nil)
+	require.NoError(t, err)
+
+	// Verify settings.json is tracked as a merged file
+	plugin := m.GetPlugin("test-plugin")
+	require.NotNil(t, plugin)
+	assert.Contains(t, plugin.MergedFiles, filepath.Join(".claude", "settings.json"))
+
+	// Verify it's included in AllFiles
+	allFiles := m.AllFiles()
+	assert.Contains(t, allFiles, filepath.Join(".claude", "settings.json"))
+}
+
+func TestExecutor_TracksAgentFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	m := newTestManifest(t, tmpDir)
+	executor := NewExecutor(tmpDir, m, false)
+
+	plan := &adapter.Plan{
+		PluginName:       "test-plugin",
+		AgentFileContent: "Test agent content",
+	}
+
+	err := executor.Execute(plan, nil)
+	require.NoError(t, err)
+
+	// Verify CLAUDE.md is tracked as a merged file
+	plugin := m.GetPlugin("test-plugin")
+	require.NotNil(t, plugin)
+	assert.Contains(t, plugin.MergedFiles, "CLAUDE.md")
+
+	// Verify it's included in AllFiles
+	allFiles := m.AllFiles()
+	assert.Contains(t, allFiles, "CLAUDE.md")
+}
+
+func TestExecutor_TracksCustomAgentFilePath(t *testing.T) {
+	tmpDir := t.TempDir()
+	m := newTestManifest(t, tmpDir)
+	executor := NewExecutor(tmpDir, m, false)
+
+	customPath := filepath.Join(".github", "copilot-instructions.md")
+	plan := &adapter.Plan{
+		PluginName:       "test-plugin",
+		AgentFileContent: "Custom agent content",
+		AgentFilePath:    customPath,
+	}
+
+	err := executor.Execute(plan, nil)
+	require.NoError(t, err)
+
+	// Verify custom path is tracked
+	plugin := m.GetPlugin("test-plugin")
+	require.NotNil(t, plugin)
+	assert.Contains(t, plugin.MergedFiles, customPath)
+
+	// Verify it's included in AllFiles
+	allFiles := m.AllFiles()
+	assert.Contains(t, allFiles, customPath)
+}
+
+func TestExecutor_MultiplPlugins_SharedMergedFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	m := newTestManifest(t, tmpDir)
+	executor := NewExecutor(tmpDir, m, false)
+
+	// Install plugin1 with MCP config
+	plan1 := &adapter.Plan{
+		PluginName: "plugin1",
+		MCPEntries: map[string]any{
+			"mcpServers": map[string]any{
+				"server1": map[string]any{"command": "cmd1"},
+			},
+		},
+	}
+	err := executor.Execute(plan1, nil)
+	require.NoError(t, err)
+
+	// Install plugin2 with MCP config
+	plan2 := &adapter.Plan{
+		PluginName: "plugin2",
+		MCPEntries: map[string]any{
+			"mcpServers": map[string]any{
+				"server2": map[string]any{"command": "cmd2"},
+			},
+		},
+	}
+	err = executor.Execute(plan2, nil)
+	require.NoError(t, err)
+
+	// Both should track .mcp.json
+	plugin1 := m.GetPlugin("plugin1")
+	require.NotNil(t, plugin1)
+	assert.Contains(t, plugin1.MergedFiles, ".mcp.json")
+
+	plugin2 := m.GetPlugin("plugin2")
+	require.NotNil(t, plugin2)
+	assert.Contains(t, plugin2.MergedFiles, ".mcp.json")
+
+	// .mcp.json should appear only once in AllFiles
+	allFiles := m.AllFiles()
+	mcpCount := 0
+	for _, f := range allFiles {
+		if f == ".mcp.json" {
+			mcpCount++
+		}
+	}
+	assert.Equal(t, 1, mcpCount)
+
+	// .mcp.json should be used by others from each plugin's perspective
+	assert.True(t, m.IsMergedFileUsedByOthers("plugin1", ".mcp.json"))
+	assert.True(t, m.IsMergedFileUsedByOthers("plugin2", ".mcp.json"))
+}
+
+func TestUninstall_RemovesEmptyMergedFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	m := newTestManifest(t, tmpDir)
+
+	// Create minimal dex.hcl for installer
+	dexHCL := `project {
+  name = "test"
+  agentic_platform = "claude-code"
+}`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(dexHCL), 0644)
+	require.NoError(t, err)
+
+	// Create installer
+	inst, err := NewInstaller(tmpDir)
+	require.NoError(t, err)
+	inst.manifest = m
+
+	// Manually create an MCP config with one server
+	mcpPath := filepath.Join(tmpDir, ".mcp.json")
+	mcpConfig := map[string]any{
+		"mcpServers": map[string]any{
+			"test-server": map[string]any{"command": "test"},
+		},
+	}
+	err = WriteJSONFile(mcpPath, mcpConfig)
+	require.NoError(t, err)
+
+	// Track the plugin and merged file
+	m.TrackMCPServer("test-plugin", "test-server")
+	m.TrackMergedFile("test-plugin", ".mcp.json")
+
+	// Uninstall the plugin
+	err = inst.uninstallPlugin("test-plugin")
+	require.NoError(t, err)
+
+	// Since we removed the only server, .mcp.json should be empty and deleted
+	_, err = os.Stat(mcpPath)
+	assert.True(t, os.IsNotExist(err), ".mcp.json should be deleted when empty")
+}
+
+func TestUninstall_PreservesSharedMergedFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	m := newTestManifest(t, tmpDir)
+
+	// Create minimal dex.hcl for installer
+	dexHCL := `project {
+  name = "test"
+  agentic_platform = "claude-code"
+}`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(dexHCL), 0644)
+	require.NoError(t, err)
+
+	// Create installer
+	inst, err := NewInstaller(tmpDir)
+	require.NoError(t, err)
+	inst.manifest = m
+
+	// Create an MCP config with two servers
+	mcpPath := filepath.Join(tmpDir, ".mcp.json")
+	mcpConfig := map[string]any{
+		"mcpServers": map[string]any{
+			"server1": map[string]any{"command": "cmd1"},
+			"server2": map[string]any{"command": "cmd2"},
+		},
+	}
+	err = WriteJSONFile(mcpPath, mcpConfig)
+	require.NoError(t, err)
+
+	// Track both plugins using the same merged file
+	m.TrackMCPServer("plugin1", "server1")
+	m.TrackMergedFile("plugin1", ".mcp.json")
+	m.TrackMCPServer("plugin2", "server2")
+	m.TrackMergedFile("plugin2", ".mcp.json")
+
+	// Uninstall plugin1
+	err = inst.uninstallPlugin("plugin1")
+	require.NoError(t, err)
+
+	// .mcp.json should still exist (plugin2 still uses it)
+	_, err = os.Stat(mcpPath)
+	assert.NoError(t, err, ".mcp.json should still exist")
+
+	// It should only contain server2
+	content, err := os.ReadFile(mcpPath)
+	require.NoError(t, err)
+	var result map[string]any
+	err = json.Unmarshal(content, &result)
+	require.NoError(t, err)
+	servers := result["mcpServers"].(map[string]any)
+	assert.NotContains(t, servers, "server1")
+	assert.Contains(t, servers, "server2")
+}

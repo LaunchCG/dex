@@ -531,13 +531,7 @@ plugin "mcp-test" {
 	err = installer.Uninstall([]string{"mcp-test"}, false)
 	require.NoError(t, err)
 
-	// Verify server was removed
-	mcpData, err = os.ReadFile(mcpPath)
-	require.NoError(t, err)
-
-	err = json.Unmarshal(mcpData, &mcpConfig)
-	require.NoError(t, err)
-
-	mcpServers = mcpConfig["mcpServers"].(map[string]any)
-	assert.NotContains(t, mcpServers, "test-server")
+	// Verify .mcp.json was deleted since it's now empty
+	_, err = os.Stat(mcpPath)
+	assert.True(t, os.IsNotExist(err), ".mcp.json should be deleted when all servers are removed")
 }

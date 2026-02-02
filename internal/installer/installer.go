@@ -10,10 +10,12 @@
 package installer
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/launchcg/dex/internal/adapter"
 	"github.com/launchcg/dex/internal/config"
@@ -539,11 +541,14 @@ func (i *Installer) installProjectAgentInstructions() error {
 	// Track in manifest only if we have content
 	if i.project.Project.AgentInstructions != "" {
 		i.manifest.TrackAgentContent("__project__")
+		i.manifest.TrackMergedFile("__project__", agentPath)
 	} else {
 		// Remove tracking if instructions are empty
 		plugin := i.manifest.GetPlugin("__project__")
 		if plugin != nil {
 			plugin.HasAgentContent = false
+			// Remove the merged file tracking
+			plugin.MergedFiles = removeString(plugin.MergedFiles, agentPath)
 		}
 	}
 
@@ -724,6 +729,60 @@ func (i *Installer) uninstallPlugin(name string) error {
 			if err := os.WriteFile(agentPath, []byte(newContent), 0644); err != nil {
 				return errors.NewInstallError(name, "uninstall",
 					fmt.Errorf("failed to update CLAUDE.md: %w", err))
+			}
+		}
+	}
+
+	// Check if merged files should be cleaned up
+	// Only delete merged files if they're no longer used by any other plugin
+	// and if they contain no meaningful content
+	for _, mergedFile := range result.MergedFiles {
+		// Skip if any other plugin still uses this merged file
+		if i.manifest.IsMergedFileUsedByOthers(name, mergedFile) {
+			continue
+		}
+
+		// File is not used by any other plugin - check if it should be removed
+		fullPath := filepath.Join(i.projectRoot, mergedFile)
+
+		// Read the file to check if it's essentially empty
+		data, err := os.ReadFile(fullPath)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				return errors.NewInstallError(name, "uninstall",
+					fmt.Errorf("failed to read merged file %s: %w", mergedFile, err))
+			}
+			continue // File doesn't exist, nothing to do
+		}
+
+		// Check if file is effectively empty
+		isEmpty := false
+		if strings.HasSuffix(mergedFile, ".json") {
+			// Parse JSON and check if it's effectively empty
+			var obj map[string]any
+			if err := json.Unmarshal(data, &obj); err == nil {
+				// For MCP config files, check if mcpServers is empty
+				if strings.Contains(mergedFile, ".mcp.json") {
+					if servers, ok := obj["mcpServers"].(map[string]any); ok {
+						isEmpty = len(servers) == 0
+					} else {
+						isEmpty = len(obj) == 0
+					}
+				} else {
+					// For other JSON files (like settings.json), check if truly empty
+					isEmpty = len(obj) == 0
+				}
+			}
+		} else if strings.HasSuffix(mergedFile, ".md") {
+			// For markdown, check if it's empty or just whitespace
+			isEmpty = len(strings.TrimSpace(string(data))) == 0
+		}
+
+		// Remove the file if it's empty
+		if isEmpty {
+			if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
+				return errors.NewInstallError(name, "uninstall",
+					fmt.Errorf("failed to remove empty merged file %s: %w", mergedFile, err))
 			}
 		}
 	}
@@ -945,4 +1004,15 @@ func (i *Installer) updatePlugin(name string, dryRun bool) (*UpdateResult, error
 // GetResolver returns a new resolver instance for dependency operations.
 func (i *Installer) GetResolver() *resolver.Resolver {
 	return resolver.NewResolver(i.project, i.lock)
+}
+
+// removeString removes a string from a slice, returning a new slice without the string.
+func removeString(slice []string, s string) []string {
+	result := make([]string, 0, len(slice))
+	for _, v := range slice {
+		if v != s {
+			result = append(result, v)
+		}
+	}
+	return result
 }

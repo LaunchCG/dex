@@ -58,6 +58,13 @@ func (e *Executor) Execute(plan *adapter.Plan, vars map[string]string) error {
 			return fmt.Errorf("applying MCP config: %w", err)
 		}
 
+		// Track the merged MCP config file
+		mcpPath := plan.MCPPath
+		if mcpPath == "" {
+			mcpPath = ".mcp.json"
+		}
+		e.manifest.TrackMergedFile(plan.PluginName, mcpPath)
+
 		// Track MCP servers in manifest
 		for serverName := range plan.MCPEntries {
 			// The MCPEntries map contains the server configs, but we need to extract
@@ -77,6 +84,13 @@ func (e *Executor) Execute(plan *adapter.Plan, vars map[string]string) error {
 		if err := e.applySettingsConfig(plan.SettingsEntries, plan.SettingsPath); err != nil {
 			return fmt.Errorf("applying settings config: %w", err)
 		}
+
+		// Track the merged settings file
+		settingsPath := plan.SettingsPath
+		if settingsPath == "" {
+			settingsPath = filepath.Join(".claude", "settings.json")
+		}
+		e.manifest.TrackMergedFile(plan.PluginName, settingsPath)
 
 		// Track settings values in manifest (key -> []values)
 		settingsValues := make(map[string][]string)
@@ -103,6 +117,13 @@ func (e *Executor) Execute(plan *adapter.Plan, vars map[string]string) error {
 		if err := e.applyAgentFileContent(plan.PluginName, plan.AgentFileContent, plan.AgentFilePath); err != nil {
 			return fmt.Errorf("applying agent file content: %w", err)
 		}
+
+		// Track the merged agent file
+		agentPath := plan.AgentFilePath
+		if agentPath == "" {
+			agentPath = "CLAUDE.md"
+		}
+		e.manifest.TrackMergedFile(plan.PluginName, agentPath)
 
 		// Track agent content in manifest
 		e.manifest.TrackAgentContent(plan.PluginName)

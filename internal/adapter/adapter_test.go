@@ -201,15 +201,69 @@ func TestClaudeAdapter_PlanRules(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, plan)
 
-	// Should create rules directory
-	assert.Contains(t, plan.Directories, ".claude/rules")
+	// Should create rules subdirectory (similar to skills)
+	assert.Contains(t, plan.Directories, ".claude/rules/my-plugin-typescript-rules")
 
-	// Should have rules file
+	// Should have main rules file in the subdirectory
 	require.Len(t, plan.Files, 1)
-	assert.Equal(t, ".claude/rules/my-plugin-typescript-rules.md", plan.Files[0].Path)
+	assert.Equal(t, ".claude/rules/my-plugin-typescript-rules/typescript-rules.md", plan.Files[0].Path)
 	assert.Contains(t, plan.Files[0].Content, "name: typescript-rules")
 	assert.Contains(t, plan.Files[0].Content, "- *.ts")
 	assert.Contains(t, plan.Files[0].Content, "- *.tsx")
+}
+
+func TestClaudeAdapter_PlanRules_WithFiles(t *testing.T) {
+	adapter := &ClaudeAdapter{}
+
+	// Create a temporary directory for test files
+	tmpDir := t.TempDir()
+	helperFile := filepath.Join(tmpDir, "helper.md")
+	err := os.WriteFile(helperFile, []byte("Helper content"), 0644)
+	require.NoError(t, err)
+
+	rules := &resource.ClaudeRules{
+		Name:        "tailwind",
+		Description: "Tailwind CSS standards",
+		Content:     "# Tailwind Rules\n\nMain rules content here",
+		Files: []resource.FileBlock{
+			{
+				Src:  "helper.md",
+				Dest: "tailwind-classes.md",
+			},
+			{
+				Src:  "helper.md",
+				Dest: "tailwind-components.md",
+			},
+		},
+	}
+
+	pkg := &config.PackageConfig{
+		Package: config.PackageBlock{
+			Name:    "my-plugin",
+			Version: "1.0.0",
+		},
+	}
+
+	plan, err := adapter.PlanInstallation(rules, pkg, tmpDir, "/project", &InstallContext{PackageName: "my-plugin", Namespace: false})
+	require.NoError(t, err)
+	assert.NotNil(t, plan)
+
+	// Should create rules subdirectory
+	assert.Contains(t, plan.Directories, ".claude/rules/tailwind")
+
+	// Should have main rules file + 2 additional files
+	require.Len(t, plan.Files, 3)
+
+	// Check main file
+	assert.Equal(t, ".claude/rules/tailwind/tailwind.md", plan.Files[0].Path)
+	assert.Contains(t, plan.Files[0].Content, "Main rules content here")
+
+	// Check additional files
+	assert.Equal(t, ".claude/rules/tailwind/tailwind-classes.md", plan.Files[1].Path)
+	assert.Equal(t, "Helper content", plan.Files[1].Content)
+
+	assert.Equal(t, ".claude/rules/tailwind/tailwind-components.md", plan.Files[2].Path)
+	assert.Equal(t, "Helper content", plan.Files[2].Content)
 }
 
 func TestClaudeAdapter_PlanSettings(t *testing.T) {
