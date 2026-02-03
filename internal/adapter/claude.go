@@ -10,6 +10,7 @@ import (
 	"github.com/launchcg/dex/internal/config"
 	"github.com/launchcg/dex/internal/resource"
 	"github.com/launchcg/dex/internal/template"
+	"gopkg.in/yaml.v3"
 )
 
 // ClaudeAdapter implements the Adapter interface for Claude Code.
@@ -538,6 +539,20 @@ func (a *ClaudeAdapter) generateSkillFrontmatter(skill *resource.ClaudeSkill, pk
 		b.WriteString(fmt.Sprintf("%s: %s\n", k, v))
 	}
 
+	// Add hooks if present
+	if len(skill.Hooks) > 0 {
+		hooksYAML, err := yaml.Marshal(skill.Hooks)
+		if err == nil {
+			b.WriteString("hooks:\n")
+			// Indent each line of marshaled YAML
+			for _, line := range strings.Split(string(hooksYAML), "\n") {
+				if line != "" {
+					b.WriteString("  " + line + "\n")
+				}
+			}
+		}
+	}
+
 	b.WriteString("---\n")
 	return b.String()
 }
@@ -587,6 +602,20 @@ func (a *ClaudeAdapter) generateSubagentFrontmatter(agent *resource.ClaudeSubage
 		b.WriteString("tools:\n")
 		for _, tool := range agent.Tools {
 			b.WriteString(fmt.Sprintf("- %s\n", tool))
+		}
+	}
+
+	// Add hooks if present
+	if len(agent.Hooks) > 0 {
+		hooksYAML, err := yaml.Marshal(agent.Hooks)
+		if err == nil {
+			b.WriteString("hooks:\n")
+			// Indent each line of marshaled YAML
+			for _, line := range strings.Split(string(hooksYAML), "\n") {
+				if line != "" {
+					b.WriteString("  " + line + "\n")
+				}
+			}
 		}
 	}
 

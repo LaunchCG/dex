@@ -1126,3 +1126,266 @@ func countOccurrences(s, substr string) int {
 	}
 	return count
 }
+
+func TestClaudeAdapter_GenerateFrontmatter_Skill_WithHooks(t *testing.T) {
+	adapter := &ClaudeAdapter{}
+
+	skill := &resource.ClaudeSkill{
+		Name:        "test-skill",
+		Description: "A test skill with hooks",
+		Hooks: map[string]interface{}{
+			"PreToolUse": []interface{}{
+				map[string]interface{}{
+					"matcher": "Bash",
+					"hooks": []interface{}{
+						map[string]interface{}{
+							"type":    "command",
+							"command": "./scripts/check.sh",
+							"timeout": 30,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	pkg := &config.PackageConfig{
+		Package: config.PackageBlock{
+			Name:    "my-plugin",
+			Version: "1.0.0",
+		},
+	}
+
+	frontmatter := adapter.GenerateFrontmatter(skill, pkg)
+
+	// Verify basic frontmatter fields
+	assert.Contains(t, frontmatter, "name: test-skill")
+	assert.Contains(t, frontmatter, "description: A test skill with hooks")
+
+	// Verify hooks section is present
+	assert.Contains(t, frontmatter, "hooks:")
+	assert.Contains(t, frontmatter, "PreToolUse:")
+	assert.Contains(t, frontmatter, "matcher: Bash")
+	assert.Contains(t, frontmatter, "type: command")
+	assert.Contains(t, frontmatter, "command: ./scripts/check.sh")
+	assert.Contains(t, frontmatter, "timeout: 30")
+}
+
+func TestClaudeAdapter_GenerateFrontmatter_Skill_WithMultipleHooks(t *testing.T) {
+	adapter := &ClaudeAdapter{}
+
+	skill := &resource.ClaudeSkill{
+		Name:        "security-skill",
+		Description: "Skill with multiple hook types",
+		Hooks: map[string]interface{}{
+			"PreToolUse": []interface{}{
+				map[string]interface{}{
+					"matcher": "Bash",
+					"hooks": []interface{}{
+						map[string]interface{}{
+							"type":    "command",
+							"command": "./check.sh",
+						},
+					},
+				},
+			},
+			"SessionStart": []interface{}{
+				map[string]interface{}{
+					"hooks": []interface{}{
+						map[string]interface{}{
+							"type":   "prompt",
+							"prompt": "Initialize security context",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	pkg := &config.PackageConfig{}
+
+	frontmatter := adapter.GenerateFrontmatter(skill, pkg)
+
+	// Verify multiple hook events
+	assert.Contains(t, frontmatter, "hooks:")
+	assert.Contains(t, frontmatter, "PreToolUse:")
+	assert.Contains(t, frontmatter, "SessionStart:")
+	assert.Contains(t, frontmatter, "type: command")
+	assert.Contains(t, frontmatter, "type: prompt")
+}
+
+func TestClaudeAdapter_GenerateFrontmatter_Skill_NoHooks(t *testing.T) {
+	adapter := &ClaudeAdapter{}
+
+	skill := &resource.ClaudeSkill{
+		Name:        "simple-skill",
+		Description: "Simple skill without hooks",
+	}
+
+	pkg := &config.PackageConfig{}
+
+	frontmatter := adapter.GenerateFrontmatter(skill, pkg)
+	expected := `---
+name: simple-skill
+description: Simple skill without hooks
+---
+`
+	assert.Equal(t, expected, frontmatter)
+
+	// Ensure no hooks section when hooks map is nil or empty
+	assert.NotContains(t, frontmatter, "hooks:")
+}
+
+func TestClaudeAdapter_GenerateFrontmatter_Subagent_WithHooks(t *testing.T) {
+	adapter := &ClaudeAdapter{}
+
+	agent := &resource.ClaudeSubagent{
+		Name:        "security-agent",
+		Description: "Security agent with hooks",
+		Model:       "sonnet",
+		Color:       "red",
+		Hooks: map[string]interface{}{
+			"SubagentStart": []interface{}{
+				map[string]interface{}{
+					"hooks": []interface{}{
+						map[string]interface{}{
+							"type":    "command",
+							"command": "./init-security.sh",
+							"async":   true,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	pkg := &config.PackageConfig{}
+
+	frontmatter := adapter.GenerateFrontmatter(agent, pkg)
+
+	// Verify basic frontmatter fields
+	assert.Contains(t, frontmatter, "name: security-agent")
+	assert.Contains(t, frontmatter, "description: Security agent with hooks")
+	assert.Contains(t, frontmatter, "model: sonnet")
+	assert.Contains(t, frontmatter, "color: red")
+
+	// Verify hooks section
+	assert.Contains(t, frontmatter, "hooks:")
+	assert.Contains(t, frontmatter, "SubagentStart:")
+	assert.Contains(t, frontmatter, "type: command")
+	assert.Contains(t, frontmatter, "command: ./init-security.sh")
+	assert.Contains(t, frontmatter, "async: true")
+}
+
+func TestClaudeAdapter_GenerateFrontmatter_Subagent_NoHooks(t *testing.T) {
+	adapter := &ClaudeAdapter{}
+
+	agent := &resource.ClaudeSubagent{
+		Name:        "simple-agent",
+		Description: "Simple agent without hooks",
+		Model:       "haiku",
+	}
+
+	pkg := &config.PackageConfig{}
+
+	frontmatter := adapter.GenerateFrontmatter(agent, pkg)
+	expected := `---
+name: simple-agent
+description: Simple agent without hooks
+model: haiku
+---
+`
+	assert.Equal(t, expected, frontmatter)
+
+	// Ensure no hooks section when hooks map is nil or empty
+	assert.NotContains(t, frontmatter, "hooks:")
+}
+
+func TestClaudeAdapter_PlanSkill_WithHooks(t *testing.T) {
+	adapter := &ClaudeAdapter{}
+
+	skill := &resource.ClaudeSkill{
+		Name:        "test-skill",
+		Description: "A test skill with hooks",
+		Content:     "Skill content here",
+		Hooks: map[string]interface{}{
+			"PreToolUse": []interface{}{
+				map[string]interface{}{
+					"matcher": "Bash",
+					"hooks": []interface{}{
+						map[string]interface{}{
+							"type":          "command",
+							"command":       "./check.sh",
+							"statusMessage": "Running security check",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	pkg := &config.PackageConfig{
+		Package: config.PackageBlock{
+			Name:    "my-plugin",
+			Version: "1.0.0",
+		},
+	}
+
+	plan, err := adapter.PlanInstallation(skill, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: true})
+	require.NoError(t, err)
+	assert.NotNil(t, plan)
+
+	// Should have SKILL.md file with hooks
+	require.Len(t, plan.Files, 1)
+	assert.Equal(t, ".claude/skills/my-plugin-test-skill/SKILL.md", plan.Files[0].Path)
+	assert.Contains(t, plan.Files[0].Content, "name: test-skill")
+	assert.Contains(t, plan.Files[0].Content, "hooks:")
+	assert.Contains(t, plan.Files[0].Content, "PreToolUse:")
+	assert.Contains(t, plan.Files[0].Content, "matcher: Bash")
+	assert.Contains(t, plan.Files[0].Content, "statusMessage: Running security check")
+	assert.Contains(t, plan.Files[0].Content, "Skill content here")
+}
+
+func TestClaudeAdapter_PlanSubagent_WithHooks(t *testing.T) {
+	adapter := &ClaudeAdapter{}
+
+	agent := &resource.ClaudeSubagent{
+		Name:        "researcher",
+		Description: "Research agent with hooks",
+		Content:     "Research instructions",
+		Model:       "opus",
+		Tools:       []string{"Read", "WebSearch"},
+		Hooks: map[string]interface{}{
+			"SubagentStart": []interface{}{
+				map[string]interface{}{
+					"hooks": []interface{}{
+						map[string]interface{}{
+							"type":   "prompt",
+							"prompt": "Initialize research context",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	pkg := &config.PackageConfig{
+		Package: config.PackageBlock{
+			Name:    "my-plugin",
+			Version: "1.0.0",
+		},
+	}
+
+	plan, err := adapter.PlanInstallation(agent, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: true})
+	require.NoError(t, err)
+	assert.NotNil(t, plan)
+
+	// Should have agent file with hooks
+	require.Len(t, plan.Files, 1)
+	assert.Equal(t, ".claude/agents/my-plugin-researcher.md", plan.Files[0].Path)
+	assert.Contains(t, plan.Files[0].Content, "name: researcher")
+	assert.Contains(t, plan.Files[0].Content, "tools:")
+	assert.Contains(t, plan.Files[0].Content, "hooks:")
+	assert.Contains(t, plan.Files[0].Content, "SubagentStart:")
+	assert.Contains(t, plan.Files[0].Content, "type: prompt")
+}

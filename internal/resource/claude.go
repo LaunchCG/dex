@@ -44,6 +44,9 @@ type ClaudeSkill struct {
 
 	// Metadata contains additional frontmatter fields for the skill
 	Metadata map[string]string `hcl:"metadata,optional"`
+
+	// Hooks defines lifecycle hooks scoped to this skill
+	Hooks map[string]interface{} `hcl:"hooks,optional"`
 }
 
 // ResourceType returns the HCL block type for Claude skills.
@@ -190,6 +193,9 @@ type ClaudeSubagent struct {
 
 	// Tools lists the tools this subagent is allowed to use
 	Tools []string `hcl:"tools,optional"`
+
+	// Hooks defines lifecycle hooks scoped to this subagent
+	Hooks map[string]interface{} `hcl:"hooks,optional"`
 }
 
 // ResourceType returns the HCL block type for Claude subagents.
