@@ -38,9 +38,12 @@ clean:
 	rm -rf $(BIN_DIR)
 	rm -f coverage.out coverage.html
 
-## install: Install binary to GOPATH/bin
+## install: Install binary to ~/.bin
 install: build
-	cp $(BIN_DIR)/$(BINARY_NAME) $(GOPATH)/bin/
+	@mkdir -p $(HOME)/.bin
+	cp $(BIN_DIR)/$(BINARY_NAME) $(HOME)/.bin/
+	@echo "Installed to $(HOME)/.bin/$(BINARY_NAME)"
+	@echo "Make sure $(HOME)/.bin is in your PATH"
 
 ## install-user: Install binary to ~/.bin
 install-user: build
