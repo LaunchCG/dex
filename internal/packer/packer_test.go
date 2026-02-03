@@ -243,6 +243,106 @@ func createTestPlugin(t *testing.T, name, version string) string {
 	return dir
 }
 
+func TestPackWithVariousFileTypes(t *testing.T) {
+	t.Run("packs directory with various file types and sizes", func(t *testing.T) {
+		dir := createTestPlugin(t, "comprehensive-test", "1.0.0")
+		defer os.RemoveAll(dir)
+
+		// Create files of various sizes to test the race condition fix
+		// Small file
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "small.txt"), []byte("small content"), 0644))
+
+		// Medium file
+		mediumContent := strings.Repeat("medium content line\n", 100)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "medium.txt"), []byte(mediumContent), 0644))
+
+		// Large file
+		largeContent := strings.Repeat("large content line with more data\n", 1000)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "large.txt"), []byte(largeContent), 0644))
+
+		// Binary file (simulate binary data)
+		binaryData := make([]byte, 512)
+		for i := range binaryData {
+			binaryData[i] = byte(i % 256)
+		}
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "binary.dat"), binaryData, 0644))
+
+		// Executable file
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "script.sh"), []byte("#!/bin/bash\necho 'test'"), 0755))
+
+		// Create nested directory structure
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "nested", "deep", "path"), 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "nested", "file1.txt"), []byte("nested file 1"), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "nested", "deep", "file2.txt"), []byte("nested file 2"), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "nested", "deep", "path", "file3.txt"), []byte("deeply nested file"), 0644))
+
+		// Create empty file
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "empty.txt"), []byte(""), 0644))
+
+		// Pack the directory
+		p, err := New(dir)
+		require.NoError(t, err)
+
+		outDir := t.TempDir()
+		output := filepath.Join(outDir, "comprehensive-test.tar.gz")
+
+		result, err := p.Pack(output)
+		require.NoError(t, err, "Pack should succeed without 'write too long' error")
+
+		// Verify result metadata
+		assert.Equal(t, output, result.Path)
+		assert.Equal(t, "comprehensive-test", result.Name)
+		assert.Equal(t, "1.0.0", result.Version)
+		assert.True(t, result.Size > 0)
+		assert.True(t, strings.HasPrefix(result.Integrity, "sha256-"))
+
+		// Verify tarball file exists
+		fileInfo, err := os.Stat(output)
+		require.NoError(t, err)
+		assert.Equal(t, result.Size, fileInfo.Size())
+
+		// Extract and verify all files are present
+		files := extractTarballFiles(t, output)
+
+		expectedFiles := []string{
+			"comprehensive-test-1.0.0/package.hcl",
+			"comprehensive-test-1.0.0/small.txt",
+			"comprehensive-test-1.0.0/medium.txt",
+			"comprehensive-test-1.0.0/large.txt",
+			"comprehensive-test-1.0.0/binary.dat",
+			"comprehensive-test-1.0.0/script.sh",
+			"comprehensive-test-1.0.0/nested/file1.txt",
+			"comprehensive-test-1.0.0/nested/deep/file2.txt",
+			"comprehensive-test-1.0.0/nested/deep/path/file3.txt",
+			"comprehensive-test-1.0.0/empty.txt",
+		}
+
+		for _, expected := range expectedFiles {
+			assert.Contains(t, files, expected, "tarball should contain %s", expected)
+		}
+
+		// Verify file contents match by extracting and comparing
+		contents := extractTarballContents(t, output)
+
+		assert.Equal(t, "small content", contents["comprehensive-test-1.0.0/small.txt"])
+		assert.Equal(t, mediumContent, contents["comprehensive-test-1.0.0/medium.txt"])
+		assert.Equal(t, largeContent, contents["comprehensive-test-1.0.0/large.txt"])
+		assert.Equal(t, string(binaryData), contents["comprehensive-test-1.0.0/binary.dat"])
+		assert.Equal(t, "#!/bin/bash\necho 'test'", contents["comprehensive-test-1.0.0/script.sh"])
+		assert.Equal(t, "nested file 1", contents["comprehensive-test-1.0.0/nested/file1.txt"])
+		assert.Equal(t, "nested file 2", contents["comprehensive-test-1.0.0/nested/deep/file2.txt"])
+		assert.Equal(t, "deeply nested file", contents["comprehensive-test-1.0.0/nested/deep/path/file3.txt"])
+		assert.Equal(t, "", contents["comprehensive-test-1.0.0/empty.txt"])
+
+		// Verify integrity hash matches actual file
+		data, err := os.ReadFile(output)
+		require.NoError(t, err)
+		hash := sha256.Sum256(data)
+		expectedIntegrity := "sha256-" + hex.EncodeToString(hash[:])
+		assert.Equal(t, expectedIntegrity, result.Integrity)
+	})
+}
+
 // extractTarballFiles extracts all file paths from a tarball.
 func extractTarballFiles(t *testing.T, tarPath string) []string {
 	t.Helper()
@@ -272,4 +372,37 @@ func extractTarballFiles(t *testing.T, tarPath string) []string {
 	}
 
 	return files
+}
+
+// extractTarballContents extracts all file contents from a tarball.
+func extractTarballContents(t *testing.T, tarPath string) map[string]string {
+	t.Helper()
+
+	file, err := os.Open(tarPath)
+	require.NoError(t, err)
+	defer file.Close()
+
+	gzr, err := gzip.NewReader(file)
+	require.NoError(t, err)
+	defer gzr.Close()
+
+	tr := tar.NewReader(gzr)
+
+	contents := make(map[string]string)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+
+		// Only read regular files
+		if header.Typeflag == tar.TypeReg {
+			data, err := io.ReadAll(tr)
+			require.NoError(t, err)
+			contents[header.Name] = string(data)
+		}
+	}
+
+	return contents
 }

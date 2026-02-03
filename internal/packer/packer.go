@@ -115,6 +115,13 @@ func (p *Packer) Pack(output string) (*PackResult, error) {
 		return nil, errors.NewPackError(p.dir, "compress", fmt.Errorf("failed to resolve output path: %w", err))
 	}
 
+	// Check if output would be inside the directory being packed
+	relToDir, err := filepath.Rel(p.dir, absOutput)
+	if err == nil && !strings.HasPrefix(relToDir, "..") {
+		return nil, errors.NewPackError(p.dir, "compress",
+			fmt.Errorf("cannot write output file inside the directory being packed. Specify an output directory outside this directory"))
+	}
+
 	// Create output file
 	outFile, err := os.Create(absOutput)
 	if err != nil {
@@ -162,10 +169,39 @@ func (p *Packer) Pack(output string) (*PackResult, error) {
 			return nil
 		}
 
-		// Create tar header
-		header, err := tar.FileInfoHeader(info, "")
-		if err != nil {
-			return fmt.Errorf("failed to create header for %s: %w", relPath, err)
+		// For regular files, open first and stat to avoid race condition
+		// where file size changes between Walk's stat and our read
+		var header *tar.Header
+		var file *os.File
+
+		if info.Mode().IsRegular() {
+			// Open file first
+			f, err := os.Open(path)
+			if err != nil {
+				return fmt.Errorf("failed to open %s: %w", relPath, err)
+			}
+			file = f
+
+			// Stat the opened file to get accurate size
+			fileInfo, err := file.Stat()
+			if err != nil {
+				file.Close()
+				return fmt.Errorf("failed to stat opened file %s: %w", relPath, err)
+			}
+
+			// Create header from the file we just opened
+			header, err = tar.FileInfoHeader(fileInfo, "")
+			if err != nil {
+				file.Close()
+				return fmt.Errorf("failed to create header for %s: %w", relPath, err)
+			}
+		} else {
+			// For directories and symlinks, use the info from Walk
+			var err error
+			header, err = tar.FileInfoHeader(info, "")
+			if err != nil {
+				return fmt.Errorf("failed to create header for %s: %w", relPath, err)
+			}
 		}
 
 		// Set name with top-level directory prefix
@@ -182,20 +218,19 @@ func (p *Packer) Pack(output string) (*PackResult, error) {
 
 		// Write header
 		if err := tw.WriteHeader(header); err != nil {
+			if file != nil {
+				file.Close()
+			}
 			return fmt.Errorf("failed to write header for %s: %w", relPath, err)
 		}
 
-		// Write file content if regular file
-		if info.Mode().IsRegular() {
-			file, err := os.Open(path)
-			if err != nil {
-				return fmt.Errorf("failed to open %s: %w", relPath, err)
-			}
-			defer file.Close()
-
+		// Write file content if we opened it
+		if file != nil {
 			if _, err := io.Copy(tw, file); err != nil {
+				file.Close()
 				return fmt.Errorf("failed to write %s: %w", relPath, err)
 			}
+			file.Close()
 		}
 
 		return nil
