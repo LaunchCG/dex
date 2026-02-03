@@ -501,4 +501,3 @@ func (a *CopilotAdapter) generateSkillFrontmatter(skill *resource.CopilotSkill, 
 	b.WriteString("---\n")
 	return b.String()
 }
-

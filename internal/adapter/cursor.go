@@ -312,4 +312,3 @@ func (a *CursorAdapter) generateCommandFrontmatter(cmd *resource.CursorCommand, 
 	b.WriteString("---\n")
 	return b.String()
 }
-

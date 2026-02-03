@@ -611,4 +611,3 @@ func (a *ClaudeAdapter) generateRulesFrontmatter(rules *resource.ClaudeRules, pk
 	b.WriteString("---\n")
 	return b.String()
 }
-
