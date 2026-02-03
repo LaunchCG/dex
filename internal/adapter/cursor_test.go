@@ -220,7 +220,7 @@ func TestCursorAdapter_PlanRules(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, plan)
 
-	assert.Equal(t, []string{filepath.Join(".cursor", "rules")}, plan.Directories)
+	assert.Equal(t, []string{filepath.Join(".cursor", "rules")}, getDirPaths(plan))
 	require.Len(t, plan.Files, 1)
 	assert.Equal(t, filepath.Join(".cursor", "rules", "my-plugin-typescript.mdc"), plan.Files[0].Path)
 	assert.Equal(t, "", plan.Files[0].Chmod)
@@ -312,7 +312,7 @@ func TestCursorAdapter_PlanCommand(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, plan)
 
-	assert.Equal(t, []string{filepath.Join(".cursor", "commands")}, plan.Directories)
+	assert.Equal(t, []string{filepath.Join(".cursor", "commands")}, getDirPaths(plan))
 	require.Len(t, plan.Files, 1)
 	assert.Equal(t, filepath.Join(".cursor", "commands", "my-plugin-deploy.md"), plan.Files[0].Path)
 
@@ -745,8 +745,10 @@ func TestCursorAdapter_MergeMCPConfig_NoOp(t *testing.T) {
 
 func TestMergePlans_WithCursorPaths(t *testing.T) {
 	plan1 := &Plan{
-		PluginName:       "plugin1",
-		Directories:      []string{".cursor/rules"},
+		PluginName: "plugin1",
+		Directories: []DirectoryCreate{
+			{Path: ".cursor/rules", Parents: true},
+		},
 		AgentFileContent: "Rule content",
 		AgentFilePath:    "AGENTS.md",
 		MCPEntries:       make(map[string]any),
@@ -774,7 +776,7 @@ func TestMergePlans_WithCursorPaths(t *testing.T) {
 	assert.Equal(t, ".cursor/mcp.json", merged.MCPPath)
 	assert.Equal(t, "mcpServers", merged.MCPKey)
 	assert.Equal(t, "Rule content", merged.AgentFileContent)
-	assert.Equal(t, []string{".cursor/rules"}, merged.Directories)
+	assert.Equal(t, []string{".cursor/rules"}, getDirPaths(merged))
 }
 
 // =============================================================================

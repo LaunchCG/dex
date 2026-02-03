@@ -74,6 +74,12 @@ func (a *CursorAdapter) PlanInstallation(res resource.Resource, pkg *config.Pack
 	case *resource.CursorCommand:
 		return a.planCommand(r, pkg, pluginDir, projectRoot, ctx)
 
+	// Universal resources
+	case *resource.File:
+		return PlanUniversalFile(r, pkg, pluginDir, projectRoot, "cursor", ctx)
+	case *resource.Directory:
+		return PlanUniversalDirectory(r, pkg, ctx)
+
 	default:
 		return nil, fmt.Errorf("unsupported resource type for cursor adapter: %T", res)
 	}
@@ -220,7 +226,7 @@ func (a *CursorAdapter) planRules(rules *resource.CursorRules, pkg *config.Packa
 
 	// Create rules directory
 	rulesDir := filepath.Join(".cursor", "rules")
-	plan.AddDirectory(rulesDir)
+	plan.AddDirectory(rulesDir, true)
 
 	// Generate frontmatter and content
 	var content string
@@ -251,7 +257,7 @@ func (a *CursorAdapter) planCommand(cmd *resource.CursorCommand, pkg *config.Pac
 
 	// Create commands directory
 	commandsDir := filepath.Join(".cursor", "commands")
-	plan.AddDirectory(commandsDir)
+	plan.AddDirectory(commandsDir, true)
 
 	// Generate frontmatter and content
 	var content string
@@ -306,3 +312,4 @@ func (a *CursorAdapter) generateCommandFrontmatter(cmd *resource.CursorCommand, 
 	b.WriteString("---\n")
 	return b.String()
 }
+

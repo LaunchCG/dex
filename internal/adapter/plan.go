@@ -1,11 +1,21 @@
 package adapter
 
+// DirectoryCreate represents a directory to create during installation.
+type DirectoryCreate struct {
+	// Path is relative to the project root
+	Path string
+
+	// Parents controls whether to create parent directories (like mkdir -p)
+	// When true, uses os.MkdirAll; when false, uses os.Mkdir
+	Parents bool
+}
+
 // Plan represents an installation plan for a resource.
 // Plans describe what files to write and configurations to merge
 // without actually performing the installation.
 type Plan struct {
 	// Directories to create before writing files
-	Directories []string
+	Directories []DirectoryCreate
 
 	// Files to write during installation
 	Files []FileWrite
@@ -58,8 +68,12 @@ func NewPlan(pluginName string) *Plan {
 }
 
 // AddDirectory adds a directory to create.
-func (p *Plan) AddDirectory(dir string) {
-	p.Directories = append(p.Directories, dir)
+// The parents parameter controls whether to create parent directories (like mkdir -p).
+func (p *Plan) AddDirectory(path string, parents bool) {
+	p.Directories = append(p.Directories, DirectoryCreate{
+		Path:    path,
+		Parents: parents,
+	})
 }
 
 // AddFile adds a file to write.
@@ -89,10 +103,10 @@ func MergePlans(plans ...*Plan) *Plan {
 			continue
 		}
 
-		// Merge directories (deduplicate)
+		// Merge directories (deduplicate by path, keeping first occurrence)
 		for _, dir := range plan.Directories {
-			if !dirsSeen[dir] {
-				dirsSeen[dir] = true
+			if !dirsSeen[dir.Path] {
+				dirsSeen[dir.Path] = true
 				merged.Directories = append(merged.Directories, dir)
 			}
 		}

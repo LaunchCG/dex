@@ -50,6 +50,10 @@ type PackageConfig struct {
 	CursorRules    []resource.CursorRules   `hcl:"cursor_rules,block"`
 	CursorCommands []resource.CursorCommand `hcl:"cursor_command,block"`
 
+	// Universal resources (work across all platforms)
+	Files       []resource.File      `hcl:"file,block"`
+	Directories []resource.Directory `hcl:"directory,block"`
+
 	// Resources is a unified view of all resources (populated after parsing)
 	// This field has no hcl tag because it's populated programmatically, not from HCL.
 	Resources []resource.Resource
@@ -325,6 +329,14 @@ func (p *PackageConfig) buildResources() {
 	}
 	for i := range p.CursorCommands {
 		p.Resources = append(p.Resources, &p.CursorCommands[i])
+	}
+
+	// Universal resources
+	for i := range p.Files {
+		p.Resources = append(p.Resources, &p.Files[i])
+	}
+	for i := range p.Directories {
+		p.Resources = append(p.Resources, &p.Directories[i])
 	}
 }
 

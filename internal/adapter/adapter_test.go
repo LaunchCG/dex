@@ -12,6 +12,15 @@ import (
 	"github.com/launchcg/dex/internal/resource"
 )
 
+// getDirPaths extracts directory paths from a plan for test assertions.
+func getDirPaths(plan *Plan) []string {
+	paths := make([]string, len(plan.Directories))
+	for i, d := range plan.Directories {
+		paths[i] = d.Path
+	}
+	return paths
+}
+
 func TestGet_ClaudeCode(t *testing.T) {
 	adapter, err := Get("claude-code")
 	require.NoError(t, err)
@@ -76,7 +85,7 @@ func TestClaudeAdapter_PlanSkill(t *testing.T) {
 	assert.Equal(t, "my-plugin", plan.PluginName)
 
 	// Should create skill directory
-	assert.Contains(t, plan.Directories, ".claude/skills/my-plugin-test-skill")
+	assert.Contains(t, getDirPaths(plan), ".claude/skills/my-plugin-test-skill")
 
 	// Should have SKILL.md file
 	require.Len(t, plan.Files, 1)
@@ -109,7 +118,7 @@ func TestClaudeAdapter_PlanCommand(t *testing.T) {
 	assert.NotNil(t, plan)
 
 	// Should create commands directory
-	assert.Contains(t, plan.Directories, ".claude/commands")
+	assert.Contains(t, getDirPaths(plan), ".claude/commands")
 
 	// Should have command file
 	require.Len(t, plan.Files, 1)
@@ -143,7 +152,7 @@ func TestClaudeAdapter_PlanSubagent(t *testing.T) {
 	assert.NotNil(t, plan)
 
 	// Should create agents directory
-	assert.Contains(t, plan.Directories, ".claude/agents")
+	assert.Contains(t, getDirPaths(plan), ".claude/agents")
 
 	// Should have agent file
 	require.Len(t, plan.Files, 1)
@@ -202,7 +211,7 @@ func TestClaudeAdapter_PlanRules(t *testing.T) {
 	assert.NotNil(t, plan)
 
 	// Should create rules subdirectory (similar to skills)
-	assert.Contains(t, plan.Directories, ".claude/rules/my-plugin-typescript-rules")
+	assert.Contains(t, getDirPaths(plan), ".claude/rules/my-plugin-typescript-rules")
 
 	// Should have main rules file in the subdirectory
 	require.Len(t, plan.Files, 1)
@@ -249,7 +258,7 @@ func TestClaudeAdapter_PlanRules_WithFiles(t *testing.T) {
 	assert.NotNil(t, plan)
 
 	// Should create rules subdirectory
-	assert.Contains(t, plan.Directories, ".claude/rules/tailwind")
+	assert.Contains(t, getDirPaths(plan), ".claude/rules/tailwind")
 
 	// Should have main rules file + 2 additional files
 	require.Len(t, plan.Files, 3)
@@ -624,8 +633,11 @@ New content
 
 func TestMergePlans(t *testing.T) {
 	plan1 := &Plan{
-		PluginName:  "plugin1",
-		Directories: []string{"dir1", "dir2"},
+		PluginName: "plugin1",
+		Directories: []DirectoryCreate{
+			{Path: "dir1", Parents: true},
+			{Path: "dir2", Parents: true},
+		},
 		Files: []FileWrite{
 			{Path: "file1.md", Content: "content1"},
 		},
@@ -639,8 +651,11 @@ func TestMergePlans(t *testing.T) {
 	}
 
 	plan2 := &Plan{
-		PluginName:  "plugin1",
-		Directories: []string{"dir2", "dir3"}, // dir2 is duplicate
+		PluginName: "plugin1",
+		Directories: []DirectoryCreate{
+			{Path: "dir2", Parents: true}, // dir2 is duplicate
+			{Path: "dir3", Parents: true},
+		},
 		Files: []FileWrite{
 			{Path: "file2.md", Content: "content2"},
 		},
@@ -657,11 +672,15 @@ func TestMergePlans(t *testing.T) {
 
 	assert.Equal(t, "plugin1", merged.PluginName)
 
-	// Directories should be deduplicated
+	// Directories should be deduplicated by path
 	assert.Len(t, merged.Directories, 3)
-	assert.Contains(t, merged.Directories, "dir1")
-	assert.Contains(t, merged.Directories, "dir2")
-	assert.Contains(t, merged.Directories, "dir3")
+	dirPaths := make([]string, len(merged.Directories))
+	for i, d := range merged.Directories {
+		dirPaths[i] = d.Path
+	}
+	assert.Contains(t, dirPaths, "dir1")
+	assert.Contains(t, dirPaths, "dir2")
+	assert.Contains(t, dirPaths, "dir3")
 
 	// Files should be concatenated
 	assert.Len(t, merged.Files, 2)
@@ -835,10 +854,14 @@ func TestNewPlan(t *testing.T) {
 
 func TestPlan_AddDirectory(t *testing.T) {
 	plan := NewPlan("plugin")
-	plan.AddDirectory("dir1")
-	plan.AddDirectory("dir2")
+	plan.AddDirectory("dir1", true)
+	plan.AddDirectory("dir2", false)
 
-	assert.Equal(t, []string{"dir1", "dir2"}, plan.Directories)
+	require.Len(t, plan.Directories, 2)
+	assert.Equal(t, "dir1", plan.Directories[0].Path)
+	assert.True(t, plan.Directories[0].Parents)
+	assert.Equal(t, "dir2", plan.Directories[1].Path)
+	assert.False(t, plan.Directories[1].Parents)
 }
 
 func TestPlan_AddFile(t *testing.T) {
@@ -855,7 +878,7 @@ func TestPlan_IsEmpty(t *testing.T) {
 	plan := NewPlan("plugin")
 	assert.True(t, plan.IsEmpty())
 
-	plan.AddDirectory("dir")
+	plan.AddDirectory("dir", true)
 	assert.False(t, plan.IsEmpty())
 
 	plan2 := NewPlan("plugin")

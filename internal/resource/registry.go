@@ -37,6 +37,10 @@ var resourceTypes = map[string]ResourceFactory{
 	// Cursor resources - standalone (one file per resource)
 	"cursor_rules":   func() Resource { return &CursorRules{} },
 	"cursor_command": func() Resource { return &CursorCommand{} },
+
+	// Universal resources (work across all platforms)
+	"file":      func() Resource { return &File{} },
+	"directory": func() Resource { return &Directory{} },
 }
 
 // NewResource creates a new resource instance by type name.

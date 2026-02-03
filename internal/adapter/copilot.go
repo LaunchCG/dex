@@ -80,6 +80,12 @@ func (a *CopilotAdapter) PlanInstallation(res resource.Resource, pkg *config.Pac
 	case *resource.CopilotSkill:
 		return a.planSkill(r, pkg, pluginDir, projectRoot, ctx)
 
+	// Universal resources
+	case *resource.File:
+		return PlanUniversalFile(r, pkg, pluginDir, projectRoot, "github-copilot", ctx)
+	case *resource.Directory:
+		return PlanUniversalDirectory(r, pkg, ctx)
+
 	default:
 		return nil, fmt.Errorf("unsupported resource type for github-copilot adapter: %T", res)
 	}
@@ -232,7 +238,7 @@ func (a *CopilotAdapter) planInstructions(inst *resource.CopilotInstructions, pk
 
 	// Create instructions directory
 	instructionsDir := filepath.Join(".github", "instructions")
-	plan.AddDirectory(instructionsDir)
+	plan.AddDirectory(instructionsDir, true)
 
 	// Generate frontmatter and content
 	var content string
@@ -263,7 +269,7 @@ func (a *CopilotAdapter) planPrompt(prompt *resource.CopilotPrompt, pkg *config.
 
 	// Create prompts directory
 	promptsDir := filepath.Join(".github", "prompts")
-	plan.AddDirectory(promptsDir)
+	plan.AddDirectory(promptsDir, true)
 
 	// Generate frontmatter and content
 	var content string
@@ -294,7 +300,7 @@ func (a *CopilotAdapter) planAgent(agent *resource.CopilotAgent, pkg *config.Pac
 
 	// Create agents directory
 	agentsDir := filepath.Join(".github", "agents")
-	plan.AddDirectory(agentsDir)
+	plan.AddDirectory(agentsDir, true)
 
 	// Generate frontmatter and content
 	var content string
@@ -331,7 +337,7 @@ func (a *CopilotAdapter) planSkill(skill *resource.CopilotSkill, pkg *config.Pac
 		skillDirName = skill.Name
 	}
 	skillDir := filepath.Join(".github", "skills", skillDirName)
-	plan.AddDirectory(skillDir)
+	plan.AddDirectory(skillDir, true)
 
 	// Generate frontmatter and content
 	var content string
@@ -495,3 +501,4 @@ func (a *CopilotAdapter) generateSkillFrontmatter(skill *resource.CopilotSkill, 
 	b.WriteString("---\n")
 	return b.String()
 }
+

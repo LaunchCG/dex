@@ -30,8 +30,11 @@ func TestExecutor_CreateDirectories(t *testing.T) {
 	executor := NewExecutor(tmpDir, m, false)
 
 	plan := &adapter.Plan{
-		PluginName:  "test-plugin",
-		Directories: []string{"dir1", "dir2/nested"},
+		PluginName: "test-plugin",
+		Directories: []adapter.DirectoryCreate{
+			{Path: "dir1", Parents: true},
+			{Path: "dir2/nested", Parents: true},
+		},
 	}
 
 	err := executor.Execute(plan, nil)
@@ -1149,8 +1152,10 @@ func TestExecutor_FullPlan(t *testing.T) {
 
 	// Create a comprehensive plan
 	plan := &adapter.Plan{
-		PluginName:  "full-test-plugin",
-		Directories: []string{".claude/commands"},
+		PluginName: "full-test-plugin",
+		Directories: []adapter.DirectoryCreate{
+			{Path: ".claude/commands", Parents: true},
+		},
 		Files: []adapter.FileWrite{
 			{Path: ".claude/commands/test.md", Content: "---\nname: test\n---\nContent", Chmod: ""},
 		},
@@ -1211,8 +1216,10 @@ func TestManifestTracking(t *testing.T) {
 	executor := NewExecutor(tmpDir, m, false)
 
 	plan := &adapter.Plan{
-		PluginName:  "tracked-plugin",
-		Directories: []string{"test-dir"},
+		PluginName: "tracked-plugin",
+		Directories: []adapter.DirectoryCreate{
+			{Path: "test-dir", Parents: true},
+		},
 		Files: []adapter.FileWrite{
 			{Path: "test-dir/file.txt", Content: "content", Chmod: ""},
 		},

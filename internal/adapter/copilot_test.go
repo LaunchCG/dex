@@ -219,7 +219,7 @@ func TestCopilotAdapter_PlanInstructions(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, plan)
 
-	assert.Equal(t, []string{filepath.Join(".github", "instructions")}, plan.Directories)
+	assert.Equal(t, []string{filepath.Join(".github", "instructions")}, getDirPaths(plan))
 	require.Len(t, plan.Files, 1)
 	assert.Equal(t, filepath.Join(".github", "instructions", "my-plugin-typescript.instructions.md"), plan.Files[0].Path)
 	assert.Equal(t, "", plan.Files[0].Chmod)
@@ -283,7 +283,7 @@ func TestCopilotAdapter_PlanPrompt(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, plan)
 
-	assert.Equal(t, []string{filepath.Join(".github", "prompts")}, plan.Directories)
+	assert.Equal(t, []string{filepath.Join(".github", "prompts")}, getDirPaths(plan))
 	require.Len(t, plan.Files, 1)
 	assert.Equal(t, filepath.Join(".github", "prompts", "my-plugin-review.prompt.md"), plan.Files[0].Path)
 
@@ -353,7 +353,7 @@ func TestCopilotAdapter_PlanAgent(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, plan)
 
-	assert.Equal(t, []string{filepath.Join(".github", "agents")}, plan.Directories)
+	assert.Equal(t, []string{filepath.Join(".github", "agents")}, getDirPaths(plan))
 	require.Len(t, plan.Files, 1)
 	assert.Equal(t, filepath.Join(".github", "agents", "my-plugin-planner.agent.md"), plan.Files[0].Path)
 
@@ -421,7 +421,7 @@ func TestCopilotAdapter_PlanSkill(t *testing.T) {
 	require.NotNil(t, plan)
 	assert.Equal(t, "my-plugin", plan.PluginName)
 
-	assert.Equal(t, []string{filepath.Join(".github", "skills", "my-plugin-testing")}, plan.Directories)
+	assert.Equal(t, []string{filepath.Join(".github", "skills", "my-plugin-testing")}, getDirPaths(plan))
 	require.Len(t, plan.Files, 1)
 	assert.Equal(t, filepath.Join(".github", "skills", "my-plugin-testing", "SKILL.md"), plan.Files[0].Path)
 
@@ -464,7 +464,7 @@ func TestCopilotAdapter_PlanSkill_WithFiles(t *testing.T) {
 	plan, err := adapter.PlanInstallation(skill, pkg, tmpDir, "/project", &InstallContext{PackageName: "my-plugin", Namespace: true})
 	require.NoError(t, err)
 
-	assert.Equal(t, []string{filepath.Join(".github", "skills", "my-plugin-test-skill")}, plan.Directories)
+	assert.Equal(t, []string{filepath.Join(".github", "skills", "my-plugin-test-skill")}, getDirPaths(plan))
 	require.Len(t, plan.Files, 2)
 
 	// Find SKILL.md and helper.sh
@@ -807,8 +807,10 @@ func TestRegisteredAdapters_IncludesCopilot(t *testing.T) {
 
 func TestMergePlans_WithCopilotPaths(t *testing.T) {
 	plan1 := &Plan{
-		PluginName:       "plugin1",
-		Directories:      []string{".github/instructions"},
+		PluginName: "plugin1",
+		Directories: []DirectoryCreate{
+			{Path: ".github/instructions", Parents: true},
+		},
 		AgentFileContent: "Instruction 1",
 		AgentFilePath:    ".github/copilot-instructions.md",
 		MCPEntries:       make(map[string]any),
@@ -837,5 +839,5 @@ func TestMergePlans_WithCopilotPaths(t *testing.T) {
 	assert.Equal(t, ".vscode/mcp.json", merged.MCPPath)
 	assert.Equal(t, "servers", merged.MCPKey)
 	assert.Equal(t, "Instruction 1", merged.AgentFileContent)
-	assert.Equal(t, []string{".github/instructions"}, merged.Directories)
+	assert.Equal(t, []string{".github/instructions"}, getDirPaths(merged))
 }

@@ -134,17 +134,29 @@ func (e *Executor) Execute(plan *adapter.Plan, vars map[string]string) error {
 	for i, f := range plan.Files {
 		filePaths[i] = f.Path
 	}
-	e.manifest.Track(plan.PluginName, filePaths, plan.Directories)
+	dirPaths := make([]string, len(plan.Directories))
+	for i, d := range plan.Directories {
+		dirPaths[i] = d.Path
+	}
+	e.manifest.Track(plan.PluginName, filePaths, dirPaths)
 
 	return nil
 }
 
 // createDirectories creates all directories in the plan.
-func (e *Executor) createDirectories(dirs []string) error {
+func (e *Executor) createDirectories(dirs []adapter.DirectoryCreate) error {
 	for _, dir := range dirs {
-		path := filepath.Join(e.projectRoot, dir)
-		if err := os.MkdirAll(path, 0755); err != nil {
-			return fmt.Errorf("creating directory %s: %w", dir, err)
+		path := filepath.Join(e.projectRoot, dir.Path)
+		if dir.Parents {
+			// Create with parents (like mkdir -p)
+			if err := os.MkdirAll(path, 0755); err != nil {
+				return fmt.Errorf("creating directory %s: %w", dir.Path, err)
+			}
+		} else {
+			// Create without parents (fails if parent doesn't exist)
+			if err := os.Mkdir(path, 0755); err != nil {
+				return fmt.Errorf("creating directory %s: %w", dir.Path, err)
+			}
 		}
 	}
 	return nil

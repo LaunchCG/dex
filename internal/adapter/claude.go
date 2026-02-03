@@ -76,6 +76,13 @@ func (a *ClaudeAdapter) PlanInstallation(res resource.Resource, pkg *config.Pack
 		return a.planSettings(r, pkg, pluginDir, projectRoot, ctx)
 	case *resource.ClaudeMCPServer:
 		return a.planMCPServer(r, pkg, pluginDir, projectRoot, ctx)
+
+	// Universal resources
+	case *resource.File:
+		return PlanUniversalFile(r, pkg, pluginDir, projectRoot, "claude-code", ctx)
+	case *resource.Directory:
+		return PlanUniversalDirectory(r, pkg, ctx)
+
 	default:
 		return nil, fmt.Errorf("unsupported resource type for claude-code adapter: %T", res)
 	}
@@ -253,7 +260,7 @@ func (a *ClaudeAdapter) planSkill(skill *resource.ClaudeSkill, pkg *config.Packa
 		skillDirName = skill.Name
 	}
 	skillDir := filepath.Join(".claude", "skills", skillDirName)
-	plan.AddDirectory(skillDir)
+	plan.AddDirectory(skillDir, true)
 
 	// Use content as-is if it already has frontmatter, otherwise add ours
 	var content string
@@ -288,7 +295,7 @@ func (a *ClaudeAdapter) planCommand(cmd *resource.ClaudeCommand, pkg *config.Pac
 
 	// Create commands directory
 	commandsDir := filepath.Join(".claude", "commands")
-	plan.AddDirectory(commandsDir)
+	plan.AddDirectory(commandsDir, true)
 
 	// Use content as-is if it already has frontmatter, otherwise add ours
 	var content string
@@ -319,7 +326,7 @@ func (a *ClaudeAdapter) planSubagent(agent *resource.ClaudeSubagent, pkg *config
 
 	// Create agents directory
 	agentsDir := filepath.Join(".claude", "agents")
-	plan.AddDirectory(agentsDir)
+	plan.AddDirectory(agentsDir, true)
 
 	// Use content as-is if it already has frontmatter, otherwise add ours
 	var content string
@@ -369,7 +376,7 @@ func (a *ClaudeAdapter) planRules(rules *resource.ClaudeRules, pkg *config.Packa
 		rulesDirName = rules.Name
 	}
 	rulesDir := filepath.Join(".claude", "rules", rulesDirName)
-	plan.AddDirectory(rulesDir)
+	plan.AddDirectory(rulesDir, true)
 
 	// Only create main rules file if content is provided
 	if rules.Content != "" {
@@ -604,3 +611,4 @@ func (a *ClaudeAdapter) generateRulesFrontmatter(rules *resource.ClaudeRules, pk
 	b.WriteString("---\n")
 	return b.String()
 }
+
