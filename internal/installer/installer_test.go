@@ -2340,3 +2340,43 @@ func TestUninstall_PreservesSharedMergedFile(t *testing.T) {
 	assert.NotContains(t, servers, "server1")
 	assert.Contains(t, servers, "server2")
 }
+
+// TestExecutor_ClaudeSettingsCreatesFile tests that claude_settings blocks
+// result in .claude/settings.json being created during installation.
+// This reproduces the issue where settings files were not being created.
+func TestExecutor_ClaudeSettingsCreatesFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	m := newTestManifest(t, tmpDir)
+	executor := NewExecutor(tmpDir, m, false)
+
+	// Create a plan with just settings entries (like docker-compose plugin)
+	plan := &adapter.Plan{
+		PluginName: "test-settings-plugin",
+		SettingsEntries: map[string]any{
+			"allow": []any{"mcp__dev-toolkit-mcp"},
+		},
+	}
+
+	err := executor.Execute(plan, nil)
+	require.NoError(t, err)
+
+	// Verify .claude directory was created
+	_, err = os.Stat(filepath.Join(tmpDir, ".claude"))
+	assert.NoError(t, err, ".claude directory should be created")
+
+	// Verify .claude/settings.json was created
+	settingsPath := filepath.Join(tmpDir, ".claude/settings.json")
+	_, err = os.Stat(settingsPath)
+	require.NoError(t, err, ".claude/settings.json should exist")
+
+	// Verify settings content
+	settingsContent, err := os.ReadFile(settingsPath)
+	require.NoError(t, err)
+	var settingsResult map[string]any
+	err = json.Unmarshal(settingsContent, &settingsResult)
+	require.NoError(t, err)
+
+	allow, ok := settingsResult["allow"].([]any)
+	require.True(t, ok, "allow should be an array")
+	assert.Contains(t, allow, "mcp__dev-toolkit-mcp")
+}
