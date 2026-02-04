@@ -2380,3 +2380,254 @@ func TestExecutor_ClaudeSettingsCreatesFile(t *testing.T) {
 	require.True(t, ok, "allow should be an array")
 	assert.Contains(t, allow, "mcp__dev-toolkit-mcp")
 }
+
+// =============================================================================
+// Update Command with Local Resources Tests
+// =============================================================================
+
+func TestInstaller_Update_LocalResourcesOnly(t *testing.T) {
+	// Setup: Project with plugins at latest versions, modified agent_instructions in dex.hcl
+	projectDir := t.TempDir()
+
+	// Set up a local plugin
+	pluginDir := t.TempDir()
+	createTestPlugin(t, pluginDir, "my-plugin", "1.0.0", "Test plugin")
+
+	// Create project config with initial agent instructions
+	projectContent := `project {
+  name = "test-project"
+  agentic_platform = "claude-code"
+  agent_instructions = "# Initial Instructions"
+}
+
+plugin "my-plugin" {
+  source = "file:` + pluginDir + `"
+}
+`
+	err := os.WriteFile(filepath.Join(projectDir, "dex.hcl"), []byte(projectContent), 0644)
+	require.NoError(t, err)
+
+	// Install initial version
+	installer1, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	err = installer1.InstallAll()
+	require.NoError(t, err)
+
+	// Verify initial agent instructions
+	claudePath := filepath.Join(projectDir, "CLAUDE.md")
+	content1, err := os.ReadFile(claudePath)
+	require.NoError(t, err)
+	assert.Contains(t, string(content1), "# Initial Instructions")
+
+	// Update agent_instructions in dex.hcl
+	projectContent = `project {
+  name = "test-project"
+  agentic_platform = "claude-code"
+  agent_instructions = "# Updated Instructions\n\nThis is the new content."
+}
+
+plugin "my-plugin" {
+  source = "file:` + pluginDir + `"
+}
+`
+	err = os.WriteFile(filepath.Join(projectDir, "dex.hcl"), []byte(projectContent), 0644)
+	require.NoError(t, err)
+
+	// Execute: dex update
+	installer2, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	results, err := installer2.Update(nil, false)
+	require.NoError(t, err)
+
+	// Verify: Plugin was not updated (already at latest version)
+	require.Len(t, results, 1)
+	assert.True(t, results[0].Skipped)
+	assert.Contains(t, results[0].Reason, "already at latest compatible version")
+
+	// Verify: Agent file (CLAUDE.md) updated with new content
+	content2, err := os.ReadFile(claudePath)
+	require.NoError(t, err)
+	contentStr := string(content2)
+	assert.Contains(t, contentStr, "# Updated Instructions")
+	assert.Contains(t, contentStr, "This is the new content.")
+	assert.NotContains(t, contentStr, "# Initial Instructions")
+
+	// Verify: Plugin content still present
+	assert.Contains(t, contentStr, "<!-- dex:my-plugin -->")
+
+	// Verify: Manifest was saved
+	plugin := installer2.manifest.GetPlugin("__project__")
+	assert.NotNil(t, plugin)
+	assert.True(t, plugin.HasAgentContent)
+}
+
+func TestInstaller_Update_BothPluginAndLocalChanges(t *testing.T) {
+	// Setup: Project with plugin and agent instructions, then modify plugin source and instructions
+	projectDir := t.TempDir()
+
+	// Set up plugin v1
+	pluginV1Dir := t.TempDir()
+	pluginV1Content := `package {
+  name = "test-plugin"
+  version = "1.0.0"
+  description = "Test plugin v1"
+}
+
+claude_rule "test-rule" {
+  description = "Rule from v1"
+  content = "This is version 1 content."
+}
+`
+	err := os.WriteFile(filepath.Join(pluginV1Dir, "package.hcl"), []byte(pluginV1Content), 0644)
+	require.NoError(t, err)
+
+	// Create project config with v1 and initial agent instructions
+	projectContent := `project {
+  name = "test-project"
+  agentic_platform = "claude-code"
+  agent_instructions = "# V1 Instructions"
+}
+
+plugin "test-plugin" {
+  source = "file:` + pluginV1Dir + `"
+}
+`
+	err = os.WriteFile(filepath.Join(projectDir, "dex.hcl"), []byte(projectContent), 0644)
+	require.NoError(t, err)
+
+	// Install initial version (v1)
+	installer1, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	err = installer1.InstallAll()
+	require.NoError(t, err)
+
+	// Verify initial state
+	claudePath := filepath.Join(projectDir, "CLAUDE.md")
+	content1, err := os.ReadFile(claudePath)
+	require.NoError(t, err)
+	assert.Contains(t, string(content1), "# V1 Instructions")
+	assert.Contains(t, string(content1), "This is version 1 content.")
+
+	// Set up plugin v2 in a different directory
+	pluginV2Dir := t.TempDir()
+	pluginV2Content := `package {
+  name = "test-plugin"
+  version = "2.0.0"
+  description = "Test plugin v2"
+}
+
+claude_rule "test-rule" {
+  description = "Rule from v2"
+  content = "This is version 2 content - updated!"
+}
+`
+	err = os.WriteFile(filepath.Join(pluginV2Dir, "package.hcl"), []byte(pluginV2Content), 0644)
+	require.NoError(t, err)
+
+	// Update project config to point to v2 and modify agent instructions
+	projectContent = `project {
+  name = "test-project"
+  agentic_platform = "claude-code"
+  agent_instructions = "# V2 Instructions\n\nUpdated for version 2."
+}
+
+plugin "test-plugin" {
+  source = "file:` + pluginV2Dir + `"
+}
+`
+	err = os.WriteFile(filepath.Join(projectDir, "dex.hcl"), []byte(projectContent), 0644)
+	require.NoError(t, err)
+
+	// Execute: dex update (this should reinstall the plugin since source changed)
+	installer2, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	results, err := installer2.Update(nil, false)
+	require.NoError(t, err)
+
+	// Verify: Plugin was updated
+	require.Len(t, results, 1)
+	assert.False(t, results[0].Skipped)
+	assert.Equal(t, "1.0.0", results[0].OldVersion)
+	assert.Equal(t, "2.0.0", results[0].NewVersion)
+
+	// Verify: Agent instructions updated
+	content2, err := os.ReadFile(claudePath)
+	require.NoError(t, err)
+	contentStr := string(content2)
+	assert.Contains(t, contentStr, "# V2 Instructions")
+	assert.Contains(t, contentStr, "Updated for version 2.")
+	assert.NotContains(t, contentStr, "# V1 Instructions")
+
+	// Verify: Plugin v2 content present
+	assert.Contains(t, contentStr, "<!-- dex:test-plugin -->")
+	assert.Contains(t, contentStr, "This is version 2 content - updated!")
+	assert.NotContains(t, contentStr, "This is version 1 content.")
+}
+
+func TestInstaller_Update_DryRunMode(t *testing.T) {
+	// Setup: Project with modified agent instructions
+	projectDir := t.TempDir()
+
+	// Set up a local plugin
+	pluginDir := t.TempDir()
+	createTestPlugin(t, pluginDir, "my-plugin", "1.0.0", "Test plugin")
+
+	// Create project config with initial agent instructions
+	projectContent := `project {
+  name = "test-project"
+  agentic_platform = "claude-code"
+  agent_instructions = "# Initial Instructions"
+}
+
+plugin "my-plugin" {
+  source = "file:` + pluginDir + `"
+}
+`
+	err := os.WriteFile(filepath.Join(projectDir, "dex.hcl"), []byte(projectContent), 0644)
+	require.NoError(t, err)
+
+	// Install initial version
+	installer1, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	err = installer1.InstallAll()
+	require.NoError(t, err)
+
+	// Verify initial agent instructions
+	claudePath := filepath.Join(projectDir, "CLAUDE.md")
+	content1, err := os.ReadFile(claudePath)
+	require.NoError(t, err)
+	initialContent := string(content1)
+	assert.Contains(t, initialContent, "# Initial Instructions")
+
+	// Update agent_instructions in dex.hcl
+	projectContent = `project {
+  name = "test-project"
+  agentic_platform = "claude-code"
+  agent_instructions = "# Updated Instructions\n\nThis should not be applied in dry-run."
+}
+
+plugin "my-plugin" {
+  source = "file:` + pluginDir + `"
+}
+`
+	err = os.WriteFile(filepath.Join(projectDir, "dex.hcl"), []byte(projectContent), 0644)
+	require.NoError(t, err)
+
+	// Execute: dex update --dry-run
+	installer2, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	results, err := installer2.Update(nil, true) // dryRun = true
+	require.NoError(t, err)
+
+	// Verify: Plugin update report shows it would be skipped
+	require.Len(t, results, 1)
+	assert.True(t, results[0].Skipped)
+
+	// Verify: Agent file unchanged (dry-run should not apply changes)
+	content2, err := os.ReadFile(claudePath)
+	require.NoError(t, err)
+	contentStr := string(content2)
+	assert.Equal(t, initialContent, contentStr, "CLAUDE.md should be unchanged in dry-run mode")
+	assert.Contains(t, contentStr, "# Initial Instructions")
+	assert.NotContains(t, contentStr, "# Updated Instructions")
+}

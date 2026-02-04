@@ -207,11 +207,6 @@ func (i *Installer) InstallAll() error {
 		return nil
 	}
 
-	// Install project-level agent instructions first (before any plugins)
-	if err := i.installProjectAgentInstructions(); err != nil {
-		return err
-	}
-
 	var specs []PluginSpec
 
 	for _, plugin := range i.project.Plugins {
@@ -238,8 +233,8 @@ func (i *Installer) InstallAll() error {
 		}
 	}
 
-	// Install resources defined directly in dex.hcl
-	if err := i.installProjectResources(); err != nil {
+	// Apply project-level agent instructions and resources
+	if err := i.applyLocalResources(); err != nil {
 		return err
 	}
 
@@ -253,6 +248,23 @@ func (i *Installer) InstallAll() error {
 		if err := i.lock.Save(); err != nil {
 			return errors.Wrap(err, "failed to save lock file")
 		}
+	}
+
+	return nil
+}
+
+// applyLocalResources applies project-level agent instructions and resources.
+// This is called by both InstallAll and Update to ensure local dex.hcl changes
+// are always reflected in the installation.
+func (i *Installer) applyLocalResources() error {
+	// Install project-level agent instructions first
+	if err := i.installProjectAgentInstructions(); err != nil {
+		return err
+	}
+
+	// Install resources defined directly in dex.hcl
+	if err := i.installProjectResources(); err != nil {
+		return err
 	}
 
 	return nil
@@ -883,6 +895,13 @@ func (i *Installer) Update(names []string, dryRun bool) ([]UpdateResult, error) 
 			return nil, err
 		}
 		results = append(results, *result)
+	}
+
+	// Apply local resources (agent instructions and project resources) if not dry run
+	if !dryRun {
+		if err := i.applyLocalResources(); err != nil {
+			return nil, err
+		}
 	}
 
 	// Save files if not dry run
