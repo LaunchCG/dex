@@ -29,6 +29,9 @@ type ProjectConfig struct {
 	Settings   []resource.ClaudeSettings  `hcl:"claude_settings,block"`
 	MCPServers []resource.ClaudeMCPServer `hcl:"claude_mcp_server,block"`
 
+	// Universal MCP servers - work across all platforms
+	UniversalMCPServers []resource.MCPServer `hcl:"mcp_server,block"`
+
 	// GitHub Copilot resources
 	CopilotInstruction  []resource.CopilotInstruction  `hcl:"copilot_instruction,block"`
 	CopilotMCPServers   []resource.CopilotMCPServer    `hcl:"copilot_mcp_server,block"`
@@ -187,6 +190,11 @@ func (p *ProjectConfig) buildResources() {
 	}
 	for i := range p.MCPServers {
 		p.Resources = append(p.Resources, &p.MCPServers[i])
+	}
+
+	// Universal MCP servers
+	for i := range p.UniversalMCPServers {
+		p.Resources = append(p.Resources, &p.UniversalMCPServers[i])
 	}
 
 	// GitHub Copilot resources
