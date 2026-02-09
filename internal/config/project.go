@@ -148,7 +148,7 @@ func LoadProject(dir string) (*ProjectConfig, error) {
 	}
 
 	// Pass 2: Decode the remaining body with resolved vars in the eval context
-	ctx := NewProjectEvalContext(resolvedVars)
+	ctx := NewProjectEvalContext(dir, resolvedVars)
 	var config ProjectConfig
 	diags = DecodeBody(remain, ctx, &config)
 	if diags.HasErrors() {

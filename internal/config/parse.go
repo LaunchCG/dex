@@ -70,9 +70,9 @@ func NewPackageEvalContext(packageDir string) *hcl.EvalContext {
 }
 
 // NewProjectEvalContext creates an HCL evaluation context for dex.hcl files.
-// It includes the env() function and a var object containing resolved variable values.
+// It includes the env(), file(), and templatefile() functions and a var object containing resolved variable values.
 // This enables var.NAME syntax for referencing variables in the config.
-func NewProjectEvalContext(resolvedVars map[string]string) *hcl.EvalContext {
+func NewProjectEvalContext(projectDir string, resolvedVars map[string]string) *hcl.EvalContext {
 	// Convert resolved vars to cty values
 	ctyVars := make(map[string]cty.Value)
 	for name, value := range resolvedVars {
@@ -81,7 +81,9 @@ func NewProjectEvalContext(resolvedVars map[string]string) *hcl.EvalContext {
 
 	return &hcl.EvalContext{
 		Functions: map[string]function.Function{
-			"env": envFunction(),
+			"env":          envFunction(),
+			"file":         fileFunction(projectDir),
+			"templatefile": templatefileFunction(projectDir),
 		},
 		Variables: map[string]cty.Value{
 			"var": cty.ObjectVal(ctyVars),

@@ -1073,10 +1073,13 @@ func TestNewProjectEvalContext(t *testing.T) {
 		"VAR2": "value2",
 	}
 
-	ctx := NewProjectEvalContext(resolvedVars)
+	projectDir := t.TempDir()
+	ctx := NewProjectEvalContext(projectDir, resolvedVars)
 	assert.NotNil(t, ctx)
 	assert.NotNil(t, ctx.Functions)
 	assert.Contains(t, ctx.Functions, "env")
+	assert.Contains(t, ctx.Functions, "file")
+	assert.Contains(t, ctx.Functions, "templatefile")
 	assert.NotNil(t, ctx.Variables)
 	assert.Contains(t, ctx.Variables, "var")
 

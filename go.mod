@@ -1,6 +1,6 @@
 module github.com/launchcg/dex
 
-go 1.23
+go 1.24.0
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.13.1
