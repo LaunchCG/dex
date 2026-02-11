@@ -2,6 +2,7 @@ package publisher
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -25,13 +26,13 @@ func TestLocalPublisher(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify result
+		destPath := filepath.Join(registryDir, "my-plugin-1.0.0.tar.gz")
 		assert.Equal(t, "my-plugin", result.Name)
 		assert.Equal(t, "1.0.0", result.Version)
-		assert.Contains(t, result.URL, "my-plugin-1.0.0.tar.gz")
+		assert.Equal(t, "file:"+destPath, result.URL)
 		assert.True(t, len(result.Integrity) > 0)
 
 		// Verify tarball was copied
-		destPath := filepath.Join(registryDir, "my-plugin-1.0.0.tar.gz")
 		_, err = os.Stat(destPath)
 		require.NoError(t, err)
 
@@ -84,9 +85,16 @@ func TestLocalPublisher(t *testing.T) {
 
 		// Should preserve existing registry name
 		assert.Equal(t, "existing-registry", index.Name)
-		assert.Len(t, index.Packages, 2)
-		assert.Contains(t, index.Packages, "existing-plugin")
-		assert.Contains(t, index.Packages, "new-plugin")
+		assert.Equal(t, map[string]registry.PackageEntry{
+			"existing-plugin": {
+				Versions: []string{"1.0.0"},
+				Latest:   "1.0.0",
+			},
+			"new-plugin": {
+				Versions: []string{"2.0.0"},
+				Latest:   "2.0.0",
+			},
+		}, index.Packages)
 	})
 
 	t.Run("adds new version to existing package", func(t *testing.T) {
@@ -151,7 +159,7 @@ func TestLocalPublisher(t *testing.T) {
 
 		_, err = pub.Publish(invalidTarball)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "could not parse")
+		assert.EqualError(t, err, fmt.Sprintf("publish error for package to file:%s during validate: could not parse package name and version from tarball filename: invalid.tar.gz", registryDir))
 	})
 
 	t.Run("protocol returns file", func(t *testing.T) {

@@ -110,30 +110,8 @@ plugin "linting-rules" {
 	content, err := os.ReadFile(claudePath)
 	require.NoError(t, err)
 
-	contentStr := string(content)
-
-	// Check project instructions are at the top
-	assert.Contains(t, contentStr, "# My Project")
-	assert.Contains(t, contentStr, "This is my project's main context.")
-
-	// Check plugin content is after with markers
-	assert.Contains(t, contentStr, "<!-- dex:linting-rules -->")
-	assert.Contains(t, contentStr, "Always run ESLint before committing.")
-	assert.Contains(t, contentStr, "<!-- /dex:linting-rules -->")
-
-	// Verify order: project content comes before plugin marker
-	projectIdx := 0
-	markerIdx := len(contentStr)
-	for i := range contentStr {
-		if i+len("# My Project") <= len(contentStr) && contentStr[i:i+len("# My Project")] == "# My Project" {
-			projectIdx = i
-		}
-		if i+len("<!-- dex:") <= len(contentStr) && contentStr[i:i+len("<!-- dex:")] == "<!-- dex:" {
-			markerIdx = i
-			break
-		}
-	}
-	assert.Less(t, projectIdx, markerIdx, "Project content should appear before plugin markers")
+	expected := "# My Project\n\nThis is my project's main context.\n\n<!-- dex:linting-rules -->\nAlways run ESLint before committing.\n<!-- /dex:linting-rules -->"
+	assert.Equal(t, expected, string(content))
 }
 
 func TestInstaller_ProjectAgentInstructions_UpdateInstructions(t *testing.T) {
@@ -167,7 +145,8 @@ plugin "my-plugin" {
 	// Verify v1 content
 	content1, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
 	require.NoError(t, err)
-	assert.Contains(t, string(content1), "# V1 Instructions")
+	expected1 := "# V1 Instructions\n\n<!-- dex:my-plugin -->\nFollow this rule from my-plugin\n<!-- /dex:my-plugin -->"
+	assert.Equal(t, expected1, string(content1))
 
 	// Update project config to v2
 	projectContent = `project {
@@ -189,18 +168,11 @@ plugin "my-plugin" {
 	err = installer2.InstallAll()
 	require.NoError(t, err)
 
-	// Verify v2 content
+	// Verify v2 content: V2 instructions replace V1, plugin content preserved
 	content2, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
 	require.NoError(t, err)
-	contentStr := string(content2)
-
-	// V2 should be there, V1 should be gone
-	assert.Contains(t, contentStr, "# V2 Updated Instructions")
-	assert.Contains(t, contentStr, "This is the new version.")
-	assert.NotContains(t, contentStr, "# V1 Instructions")
-
-	// Plugin content should still be there
-	assert.Contains(t, contentStr, "<!-- dex:my-plugin -->")
+	expected2 := "# V2 Updated Instructions\n\nThis is the new version.\n\n<!-- dex:my-plugin -->\nFollow this rule from my-plugin\n<!-- /dex:my-plugin -->"
+	assert.Equal(t, expected2, string(content2))
 }
 
 func TestInstaller_ProjectAgentInstructions_RemoveInstructions(t *testing.T) {
@@ -234,7 +206,8 @@ plugin "my-plugin" {
 	// Verify instructions are there
 	content1, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
 	require.NoError(t, err)
-	assert.Contains(t, string(content1), "# Project Instructions")
+	expected1 := "# Project Instructions\n\n<!-- dex:my-plugin -->\nFollow this rule from my-plugin\n<!-- /dex:my-plugin -->"
+	assert.Equal(t, expected1, string(content1))
 
 	// Remove agent_instructions from config
 	projectContent = `project {
@@ -258,10 +231,8 @@ plugin "my-plugin" {
 	// Verify project instructions are gone, plugin content remains
 	content2, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
 	require.NoError(t, err)
-	contentStr := string(content2)
-
-	assert.NotContains(t, contentStr, "# Project Instructions")
-	assert.Contains(t, contentStr, "<!-- dex:my-plugin -->")
+	expected2 := "<!-- dex:my-plugin -->\nFollow this rule from my-plugin\n<!-- /dex:my-plugin -->"
+	assert.Equal(t, expected2, string(content2))
 }
 
 func TestInstaller_ProjectAgentInstructions_Cursor(t *testing.T) {
@@ -292,8 +263,8 @@ func TestInstaller_ProjectAgentInstructions_Cursor(t *testing.T) {
 	content, err := os.ReadFile(agentsPath)
 	require.NoError(t, err)
 
-	assert.Contains(t, string(content), "# Cursor Project Guidelines")
-	assert.Contains(t, string(content), "Use Cursor-specific instructions.")
+	expected := "# Cursor Project Guidelines\n\nUse Cursor-specific instructions."
+	assert.Equal(t, expected, string(content))
 }
 
 func TestInstaller_ProjectAgentInstructions_Copilot(t *testing.T) {
@@ -324,8 +295,8 @@ func TestInstaller_ProjectAgentInstructions_Copilot(t *testing.T) {
 	content, err := os.ReadFile(copilotPath)
 	require.NoError(t, err)
 
-	assert.Contains(t, string(content), "# Copilot Project Guidelines")
-	assert.Contains(t, string(content), "Use GitHub Copilot best practices.")
+	expected := "# Copilot Project Guidelines\n\nUse GitHub Copilot best practices."
+	assert.Equal(t, expected, string(content))
 }
 
 func TestInstaller_ProjectAgentInstructions_MultiplePlugins(t *testing.T) {
@@ -380,32 +351,12 @@ plugin "plugin-c" {
 	require.NoError(t, err)
 	contentStr := string(content)
 
-	// Project instructions at top
-	assert.Contains(t, contentStr, "# Main Project Guidelines")
-
-	// All three plugins present
-	assert.Contains(t, contentStr, "<!-- dex:plugin-a -->")
-	assert.Contains(t, contentStr, "<!-- dex:plugin-b -->")
-	assert.Contains(t, contentStr, "<!-- dex:plugin-c -->")
-
-	// Verify project content comes before any plugin markers
-	projectIdx := 0
-	for i := range contentStr {
-		if i+len("# Main") <= len(contentStr) && contentStr[i:i+len("# Main")] == "# Main" {
-			projectIdx = i
-			break
-		}
-	}
-
-	firstMarkerIdx := len(contentStr)
-	for i := range contentStr {
-		if i+len("<!-- dex:") <= len(contentStr) && contentStr[i:i+len("<!-- dex:")] == "<!-- dex:" {
-			firstMarkerIdx = i
-			break
-		}
-	}
-
-	assert.Less(t, projectIdx, firstMarkerIdx, "Project content should come before plugin markers")
+	// Verify full content: project instructions at top, then all three plugin sections
+	expected := "# Main Project Guidelines\n\nThese are the overarching project rules.\nAll plugins must follow these.\n\n" +
+		"<!-- dex:plugin-a -->\nFollow this rule from plugin-a\n<!-- /dex:plugin-a -->\n\n" +
+		"<!-- dex:plugin-b -->\nFollow this rule from plugin-b\n<!-- /dex:plugin-b -->\n\n" +
+		"<!-- dex:plugin-c -->\nFollow this rule from plugin-c\n<!-- /dex:plugin-c -->"
+	assert.Equal(t, expected, contentStr)
 }
 
 func TestInstaller_ProjectAgentInstructions_NoInstructionsNoPlugins(t *testing.T) {

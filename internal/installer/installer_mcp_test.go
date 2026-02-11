@@ -65,19 +65,16 @@ plugin "mcp-test" {
 	err = json.Unmarshal(mcpData, &mcpConfig)
 	require.NoError(t, err)
 
-	// Verify structure
-	assert.Contains(t, mcpConfig, "mcpServers")
-	mcpServers := mcpConfig["mcpServers"].(map[string]any)
-
-	// Verify the filesystem server was installed (non-namespaced by default)
-	assert.Contains(t, mcpServers, "filesystem")
-	fsServer := mcpServers["filesystem"].(map[string]any)
-
-	assert.Equal(t, "npx", fsServer["command"])
-	assert.Equal(t, []any{"-y", "@modelcontextprotocol/server-filesystem", "/tmp"}, fsServer["args"])
-
-	env := fsServer["env"].(map[string]any)
-	assert.Equal(t, "true", env["DEBUG"])
+	// Verify full MCP config
+	assert.Equal(t, map[string]any{
+		"mcpServers": map[string]any{
+			"filesystem": map[string]any{
+				"command": "npx",
+				"args":    []any{"-y", "@modelcontextprotocol/server-filesystem", "/tmp"},
+				"env":     map[string]any{"DEBUG": "true"},
+			},
+		},
+	}, mcpConfig)
 }
 
 func TestInstaller_MCPServer_ClaudeCode_WithNamespacing(t *testing.T) {
@@ -135,16 +132,15 @@ plugin "mcp-test" {
 	err = json.Unmarshal(mcpData, &mcpConfig)
 	require.NoError(t, err)
 
-	// Verify structure
-	assert.Contains(t, mcpConfig, "mcpServers")
-	mcpServers := mcpConfig["mcpServers"].(map[string]any)
-
-	// Verify the server was namespaced
-	assert.Contains(t, mcpServers, "mcp-test-filesystem")
-	assert.NotContains(t, mcpServers, "filesystem")
-
-	fsServer := mcpServers["mcp-test-filesystem"].(map[string]any)
-	assert.Equal(t, "npx", fsServer["command"])
+	// Verify full MCP config with namespaced server name
+	assert.Equal(t, map[string]any{
+		"mcpServers": map[string]any{
+			"mcp-test-filesystem": map[string]any{
+				"command": "npx",
+				"args":    []any{"-y", "@modelcontextprotocol/server-filesystem", "/tmp"},
+			},
+		},
+	}, mcpConfig)
 }
 
 func TestInstaller_MCPServer_Cursor(t *testing.T) {
@@ -203,18 +199,15 @@ plugin "mcp-test" {
 	err = json.Unmarshal(mcpData, &mcpConfig)
 	require.NoError(t, err)
 
-	// Verify structure
-	assert.Contains(t, mcpConfig, "mcpServers")
-	mcpServers := mcpConfig["mcpServers"].(map[string]any)
-
-	// Verify the context7 server was installed
-	assert.Contains(t, mcpServers, "context7")
-	ctx7Server := mcpServers["context7"].(map[string]any)
-
-	assert.Equal(t, "https://mcp.context7.com/mcp", ctx7Server["url"])
-
-	headers := ctx7Server["headers"].(map[string]any)
-	assert.Equal(t, "Bearer test-token", headers["Authorization"])
+	// Verify full MCP config for Cursor
+	assert.Equal(t, map[string]any{
+		"mcpServers": map[string]any{
+			"context7": map[string]any{
+				"url":     "https://mcp.context7.com/mcp",
+				"headers": map[string]any{"Authorization": "Bearer test-token"},
+			},
+		},
+	}, mcpConfig)
 }
 
 func TestInstaller_MCPServer_Copilot(t *testing.T) {
@@ -275,21 +268,17 @@ plugin "mcp-test" {
 	err = json.Unmarshal(mcpData, &mcpConfig)
 	require.NoError(t, err)
 
-	// Verify structure (Copilot uses "servers" key, not "mcpServers")
-	assert.Contains(t, mcpConfig, "servers")
-	servers := mcpConfig["servers"].(map[string]any)
-
-	// Verify the database server was installed
-	assert.Contains(t, servers, "database")
-	dbServer := servers["database"].(map[string]any)
-
-	assert.Equal(t, "stdio", dbServer["type"])
-	assert.Equal(t, "db-server", dbServer["command"])
-	assert.Equal(t, []any{"--host", "localhost"}, dbServer["args"])
-
-	env := dbServer["env"].(map[string]any)
-	assert.Equal(t, "localhost", env["DB_HOST"])
-	assert.Equal(t, "5432", env["DB_PORT"])
+	// Verify full MCP config (Copilot uses "servers" key, not "mcpServers")
+	assert.Equal(t, map[string]any{
+		"servers": map[string]any{
+			"database": map[string]any{
+				"type":    "stdio",
+				"command": "db-server",
+				"args":    []any{"--host", "localhost"},
+				"env":     map[string]any{"DB_HOST": "localhost", "DB_PORT": "5432"},
+			},
+		},
+	}, mcpConfig)
 }
 
 func TestInstaller_MCPServer_PlatformOverride(t *testing.T) {
@@ -350,12 +339,14 @@ plugin "mcp-test" {
 		err = json.Unmarshal(mcpData, &mcpConfig)
 		require.NoError(t, err)
 
-		mcpServers := mcpConfig["mcpServers"].(map[string]any)
-		assert.Contains(t, mcpServers, "multi-platform")
-
-		server := mcpServers["multi-platform"].(map[string]any)
-		assert.Equal(t, "claude-command", server["command"])
-		assert.Equal(t, []any{"--claude"}, server["args"])
+		assert.Equal(t, map[string]any{
+			"mcpServers": map[string]any{
+				"multi-platform": map[string]any{
+					"command": "claude-command",
+					"args":    []any{"--claude"},
+				},
+			},
+		}, mcpConfig)
 	})
 
 	// Test Cursor (should be disabled)
@@ -379,21 +370,10 @@ plugin "mcp-test" {
 		err = installer.InstallAll()
 		require.NoError(t, err)
 
-		// The MCP file might not even exist if no servers are installed
+		// The MCP file should not exist since the server is disabled for Cursor
 		mcpPath := filepath.Join(cursorProjectDir, ".cursor", "mcp.json")
-		if _, err := os.Stat(mcpPath); err == nil {
-			// File exists, check it doesn't contain the server
-			mcpData, err := os.ReadFile(mcpPath)
-			require.NoError(t, err)
-
-			var mcpConfig map[string]any
-			err = json.Unmarshal(mcpData, &mcpConfig)
-			require.NoError(t, err)
-
-			if mcpServers, ok := mcpConfig["mcpServers"].(map[string]any); ok {
-				assert.NotContains(t, mcpServers, "multi-platform")
-			}
-		}
+		_, err = os.Stat(mcpPath)
+		assert.True(t, os.IsNotExist(err), ".cursor/mcp.json should not exist when server is disabled")
 	})
 }
 
@@ -459,26 +439,23 @@ plugin "multi-mcp" {
 	err = json.Unmarshal(mcpData, &mcpConfig)
 	require.NoError(t, err)
 
-	mcpServers := mcpConfig["mcpServers"].(map[string]any)
-
-	// Verify all three servers are present
-	assert.Contains(t, mcpServers, "filesystem")
-	assert.Contains(t, mcpServers, "github")
-	assert.Contains(t, mcpServers, "api")
-
-	// Verify filesystem server
-	fsServer := mcpServers["filesystem"].(map[string]any)
-	assert.Equal(t, "npx", fsServer["command"])
-
-	// Verify github server with env var substitution
-	ghServer := mcpServers["github"].(map[string]any)
-	assert.Equal(t, "npx", ghServer["command"])
-	ghEnv := ghServer["env"].(map[string]any)
-	assert.Equal(t, "test-gh-token", ghEnv["GITHUB_TOKEN"])
-
-	// Verify HTTP server
-	apiServer := mcpServers["api"].(map[string]any)
-	assert.Equal(t, "https://api.example.com/mcp", apiServer["url"])
+	// Verify full MCP config with all three servers
+	assert.Equal(t, map[string]any{
+		"mcpServers": map[string]any{
+			"filesystem": map[string]any{
+				"command": "npx",
+				"args":    []any{"-y", "@modelcontextprotocol/server-filesystem", "/tmp"},
+			},
+			"github": map[string]any{
+				"command": "npx",
+				"args":    []any{"-y", "@modelcontextprotocol/server-github"},
+				"env":     map[string]any{"GITHUB_TOKEN": "test-gh-token"},
+			},
+			"api": map[string]any{
+				"url": "https://api.example.com/mcp",
+			},
+		},
+	}, mcpConfig)
 }
 
 func TestInstaller_MCPServer_Uninstall(t *testing.T) {
@@ -524,8 +501,14 @@ plugin "mcp-test" {
 	err = json.Unmarshal(mcpData, &mcpConfig)
 	require.NoError(t, err)
 
-	mcpServers := mcpConfig["mcpServers"].(map[string]any)
-	assert.Contains(t, mcpServers, "test-server")
+	assert.Equal(t, map[string]any{
+		"mcpServers": map[string]any{
+			"test-server": map[string]any{
+				"command": "test-command",
+				"args":    []any{"--test"},
+			},
+		},
+	}, mcpConfig)
 
 	// Now uninstall
 	err = installer.Uninstall([]string{"mcp-test"}, false)

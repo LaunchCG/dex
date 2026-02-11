@@ -5,9 +5,11 @@ import (
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -29,14 +31,19 @@ func TestNew(t *testing.T) {
 	t.Run("directory does not exist", func(t *testing.T) {
 		_, err := New("/nonexistent/path")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "does not exist")
+		assert.EqualError(t, err, "pack error for /nonexistent/path during read: directory does not exist: /nonexistent/path")
 	})
 
 	t.Run("directory without package.hcl", func(t *testing.T) {
 		dir := t.TempDir()
 		_, err := New(dir)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to load package.hcl")
+		pkgFile := filepath.Join(dir, "package.hcl")
+		expected := fmt.Sprintf(
+			"pack error for %s during read: failed to load package.hcl: failed to parse %s: <nil>: Failed to read file; The configuration file %q could not be read.",
+			dir, pkgFile, pkgFile,
+		)
+		assert.EqualError(t, err, expected)
 	})
 
 	t.Run("invalid package.hcl", func(t *testing.T) {
@@ -73,7 +80,13 @@ func TestPack(t *testing.T) {
 		assert.Equal(t, "test-plugin", result.Name)
 		assert.Equal(t, "1.2.3", result.Version)
 		assert.True(t, result.Size > 0)
-		assert.True(t, strings.HasPrefix(result.Integrity, "sha256-"))
+
+		// Verify integrity hash matches actual file
+		data, err := os.ReadFile(output)
+		require.NoError(t, err)
+		hash := sha256.Sum256(data)
+		expectedIntegrity := "sha256-" + hex.EncodeToString(hash[:])
+		assert.Equal(t, expectedIntegrity, result.Integrity)
 
 		// Verify tarball exists and is valid
 		_, err = os.Stat(output)
@@ -81,9 +94,12 @@ func TestPack(t *testing.T) {
 
 		// Extract and verify contents
 		files := extractTarballFiles(t, output)
-		assert.Contains(t, files, "test-plugin-1.2.3/package.hcl")
-		assert.Contains(t, files, "test-plugin-1.2.3/README.md")
-		assert.Contains(t, files, "test-plugin-1.2.3/src/main.go")
+		sort.Strings(files)
+		assert.Equal(t, []string{
+			"test-plugin-1.2.3/README.md",
+			"test-plugin-1.2.3/package.hcl",
+			"test-plugin-1.2.3/src/main.go",
+		}, files)
 	})
 
 	t.Run("default output filename", func(t *testing.T) {
@@ -135,20 +151,13 @@ func TestPack(t *testing.T) {
 		require.NoError(t, err)
 
 		files := extractTarballFiles(t, output)
+		sort.Strings(files)
 
-		// Should include
-		assert.Contains(t, files, "test-plugin-1.0.0/package.hcl")
-		assert.Contains(t, files, "test-plugin-1.0.0/included.txt")
-
-		// Should exclude
-		for _, f := range files {
-			assert.NotContains(t, f, ".git/")
-			assert.NotContains(t, f, "node_modules/")
-			assert.NotContains(t, f, "__pycache__/")
-			assert.NotContains(t, f, ".env")
-			assert.NotContains(t, f, ".pyc")
-			assert.NotContains(t, f, ".DS_Store")
-		}
+		// Only non-excluded files should be present
+		assert.Equal(t, []string{
+			"test-plugin-1.0.0/included.txt",
+			"test-plugin-1.0.0/package.hcl",
+		}, files)
 	})
 
 	t.Run("single top-level directory", func(t *testing.T) {
@@ -167,10 +176,7 @@ func TestPack(t *testing.T) {
 
 		// Verify all files are under single top-level directory
 		files := extractTarballFiles(t, output)
-		for _, f := range files {
-			assert.True(t, strings.HasPrefix(f, "my-plugin-1.0.0/"),
-				"file %q should be under my-plugin-1.0.0/", f)
-		}
+		assert.Equal(t, []string{"my-plugin-1.0.0/package.hcl"}, files)
 	})
 
 	t.Run("computes correct integrity hash", func(t *testing.T) {
@@ -215,16 +221,11 @@ func TestWithExcludes(t *testing.T) {
 	require.NoError(t, err)
 
 	files := extractTarballFiles(t, output)
-	assert.Contains(t, files, "test-plugin-1.0.0/keep.txt")
-
-	hasCustom := false
-	for _, f := range files {
-		if strings.Contains(f, "custom.txt") {
-			hasCustom = true
-			break
-		}
-	}
-	assert.False(t, hasCustom, "custom.txt should be excluded")
+	sort.Strings(files)
+	assert.Equal(t, []string{
+		"test-plugin-1.0.0/keep.txt",
+		"test-plugin-1.0.0/package.hcl",
+	}, files)
 }
 
 // createTestPlugin creates a temporary directory with a valid package.hcl.
@@ -294,7 +295,6 @@ func TestPackWithVariousFileTypes(t *testing.T) {
 		assert.Equal(t, "comprehensive-test", result.Name)
 		assert.Equal(t, "1.0.0", result.Version)
 		assert.True(t, result.Size > 0)
-		assert.True(t, strings.HasPrefix(result.Integrity, "sha256-"))
 
 		// Verify tarball file exists
 		fileInfo, err := os.Stat(output)
@@ -303,23 +303,20 @@ func TestPackWithVariousFileTypes(t *testing.T) {
 
 		// Extract and verify all files are present
 		files := extractTarballFiles(t, output)
+		sort.Strings(files)
 
-		expectedFiles := []string{
-			"comprehensive-test-1.0.0/package.hcl",
-			"comprehensive-test-1.0.0/small.txt",
-			"comprehensive-test-1.0.0/medium.txt",
-			"comprehensive-test-1.0.0/large.txt",
+		assert.Equal(t, []string{
 			"comprehensive-test-1.0.0/binary.dat",
-			"comprehensive-test-1.0.0/script.sh",
-			"comprehensive-test-1.0.0/nested/file1.txt",
+			"comprehensive-test-1.0.0/empty.txt",
+			"comprehensive-test-1.0.0/large.txt",
+			"comprehensive-test-1.0.0/medium.txt",
 			"comprehensive-test-1.0.0/nested/deep/file2.txt",
 			"comprehensive-test-1.0.0/nested/deep/path/file3.txt",
-			"comprehensive-test-1.0.0/empty.txt",
-		}
-
-		for _, expected := range expectedFiles {
-			assert.Contains(t, files, expected, "tarball should contain %s", expected)
-		}
+			"comprehensive-test-1.0.0/nested/file1.txt",
+			"comprehensive-test-1.0.0/package.hcl",
+			"comprehensive-test-1.0.0/script.sh",
+			"comprehensive-test-1.0.0/small.txt",
+		}, files)
 
 		// Verify file contents match by extracting and comparing
 		contents := extractTarballContents(t, output)

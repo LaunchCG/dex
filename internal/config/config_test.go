@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -51,7 +52,8 @@ func TestLoadProject_NotFound(t *testing.T) {
 	config, err := LoadProject(tmpDir)
 	assert.Nil(t, config)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to parse")
+	expectedPrefix := fmt.Sprintf("failed to parse %s:", filepath.Join(tmpDir, "dex.hcl"))
+	assert.Equal(t, expectedPrefix, err.Error()[:len(expectedPrefix)])
 }
 
 func TestLoadProject_InvalidHCL(t *testing.T) {
@@ -67,7 +69,8 @@ project {
 	config, err := LoadProject(tmpDir)
 	assert.Nil(t, config)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to parse")
+	expectedPrefix := fmt.Sprintf("failed to parse %s:", filepath.Join(tmpDir, "dex.hcl"))
+	assert.Equal(t, expectedPrefix, err.Error()[:len(expectedPrefix)])
 }
 
 func TestLoadProject_MissingRequired(t *testing.T) {
@@ -90,7 +93,7 @@ project {
 	// Validation should fail due to missing agentic_platform
 	err = config.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "project.agentic_platform is required")
+	assert.EqualError(t, err, "project.agentic_platform is required")
 }
 
 func TestProjectConfig_Validate(t *testing.T) {
@@ -132,7 +135,7 @@ func TestProjectConfig_Validate_MissingAgenticPlatform(t *testing.T) {
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "project.agentic_platform is required")
+	assert.EqualError(t, err, "project.agentic_platform is required")
 }
 
 func TestProjectConfig_Validate_DuplicateRegistry(t *testing.T) {
@@ -149,7 +152,7 @@ func TestProjectConfig_Validate_DuplicateRegistry(t *testing.T) {
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "duplicate registry name: local")
+	assert.EqualError(t, err, "duplicate registry name: local")
 }
 
 func TestProjectConfig_Validate_DuplicatePlugin(t *testing.T) {
@@ -166,7 +169,7 @@ func TestProjectConfig_Validate_DuplicatePlugin(t *testing.T) {
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "duplicate plugin name: my-plugin")
+	assert.EqualError(t, err, "duplicate plugin name: my-plugin")
 }
 
 func TestProjectConfig_Validate_RegistryMissingPathOrURL(t *testing.T) {
@@ -182,7 +185,7 @@ func TestProjectConfig_Validate_RegistryMissingPathOrURL(t *testing.T) {
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "must have either path or url")
+	assert.EqualError(t, err, `registry "empty-registry" must have either path or url`)
 }
 
 func TestProjectConfig_Validate_RegistryBothPathAndURL(t *testing.T) {
@@ -198,7 +201,7 @@ func TestProjectConfig_Validate_RegistryBothPathAndURL(t *testing.T) {
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot have both path and url")
+	assert.EqualError(t, err, `registry "both-registry" cannot have both path and url`)
 }
 
 func TestProjectConfig_Validate_PluginMissingSourceOrRegistry(t *testing.T) {
@@ -214,7 +217,7 @@ func TestProjectConfig_Validate_PluginMissingSourceOrRegistry(t *testing.T) {
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "must have either source or registry")
+	assert.EqualError(t, err, `plugin "orphan-plugin" must have either source or registry`)
 }
 
 func TestProjectConfig_Validate_PluginBothSourceAndRegistry(t *testing.T) {
@@ -233,7 +236,7 @@ func TestProjectConfig_Validate_PluginBothSourceAndRegistry(t *testing.T) {
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot have both source and registry")
+	assert.EqualError(t, err, `plugin "confused-plugin" cannot have both source and registry`)
 }
 
 func TestProjectConfig_Validate_PluginUnknownRegistry(t *testing.T) {
@@ -249,7 +252,7 @@ func TestProjectConfig_Validate_PluginUnknownRegistry(t *testing.T) {
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "references unknown registry: nonexistent")
+	assert.EqualError(t, err, `plugin "my-plugin" references unknown registry: nonexistent`)
 }
 
 func TestLoadPackage_NotFound(t *testing.T) {
@@ -259,7 +262,8 @@ func TestLoadPackage_NotFound(t *testing.T) {
 	config, err := LoadPackage(tmpDir)
 	assert.Nil(t, config)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to parse")
+	expectedPrefix := fmt.Sprintf("failed to parse %s:", filepath.Join(tmpDir, "package.hcl"))
+	assert.Equal(t, expectedPrefix, err.Error()[:len(expectedPrefix)])
 }
 
 func TestLoadPackage_InvalidHCL(t *testing.T) {
@@ -276,7 +280,8 @@ package {
 	config, err := LoadPackage(tmpDir)
 	assert.Nil(t, config)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to parse")
+	expectedPrefix := fmt.Sprintf("failed to parse %s:", filepath.Join(tmpDir, "package.hcl"))
+	assert.Equal(t, expectedPrefix, err.Error()[:len(expectedPrefix)])
 }
 
 func TestPackageConfig_Validate(t *testing.T) {
@@ -300,7 +305,7 @@ func TestPackageConfig_Validate_MissingName(t *testing.T) {
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "package.name is required")
+	assert.EqualError(t, err, "package.name is required")
 }
 
 func TestPackageConfig_Validate_MissingVersion(t *testing.T) {
@@ -312,7 +317,7 @@ func TestPackageConfig_Validate_MissingVersion(t *testing.T) {
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "package.version is required")
+	assert.EqualError(t, err, "package.version is required")
 }
 
 func TestPackageConfig_Validate_DuplicateVariable(t *testing.T) {
@@ -329,7 +334,7 @@ func TestPackageConfig_Validate_DuplicateVariable(t *testing.T) {
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "duplicate variable name: var1")
+	assert.EqualError(t, err, "duplicate variable name: var1")
 }
 
 func TestPackageConfig_Validate_RequiredWithDefault(t *testing.T) {
@@ -345,7 +350,7 @@ func TestPackageConfig_Validate_RequiredWithDefault(t *testing.T) {
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "is marked required but has a default value")
+	assert.EqualError(t, err, `variable "var1" is marked required but has a default value`)
 }
 
 func TestPackageConfig_GetVariable(t *testing.T) {
@@ -446,7 +451,7 @@ func TestVariableBlock_ResolveValue_RequiredNotSet(t *testing.T) {
 
 	value, err := v.ResolveValue(nil)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "required variable")
+	assert.EqualError(t, err, `required variable "test" has no value`)
 	assert.Equal(t, "", value)
 }
 
@@ -526,8 +531,9 @@ value = env("TEST_ENV_VAR")
 
 	ctx := NewEvalContext()
 	assert.NotNil(t, ctx)
-	assert.NotNil(t, ctx.Functions)
-	assert.Contains(t, ctx.Functions, "env")
+	require.NotNil(t, ctx.Functions)
+	assert.Len(t, ctx.Functions, 1)
+	assert.NotNil(t, ctx.Functions["env"])
 
 	// Decode to verify env function works
 	var result struct {
@@ -603,7 +609,7 @@ func TestProjectConfig_Validate_RegistryEmptyName(t *testing.T) {
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "registry name is required")
+	assert.EqualError(t, err, "registry name is required")
 }
 
 func TestProjectConfig_Validate_PluginEmptyName(t *testing.T) {
@@ -619,7 +625,7 @@ func TestProjectConfig_Validate_PluginEmptyName(t *testing.T) {
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "plugin name is required")
+	assert.EqualError(t, err, "plugin name is required")
 }
 
 func TestPackageConfig_Validate_VariableEmptyName(t *testing.T) {
@@ -635,7 +641,7 @@ func TestPackageConfig_Validate_VariableEmptyName(t *testing.T) {
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "variable name is required")
+	assert.EqualError(t, err, "variable name is required")
 }
 
 func TestPackageBlock_OptionalFields(t *testing.T) {
@@ -768,7 +774,10 @@ value = templatefile("nonexistent.tmpl", {})
 	}
 	diags = DecodeBody(file.Body, ctx, &result)
 	require.True(t, diags.HasErrors())
-	assert.Contains(t, diags.Error(), "reading template")
+	expectedDiag := fmt.Sprintf(
+		`%s:2,9-22: Error in function call; Call to function "templatefile" failed: reading template nonexistent.tmpl: open %s: no such file or directory., and 1 other diagnostic(s)`,
+		filename, filepath.Join(tmpDir, "nonexistent.tmpl"))
+	assert.Equal(t, expectedDiag, diags.Error())
 }
 
 func TestNewPackageEvalContext_TemplatefileFunction_InvalidTemplate(t *testing.T) {
@@ -798,7 +807,10 @@ value = templatefile("invalid.tmpl", { name = "Alice" })
 	}
 	diags = DecodeBody(file.Body, ctx, &result)
 	require.True(t, diags.HasErrors())
-	assert.Contains(t, diags.Error(), "parsing template")
+	expectedDiag := fmt.Sprintf(
+		`%s:2,9-22: Error in function call; Call to function "templatefile" failed: parsing template invalid.tmpl: template: hcl:1: unclosed action., and 1 other diagnostic(s)`,
+		filename)
+	assert.Equal(t, expectedDiag, diags.Error())
 }
 
 func TestNewPackageEvalContext_TemplatefileFunction_ComplexVars(t *testing.T) {
@@ -980,8 +992,9 @@ project {
 	config, err := LoadProject(tmpDir)
 	assert.Nil(t, config)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "required variable")
-	assert.Contains(t, err.Error(), "MISSING_VAR")
+	expectedErr := fmt.Sprintf("failed to resolve variables in %s: required variable %q has no value (set via env var %q or default)",
+		filepath.Join(tmpDir, "dex.hcl"), "MISSING_VAR", "NONEXISTENT_REQUIRED_VAR")
+	assert.EqualError(t, err, expectedErr)
 }
 
 func TestProjectConfig_Validate_DuplicateVariableName(t *testing.T) {
@@ -998,7 +1011,7 @@ func TestProjectConfig_Validate_DuplicateVariableName(t *testing.T) {
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "duplicate variable name: VAR1")
+	assert.EqualError(t, err, "duplicate variable name: VAR1")
 }
 
 func TestProjectConfig_Validate_RequiredWithDefault(t *testing.T) {
@@ -1014,7 +1027,7 @@ func TestProjectConfig_Validate_RequiredWithDefault(t *testing.T) {
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "is marked required but has a default value")
+	assert.EqualError(t, err, `variable "VAR1" is marked required but has a default value`)
 }
 
 func TestProjectConfig_Validate_EmptyVariableName(t *testing.T) {
@@ -1030,7 +1043,7 @@ func TestProjectConfig_Validate_EmptyVariableName(t *testing.T) {
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "variable name is required")
+	assert.EqualError(t, err, "variable name is required")
 }
 
 func TestLoadProject_VariableOptionalNoValue(t *testing.T) {
@@ -1076,12 +1089,14 @@ func TestNewProjectEvalContext(t *testing.T) {
 	projectDir := t.TempDir()
 	ctx := NewProjectEvalContext(projectDir, resolvedVars)
 	assert.NotNil(t, ctx)
-	assert.NotNil(t, ctx.Functions)
-	assert.Contains(t, ctx.Functions, "env")
-	assert.Contains(t, ctx.Functions, "file")
-	assert.Contains(t, ctx.Functions, "templatefile")
-	assert.NotNil(t, ctx.Variables)
-	assert.Contains(t, ctx.Variables, "var")
+	require.NotNil(t, ctx.Functions)
+	assert.Len(t, ctx.Functions, 3)
+	assert.NotNil(t, ctx.Functions["env"])
+	assert.NotNil(t, ctx.Functions["file"])
+	assert.NotNil(t, ctx.Functions["templatefile"])
+	require.NotNil(t, ctx.Variables)
+	assert.Len(t, ctx.Variables, 1)
+	assert.True(t, ctx.Variables["var"].IsKnown())
 
 	// Verify the var object contains the expected values
 	varObj := ctx.Variables["var"]
@@ -1209,8 +1224,7 @@ claude_mcp_server "test-server" {
 	assert.Len(t, config.MCPServers, 1)
 	assert.Equal(t, "test-server", config.MCPServers[0].Name)
 	assert.Equal(t, "npx", config.MCPServers[0].Command)
-	assert.Contains(t, config.MCPServers[0].Args, "--arg")
-	assert.Contains(t, config.MCPServers[0].Args, "default-arg")
+	assert.Equal(t, []string{"--arg", "default-arg"}, config.MCPServers[0].Args)
 }
 
 func TestLoadProject_ResourcesWithEnvVarInterpolation(t *testing.T) {
@@ -1245,7 +1259,7 @@ claude_mcp_server "env-server" {
 	// Env var should override default
 	assert.Equal(t, "env-value", config.ResolvedVars["SERVER_ARG"])
 	assert.Len(t, config.MCPServers, 1)
-	assert.Contains(t, config.MCPServers[0].Args, "env-value")
+	assert.Equal(t, []string{"env-value"}, config.MCPServers[0].Args)
 }
 
 // Tests for dependency block parsing

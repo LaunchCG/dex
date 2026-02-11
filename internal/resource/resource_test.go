@@ -201,7 +201,7 @@ func TestClaudeSkill_Validate_MissingName(t *testing.T) {
 
 	err := skill.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "name is required")
+	assert.EqualError(t, err, "claude_skill: name is required")
 }
 
 func TestClaudeSkill_Validate_MissingDescription(t *testing.T) {
@@ -212,7 +212,7 @@ func TestClaudeSkill_Validate_MissingDescription(t *testing.T) {
 
 	err := skill.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "description is required")
+	assert.EqualError(t, err, `claude_skill "test-skill": description is required`)
 }
 
 func TestClaudeSkill_Validate_MissingContent(t *testing.T) {
@@ -223,7 +223,7 @@ func TestClaudeSkill_Validate_MissingContent(t *testing.T) {
 
 	err := skill.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "content is required")
+	assert.EqualError(t, err, `claude_skill "test-skill": content is required`)
 }
 
 func TestClaudeCommand_ResourceType(t *testing.T) {
@@ -273,7 +273,7 @@ func TestClaudeCommand_Validate(t *testing.T) {
 				Content:     "Command instructions",
 			},
 			wantErr: true,
-			errMsg:  "name is required",
+			errMsg:  "claude_command: name is required",
 		},
 		{
 			name: "missing description",
@@ -282,7 +282,7 @@ func TestClaudeCommand_Validate(t *testing.T) {
 				Content: "Command instructions",
 			},
 			wantErr: true,
-			errMsg:  "description is required",
+			errMsg:  `claude_command "test-command": description is required`,
 		},
 		{
 			name: "missing content",
@@ -291,7 +291,7 @@ func TestClaudeCommand_Validate(t *testing.T) {
 				Description: "A test command",
 			},
 			wantErr: true,
-			errMsg:  "content is required",
+			errMsg:  `claude_command "test-command": content is required`,
 		},
 	}
 
@@ -300,7 +300,7 @@ func TestClaudeCommand_Validate(t *testing.T) {
 			err := tt.command.Validate()
 			if tt.wantErr {
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errMsg)
+				assert.EqualError(t, err, tt.errMsg)
 			} else {
 				assert.NoError(t, err)
 			}
@@ -355,7 +355,7 @@ func TestClaudeSubagent_Validate(t *testing.T) {
 				Content:     "Agent instructions",
 			},
 			wantErr: true,
-			errMsg:  "name is required",
+			errMsg:  "claude_subagent: name is required",
 		},
 		{
 			name: "missing description",
@@ -364,7 +364,7 @@ func TestClaudeSubagent_Validate(t *testing.T) {
 				Content: "Agent instructions",
 			},
 			wantErr: true,
-			errMsg:  "description is required",
+			errMsg:  `claude_subagent "test-agent": description is required`,
 		},
 		{
 			name: "missing content",
@@ -373,7 +373,7 @@ func TestClaudeSubagent_Validate(t *testing.T) {
 				Description: "A test agent",
 			},
 			wantErr: true,
-			errMsg:  "content is required",
+			errMsg:  `claude_subagent "test-agent": content is required`,
 		},
 	}
 
@@ -382,7 +382,7 @@ func TestClaudeSubagent_Validate(t *testing.T) {
 			err := tt.subagent.Validate()
 			if tt.wantErr {
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errMsg)
+				assert.EqualError(t, err, tt.errMsg)
 			} else {
 				assert.NoError(t, err)
 			}
@@ -435,7 +435,7 @@ func TestClaudeRule_Validate(t *testing.T) {
 				Content:     "Rule content",
 			},
 			wantErr: true,
-			errMsg:  "name is required",
+			errMsg:  "claude_rule: name is required",
 		},
 		{
 			name: "missing description",
@@ -444,7 +444,7 @@ func TestClaudeRule_Validate(t *testing.T) {
 				Content: "Rule content",
 			},
 			wantErr: true,
-			errMsg:  "description is required",
+			errMsg:  `claude_rule "test-rule": description is required`,
 		},
 		{
 			name: "missing content",
@@ -453,7 +453,7 @@ func TestClaudeRule_Validate(t *testing.T) {
 				Description: "A test rule",
 			},
 			wantErr: true,
-			errMsg:  "content is required",
+			errMsg:  `claude_rule "test-rule": content is required`,
 		},
 	}
 
@@ -462,7 +462,7 @@ func TestClaudeRule_Validate(t *testing.T) {
 			err := tt.rule.Validate()
 			if tt.wantErr {
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errMsg)
+				assert.EqualError(t, err, tt.errMsg)
 			} else {
 				assert.NoError(t, err)
 			}
@@ -528,7 +528,7 @@ func TestClaudeRules_Validate(t *testing.T) {
 				Content:     "Rules content",
 			},
 			wantErr: true,
-			errMsg:  "name is required",
+			errMsg:  "claude_rules: name is required",
 		},
 		{
 			name: "missing description",
@@ -537,7 +537,7 @@ func TestClaudeRules_Validate(t *testing.T) {
 				Content: "Rules content",
 			},
 			wantErr: true,
-			errMsg:  "description is required",
+			errMsg:  `claude_rules "test-rules": description is required`,
 		},
 		{
 			name: "missing content and files",
@@ -546,7 +546,7 @@ func TestClaudeRules_Validate(t *testing.T) {
 				Description: "Test rules",
 			},
 			wantErr: true,
-			errMsg:  "must specify either content or file blocks",
+			errMsg:  `claude_rules "test-rules": must specify either content or file blocks`,
 		},
 	}
 
@@ -555,7 +555,7 @@ func TestClaudeRules_Validate(t *testing.T) {
 			err := tt.rules.Validate()
 			if tt.wantErr {
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errMsg)
+				assert.EqualError(t, err, tt.errMsg)
 			} else {
 				assert.NoError(t, err)
 			}
@@ -612,7 +612,7 @@ func TestClaudeSettings_Validate(t *testing.T) {
 			name:     "missing name",
 			settings: ClaudeSettings{},
 			wantErr:  true,
-			errMsg:   "name is required",
+			errMsg:   "claude_settings: name is required",
 		},
 	}
 
@@ -621,7 +621,7 @@ func TestClaudeSettings_Validate(t *testing.T) {
 			err := tt.settings.Validate()
 			if tt.wantErr {
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errMsg)
+				assert.EqualError(t, err, tt.errMsg)
 			} else {
 				assert.NoError(t, err)
 			}
@@ -696,7 +696,7 @@ func TestClaudeMCPServer_Validate(t *testing.T) {
 				Command: "npx",
 			},
 			wantErr: true,
-			errMsg:  "name is required",
+			errMsg:  "claude_mcp_server: name is required",
 		},
 	}
 
@@ -705,7 +705,7 @@ func TestClaudeMCPServer_Validate(t *testing.T) {
 			err := tt.server.Validate()
 			if tt.wantErr {
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errMsg)
+				assert.EqualError(t, err, tt.errMsg)
 			} else {
 				assert.NoError(t, err)
 			}
@@ -721,7 +721,7 @@ func TestClaudeMCPServer_Validate_InvalidType(t *testing.T) {
 
 	err := server.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "type must be 'command' or 'http'")
+	assert.EqualError(t, err, `claude_mcp_server "test-server": type must be 'command' or 'http', got "invalid"`)
 }
 
 func TestClaudeMCPServer_Validate_MissingCommand(t *testing.T) {
@@ -733,7 +733,7 @@ func TestClaudeMCPServer_Validate_MissingCommand(t *testing.T) {
 
 	err := server.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "command or source is required")
+	assert.EqualError(t, err, `claude_mcp_server "test-server": command or source is required for type 'command'`)
 }
 
 func TestClaudeMCPServer_Validate_MissingURL(t *testing.T) {
@@ -745,7 +745,7 @@ func TestClaudeMCPServer_Validate_MissingURL(t *testing.T) {
 
 	err := server.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "url is required")
+	assert.EqualError(t, err, `claude_mcp_server "test-server": url is required for type 'http'`)
 }
 
 func TestClaudeMCPServer_Validate_MissingType(t *testing.T) {
@@ -756,7 +756,7 @@ func TestClaudeMCPServer_Validate_MissingType(t *testing.T) {
 
 	err := server.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "type is required")
+	assert.EqualError(t, err, `claude_mcp_server "test-server": type is required`)
 }
 
 func TestClaudeMCPServer_GetContent(t *testing.T) {
@@ -831,29 +831,35 @@ func TestNewResource_Unknown(t *testing.T) {
 	res, err := NewResource("unknown_type")
 	assert.Nil(t, res)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unknown resource type")
-	assert.Contains(t, err.Error(), "unknown_type")
+	assert.EqualError(t, err, `unknown resource type: "unknown_type"`)
 }
 
 func TestRegisteredTypes(t *testing.T) {
 	types := RegisteredTypes()
 
 	// Should return all registered types in sorted order
-	require.NotEmpty(t, types)
-
-	// Verify known types are present
-	assert.Contains(t, types, "claude_skill")
-	assert.Contains(t, types, "claude_command")
-	assert.Contains(t, types, "claude_subagent")
-	assert.Contains(t, types, "claude_rule")
-	assert.Contains(t, types, "claude_rules")
-	assert.Contains(t, types, "claude_settings")
-	assert.Contains(t, types, "claude_mcp_server")
-
-	// Verify sorted order
-	for i := 1; i < len(types); i++ {
-		assert.True(t, types[i-1] < types[i], "types should be sorted: %s should come before %s", types[i-1], types[i])
+	expected := []string{
+		"claude_command",
+		"claude_mcp_server",
+		"claude_rule",
+		"claude_rules",
+		"claude_settings",
+		"claude_skill",
+		"claude_subagent",
+		"copilot_agent",
+		"copilot_instruction",
+		"copilot_instructions",
+		"copilot_mcp_server",
+		"copilot_prompt",
+		"copilot_skill",
+		"cursor_command",
+		"cursor_mcp_server",
+		"cursor_rule",
+		"cursor_rules",
+		"directory",
+		"file",
 	}
+	assert.Equal(t, expected, types)
 }
 
 func TestIsRegisteredType(t *testing.T) {

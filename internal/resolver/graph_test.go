@@ -63,7 +63,7 @@ func TestDepGraph_AddDependency(t *testing.T) {
 
 	// Check dependent was recorded
 	libNode := g.GetNode("lib")
-	assert.Contains(t, libNode.Dependents, "app")
+	assert.Equal(t, []string{"app"}, libNode.Dependents)
 }
 
 func TestDepGraph_TopologicalSort_Simple(t *testing.T) {
@@ -130,10 +130,7 @@ func TestDepGraph_TopologicalSort_Cycle(t *testing.T) {
 
 	cycleErr, ok := err.(*CycleError)
 	require.True(t, ok, "error should be CycleError")
-	assert.Len(t, cycleErr.Packages, 3)
-	assert.Contains(t, cycleErr.Packages, "a")
-	assert.Contains(t, cycleErr.Packages, "b")
-	assert.Contains(t, cycleErr.Packages, "c")
+	assert.ElementsMatch(t, []string{"a", "b", "c"}, cycleErr.Packages)
 }
 
 func TestDepGraph_TopologicalSort_NoDependencies(t *testing.T) {
@@ -145,11 +142,7 @@ func TestDepGraph_TopologicalSort_NoDependencies(t *testing.T) {
 
 	order, err := g.TopologicalSort()
 	require.NoError(t, err)
-	assert.Len(t, order, 3)
-	// All nodes should be present (order doesn't matter since no deps)
-	assert.Contains(t, order, "a")
-	assert.Contains(t, order, "b")
-	assert.Contains(t, order, "c")
+	assert.ElementsMatch(t, []string{"a", "b", "c"}, order)
 }
 
 func TestDepGraph_FindDependents(t *testing.T) {
@@ -161,14 +154,11 @@ func TestDepGraph_FindDependents(t *testing.T) {
 
 	// lib has two dependents
 	libDeps := g.FindDependents("lib")
-	assert.Len(t, libDeps, 2)
-	assert.Contains(t, libDeps, "app1")
-	assert.Contains(t, libDeps, "app2")
+	assert.Equal(t, []string{"app1", "app2"}, libDeps)
 
 	// core has one dependent
 	coreDeps := g.FindDependents("core")
-	assert.Len(t, coreDeps, 1)
-	assert.Contains(t, coreDeps, "lib")
+	assert.Equal(t, []string{"lib"}, coreDeps)
 
 	// apps have no dependents
 	assert.Empty(t, g.FindDependents("app1"))
@@ -193,11 +183,7 @@ func TestDepGraph_AllNodes(t *testing.T) {
 
 func TestCycleError_Error(t *testing.T) {
 	err := &CycleError{Packages: []string{"a", "b", "c"}}
-	errMsg := err.Error()
-	assert.Contains(t, errMsg, "circular dependency")
-	assert.Contains(t, errMsg, "a")
-	assert.Contains(t, errMsg, "b")
-	assert.Contains(t, errMsg, "c")
+	assert.Equal(t, "circular dependency detected involving: [a b c]", err.Error())
 }
 
 // Helper function to find index of element in slice
@@ -348,7 +334,7 @@ func TestDepGraph_TopologicalSort_SelfCycle(t *testing.T) {
 
 	cycleErr, ok := err.(*CycleError)
 	require.True(t, ok)
-	assert.Contains(t, cycleErr.Packages, "broken")
+	assert.Equal(t, []string{"broken"}, cycleErr.Packages)
 }
 
 // TestDepGraph_TopologicalSort_IndirectCycle tests indirect cycle detection.

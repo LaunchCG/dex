@@ -25,7 +25,9 @@ func TestDefaultCache(t *testing.T) {
 	cache, err := DefaultCache()
 	require.NoError(t, err)
 	assert.NotNil(t, cache)
-	assert.Contains(t, cache.Dir, DefaultCacheDir)
+	homeDir, err := os.UserHomeDir()
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(homeDir, DefaultCacheDir), cache.Dir)
 }
 
 // =============================================================================
@@ -263,8 +265,7 @@ func TestComputeIntegrity_File(t *testing.T) {
 	integrity, err := ComputeIntegrity(filePath)
 	require.NoError(t, err)
 
-	assert.NotEmpty(t, integrity)
-	assert.Contains(t, integrity, "sha256-")
+	assert.Equal(t, "sha256-auinVVUgn9bEQVfArtgBbnY/9DWhnPGG92hjFAFD/3I=", integrity)
 }
 
 func TestComputeIntegrity_File_Deterministic(t *testing.T) {
@@ -317,8 +318,7 @@ func TestComputeIntegrity_Directory(t *testing.T) {
 	integrity, err := ComputeIntegrity(tmpDir)
 	require.NoError(t, err)
 
-	assert.NotEmpty(t, integrity)
-	assert.Contains(t, integrity, "sha256-")
+	assert.Equal(t, "sha256-nV7YcMhzxIAl7E0z5WfRYEhNGQbNOa6NmKrJhDz6BDo=", integrity)
 }
 
 func TestComputeIntegrity_Directory_Deterministic(t *testing.T) {
@@ -402,8 +402,7 @@ func TestComputeIntegrity_EmptyDirectory(t *testing.T) {
 	require.NoError(t, err)
 
 	// Empty directory should still have a valid hash
-	assert.NotEmpty(t, integrity)
-	assert.Contains(t, integrity, "sha256-")
+	assert.Equal(t, "sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=", integrity)
 }
 
 func TestComputeIntegrity_NonExistent(t *testing.T) {
@@ -441,7 +440,7 @@ func TestVerifyIntegrity_Mismatch(t *testing.T) {
 	// Verify with wrong hash
 	err = VerifyIntegrity(filePath, "sha256-wronghash")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "integrity mismatch")
+	assert.EqualError(t, err, "integrity mismatch: expected sha256-wronghash, got sha256-auinVVUgn9bEQVfArtgBbnY/9DWhnPGG92hjFAFD/3I=")
 }
 
 func TestVerifyIntegrity_EmptyExpected(t *testing.T) {
@@ -466,7 +465,7 @@ func TestVerifyIntegrity_InvalidFormat(t *testing.T) {
 	// Verify with invalid format (not sha256-)
 	err = VerifyIntegrity(filePath, "md5-somehash")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "unsupported integrity format")
+	assert.EqualError(t, err, "unsupported integrity format: md5-somehash (expected sha256-{base64})")
 }
 
 func TestVerifyIntegrity_NonExistentPath(t *testing.T) {
@@ -551,6 +550,5 @@ func TestComputeIntegrity_NestedDirectories(t *testing.T) {
 	integrity, err := ComputeIntegrity(tmpDir)
 	require.NoError(t, err)
 
-	assert.NotEmpty(t, integrity)
-	assert.Contains(t, integrity, "sha256-")
+	assert.Equal(t, "sha256-TPV+ea7rtISVIIi79//zWh2LAySVku/+ZlMGt3e1icw=", integrity)
 }

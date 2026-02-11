@@ -81,7 +81,7 @@ plugin "file-test" {
 	files := fileTest["files"].([]any)
 
 	// Check that my_tasks.yaml is tracked
-	assert.Contains(t, files, "my_tasks.yaml", "Manifest should track the copied file")
+	assert.Equal(t, []any{"my_tasks.yaml"}, files, "Manifest should track the copied file")
 }
 
 func TestInstaller_FileResource_WithContent(t *testing.T) {
@@ -219,7 +219,7 @@ plugin "docker-compose" {
 	require.NoError(t, err)
 
 	mcpServers := mcpConfig["mcpServers"].(map[string]any)
-	assert.Contains(t, mcpServers, "docker-compose-tasks")
+	require.Contains(t, mcpServers, "docker-compose-tasks")
 
 	server := mcpServers["docker-compose-tasks"].(map[string]any)
 	assert.Equal(t, "dev-toolkit-mcp", server["command"])
@@ -244,7 +244,7 @@ plugin "docker-compose" {
 	dockerCompose := plugins["docker-compose"].(map[string]any)
 	files := dockerCompose["files"].([]any)
 
-	assert.Contains(t, files, "docker_compose_tasks.yaml", "Manifest should track docker_compose_tasks.yaml")
+	assert.Equal(t, []any{"docker_compose_tasks.yaml"}, files, "Manifest should track docker_compose_tasks.yaml")
 }
 
 func TestInstaller_MultipleFileResources(t *testing.T) {
@@ -330,8 +330,7 @@ plugin "multi-files" {
 	multiFiles := plugins["multi-files"].(map[string]any)
 	files := multiFiles["files"].([]any)
 
-	assert.Contains(t, files, "my_config1.yaml", "Manifest should track first file")
-	assert.Contains(t, files, "my_config2.yaml", "Manifest should track second file")
+	assert.ElementsMatch(t, []any{"my_config1.yaml", "my_config2.yaml"}, files, "Manifest should track both files")
 }
 
 func TestInstaller_FileResource_WithChmod(t *testing.T) {

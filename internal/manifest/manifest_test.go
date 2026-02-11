@@ -20,8 +20,7 @@ func TestManifest_TrackMergedFile(t *testing.T) {
 	// Verify merged files are tracked
 	plugin := m.GetPlugin("test-plugin")
 	require.NotNil(t, plugin)
-	assert.Contains(t, plugin.MergedFiles, ".mcp.json")
-	assert.Contains(t, plugin.MergedFiles, ".claude/settings.json")
+	assert.Equal(t, []string{".mcp.json", ".claude/settings.json"}, plugin.MergedFiles)
 
 	// Verify no duplicates
 	m.TrackMergedFile("test-plugin", ".mcp.json")
@@ -44,20 +43,13 @@ func TestManifest_AllFiles_IncludesMergedFiles(t *testing.T) {
 	// Get all files
 	allFiles := m.AllFiles()
 
-	// Verify all files are included
-	assert.Contains(t, allFiles, "skills/skill1.md")
-	assert.Contains(t, allFiles, "commands/cmd1.md")
-	assert.Contains(t, allFiles, ".mcp.json")
-	assert.Contains(t, allFiles, ".claude/settings.json")
-
-	// Verify no duplicates (both plugins track .mcp.json)
-	mcpCount := 0
-	for _, f := range allFiles {
-		if f == ".mcp.json" {
-			mcpCount++
-		}
-	}
-	assert.Equal(t, 1, mcpCount, ".mcp.json should appear only once")
+	// Verify all files are included (no duplicates; map iteration order is non-deterministic)
+	assert.ElementsMatch(t, []string{
+		"skills/skill1.md",
+		"commands/cmd1.md",
+		".mcp.json",
+		".claude/settings.json",
+	}, allFiles)
 }
 
 func TestManifest_Untrack_ReturnsMergedFiles(t *testing.T) {
@@ -75,9 +67,8 @@ func TestManifest_Untrack_ReturnsMergedFiles(t *testing.T) {
 
 	// Verify merged files are returned
 	require.NotNil(t, result)
-	assert.Contains(t, result.MergedFiles, ".mcp.json")
-	assert.Contains(t, result.MergedFiles, "CLAUDE.md")
-	assert.Contains(t, result.Files, "skills/skill1.md")
+	assert.Equal(t, []string{".mcp.json", "CLAUDE.md"}, result.MergedFiles)
+	assert.Equal(t, []string{"skills/skill1.md"}, result.Files)
 
 	// Verify plugin is removed
 	assert.Nil(t, m.GetPlugin("test-plugin"))
@@ -136,15 +127,12 @@ func TestManifest_SaveAndLoad_PreservesMergedFiles(t *testing.T) {
 	// Verify merged files are preserved
 	plugin := m2.GetPlugin("plugin1")
 	require.NotNil(t, plugin)
-	assert.Contains(t, plugin.MergedFiles, ".mcp.json")
-	assert.Contains(t, plugin.MergedFiles, "CLAUDE.md")
+	assert.Equal(t, []string{".mcp.json", "CLAUDE.md"}, plugin.MergedFiles)
 	assert.True(t, plugin.HasAgentContent)
 
-	// Verify all files are included
+	// Verify all files are included (single plugin, so order is deterministic)
 	allFiles := m2.AllFiles()
-	assert.Contains(t, allFiles, "skills/skill1.md")
-	assert.Contains(t, allFiles, ".mcp.json")
-	assert.Contains(t, allFiles, "CLAUDE.md")
+	assert.ElementsMatch(t, []string{"skills/skill1.md", ".mcp.json", "CLAUDE.md"}, allFiles)
 }
 
 func TestManifest_MergedFiles_EmptyByDefault(t *testing.T) {
@@ -184,7 +172,7 @@ func TestManifest_MultiplePlugins_SharedMergedFiles(t *testing.T) {
 
 	// Untrack plugin1
 	result := m.Untrack("plugin1")
-	assert.Contains(t, result.MergedFiles, ".mcp.json")
+	assert.Equal(t, []string{".mcp.json"}, result.MergedFiles)
 
 	// Verify .mcp.json is still used by others
 	assert.True(t, m.IsMergedFileUsedByOthers("plugin1", ".mcp.json"))
@@ -195,11 +183,11 @@ func TestManifest_MultiplePlugins_SharedMergedFiles(t *testing.T) {
 	// Verify .mcp.json is still used by plugin3
 	plugin3 := m.GetPlugin("plugin3")
 	require.NotNil(t, plugin3)
-	assert.Contains(t, plugin3.MergedFiles, ".mcp.json")
+	assert.Equal(t, []string{".mcp.json"}, plugin3.MergedFiles)
 
 	// Untrack plugin3
 	result = m.Untrack("plugin3")
-	assert.Contains(t, result.MergedFiles, ".mcp.json")
+	assert.Equal(t, []string{".mcp.json"}, result.MergedFiles)
 
 	// Now no plugin uses .mcp.json
 	assert.Empty(t, m.AllFiles())
@@ -224,13 +212,13 @@ func TestManifest_ProjectPlugin_MergedFiles(t *testing.T) {
 
 	// Untrack project - CLAUDE.md should still be used by plugin1
 	result := m.Untrack("__project__")
-	assert.Contains(t, result.MergedFiles, "CLAUDE.md")
+	assert.Equal(t, []string{"CLAUDE.md"}, result.MergedFiles)
 	assert.True(t, m.IsMergedFileUsedByOthers("__project__", "CLAUDE.md"))
 
 	// Verify plugin still has CLAUDE.md
 	plugin := m.GetPlugin("plugin1")
 	require.NotNil(t, plugin)
-	assert.Contains(t, plugin.MergedFiles, "CLAUDE.md")
+	assert.Equal(t, []string{"CLAUDE.md", ".mcp.json"}, plugin.MergedFiles)
 }
 
 func TestManifest_AllFiles_MultiplePlugins_ExactOutput(t *testing.T) {

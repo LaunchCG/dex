@@ -32,19 +32,12 @@ func TestGet_Unknown(t *testing.T) {
 	adapter, err := Get("unknown-platform")
 	assert.Nil(t, adapter)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unknown platform adapter")
-	assert.Contains(t, err.Error(), "unknown-platform")
+	assert.EqualError(t, err, `unknown platform adapter: "unknown-platform"`)
 }
 
 func TestRegisteredAdapters(t *testing.T) {
 	adapters := RegisteredAdapters()
-	require.NotEmpty(t, adapters)
-	assert.Contains(t, adapters, "claude-code")
-
-	// Verify sorted order
-	for i := 1; i < len(adapters); i++ {
-		assert.True(t, adapters[i-1] < adapters[i], "adapters should be sorted")
-	}
+	assert.Equal(t, []string{"claude-code", "cursor", "github-copilot"}, adapters)
 }
 
 func TestClaudeAdapter_Name(t *testing.T) {
@@ -85,14 +78,17 @@ func TestClaudeAdapter_PlanSkill(t *testing.T) {
 	assert.Equal(t, "my-plugin", plan.PluginName)
 
 	// Should create skill directory
-	assert.Contains(t, getDirPaths(plan), ".claude/skills/my-plugin-test-skill")
+	assert.Equal(t, []string{".claude/skills/my-plugin-test-skill"}, getDirPaths(plan))
 
 	// Should have SKILL.md file
 	require.Len(t, plan.Files, 1)
 	assert.Equal(t, ".claude/skills/my-plugin-test-skill/SKILL.md", plan.Files[0].Path)
-	assert.Contains(t, plan.Files[0].Content, "name: test-skill")
-	assert.Contains(t, plan.Files[0].Content, "description: A test skill")
-	assert.Contains(t, plan.Files[0].Content, "Skill content here")
+	expectedContent := `---
+name: test-skill
+description: A test skill
+---
+Skill content here`
+	assert.Equal(t, expectedContent, plan.Files[0].Content)
 }
 
 func TestClaudeAdapter_PlanCommand(t *testing.T) {
@@ -118,14 +114,19 @@ func TestClaudeAdapter_PlanCommand(t *testing.T) {
 	assert.NotNil(t, plan)
 
 	// Should create commands directory
-	assert.Contains(t, getDirPaths(plan), ".claude/commands")
+	assert.Equal(t, []string{".claude/commands"}, getDirPaths(plan))
 
 	// Should have command file
 	require.Len(t, plan.Files, 1)
 	assert.Equal(t, ".claude/commands/my-plugin-deploy.md", plan.Files[0].Path)
-	assert.Contains(t, plan.Files[0].Content, "name: deploy")
-	assert.Contains(t, plan.Files[0].Content, "argument_hint: [environment]")
-	assert.Contains(t, plan.Files[0].Content, "model: sonnet")
+	expectedContent := `---
+name: deploy
+description: Deploy the application
+argument_hint: [environment]
+model: sonnet
+---
+Deployment instructions`
+	assert.Equal(t, expectedContent, plan.Files[0].Content)
 }
 
 func TestClaudeAdapter_PlanSubagent(t *testing.T) {
@@ -152,16 +153,22 @@ func TestClaudeAdapter_PlanSubagent(t *testing.T) {
 	assert.NotNil(t, plan)
 
 	// Should create agents directory
-	assert.Contains(t, getDirPaths(plan), ".claude/agents")
+	assert.Equal(t, []string{".claude/agents"}, getDirPaths(plan))
 
 	// Should have agent file
 	require.Len(t, plan.Files, 1)
 	assert.Equal(t, ".claude/agents/my-plugin-researcher.md", plan.Files[0].Path)
-	assert.Contains(t, plan.Files[0].Content, "name: researcher")
-	assert.Contains(t, plan.Files[0].Content, "model: opus")
-	assert.Contains(t, plan.Files[0].Content, "color: blue")
-	assert.Contains(t, plan.Files[0].Content, "- Read")
-	assert.Contains(t, plan.Files[0].Content, "- WebSearch")
+	expectedContent := `---
+name: researcher
+description: Research agent
+model: opus
+color: blue
+tools:
+- Read
+- WebSearch
+---
+Research instructions`
+	assert.Equal(t, expectedContent, plan.Files[0].Content)
 }
 
 func TestClaudeAdapter_PlanRule(t *testing.T) {
@@ -211,14 +218,20 @@ func TestClaudeAdapter_PlanRules(t *testing.T) {
 	assert.NotNil(t, plan)
 
 	// Should create rules subdirectory (similar to skills)
-	assert.Contains(t, getDirPaths(plan), ".claude/rules/my-plugin-typescript-rules")
+	assert.Equal(t, []string{".claude/rules/my-plugin-typescript-rules"}, getDirPaths(plan))
 
 	// Should have main rules file in the subdirectory
 	require.Len(t, plan.Files, 1)
 	assert.Equal(t, ".claude/rules/my-plugin-typescript-rules/typescript-rules.md", plan.Files[0].Path)
-	assert.Contains(t, plan.Files[0].Content, "name: typescript-rules")
-	assert.Contains(t, plan.Files[0].Content, "- *.ts")
-	assert.Contains(t, plan.Files[0].Content, "- *.tsx")
+	expectedContent := `---
+name: typescript-rules
+description: TypeScript rules
+paths:
+- *.ts
+- *.tsx
+---
+TypeScript specific rules content`
+	assert.Equal(t, expectedContent, plan.Files[0].Content)
 }
 
 func TestClaudeAdapter_PlanRules_WithFiles(t *testing.T) {
@@ -258,14 +271,21 @@ func TestClaudeAdapter_PlanRules_WithFiles(t *testing.T) {
 	assert.NotNil(t, plan)
 
 	// Should create rules subdirectory
-	assert.Contains(t, getDirPaths(plan), ".claude/rules/tailwind")
+	assert.Equal(t, []string{".claude/rules/tailwind"}, getDirPaths(plan))
 
 	// Should have main rules file + 2 additional files
 	require.Len(t, plan.Files, 3)
 
 	// Check main file
 	assert.Equal(t, ".claude/rules/tailwind/tailwind.md", plan.Files[0].Path)
-	assert.Contains(t, plan.Files[0].Content, "Main rules content here")
+	expectedContent := `---
+name: tailwind
+description: Tailwind CSS standards
+---
+# Tailwind Rules
+
+Main rules content here`
+	assert.Equal(t, expectedContent, plan.Files[0].Content)
 
 	// Check additional files
 	assert.Equal(t, ".claude/rules/tailwind/tailwind-classes.md", plan.Files[1].Path)
@@ -324,10 +344,16 @@ func TestClaudeAdapter_PlanMCPServer(t *testing.T) {
 	assert.NotNil(t, plan)
 
 	// MCP servers are merged via MCPEntries
-	assert.NotEmpty(t, plan.MCPEntries)
-	mcpServers, ok := plan.MCPEntries["mcpServers"].(map[string]any)
-	require.True(t, ok)
-	assert.Contains(t, mcpServers, "github")
+	expectedMCPEntries := map[string]any{
+		"mcpServers": map[string]any{
+			"github": map[string]any{
+				"command": "npx",
+				"args":    []string{"-y", "@modelcontextprotocol/server-github"},
+				"env":     map[string]string{"GITHUB_TOKEN": "${GITHUB_TOKEN}"},
+			},
+		},
+	}
+	assert.Equal(t, expectedMCPEntries, plan.MCPEntries)
 }
 
 // mockUnknownResource implements resource.Resource but is not a known type
@@ -357,7 +383,7 @@ func TestClaudeAdapter_PlanInstallation_UnsupportedType(t *testing.T) {
 	plan, err := adapter.PlanInstallation(unknown, pkg, "/plugin", "/project", nil)
 	assert.Nil(t, plan)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unsupported resource type")
+	assert.EqualError(t, err, "unsupported resource type for claude-code adapter: *adapter.mockUnknownResource")
 }
 
 func TestClaudeAdapter_GenerateFrontmatter_Skill(t *testing.T) {
@@ -477,14 +503,20 @@ func TestClaudeAdapter_MergeMCPConfig(t *testing.T) {
 
 	result := adapter.MergeMCPConfig(existing, "my-plugin", servers)
 
-	mcpServers := result["mcpServers"].(map[string]any)
-	assert.Contains(t, mcpServers, "existing-server")
-	assert.Contains(t, mcpServers, "new-server")
-
-	newServer := mcpServers["new-server"].(map[string]any)
-	assert.Equal(t, "npx", newServer["command"])
-	assert.Equal(t, []string{"-y", "@mcp/server"}, newServer["args"])
-	assert.Equal(t, map[string]string{"KEY": "value"}, newServer["env"])
+	expected := map[string]any{
+		"mcpServers": map[string]any{
+			"existing-server": map[string]any{
+				"command": "node",
+				"args":    []string{"server.js"},
+			},
+			"new-server": map[string]any{
+				"command": "npx",
+				"args":    []string{"-y", "@mcp/server"},
+				"env":     map[string]string{"KEY": "value"},
+			},
+		},
+	}
+	assert.Equal(t, expected, result)
 }
 
 func TestClaudeAdapter_MergeMCPConfig_HTTP(t *testing.T) {
@@ -500,9 +532,14 @@ func TestClaudeAdapter_MergeMCPConfig_HTTP(t *testing.T) {
 
 	result := adapter.MergeMCPConfig(nil, "my-plugin", servers)
 
-	mcpServers := result["mcpServers"].(map[string]any)
-	httpServer := mcpServers["http-server"].(map[string]any)
-	assert.Equal(t, "https://api.example.com/mcp", httpServer["url"])
+	expected := map[string]any{
+		"mcpServers": map[string]any{
+			"http-server": map[string]any{
+				"url": "https://api.example.com/mcp",
+			},
+		},
+	}
+	assert.Equal(t, expected, result)
 }
 
 func TestClaudeAdapter_MergeMCPConfig_Nil(t *testing.T) {
@@ -518,9 +555,14 @@ func TestClaudeAdapter_MergeMCPConfig_Nil(t *testing.T) {
 
 	result := adapter.MergeMCPConfig(nil, "my-plugin", servers)
 
-	assert.NotNil(t, result)
-	mcpServers := result["mcpServers"].(map[string]any)
-	assert.Contains(t, mcpServers, "server")
+	expected := map[string]any{
+		"mcpServers": map[string]any{
+			"server": map[string]any{
+				"command": "node",
+			},
+		},
+	}
+	assert.Equal(t, expected, result)
 }
 
 func TestClaudeAdapter_MergeSettingsConfig(t *testing.T) {
@@ -546,24 +588,16 @@ func TestClaudeAdapter_MergeSettingsConfig(t *testing.T) {
 
 	result := adapter.MergeSettingsConfig(existing, settings)
 
-	// Check merged arrays
-	allow := result["allow"].([]any)
-	assert.Contains(t, allow, "Read(*)")
-	assert.Contains(t, allow, "Write(*)")
-
-	deny := result["deny"].([]any)
-	assert.Contains(t, deny, "Delete(*)")
-
-	// Check merged env
-	env := result["env"].(map[string]any)
-	assert.Equal(t, "value", env["EXISTING"])
-	assert.Equal(t, "new_value", env["NEW"])
-
-	// Check scalar values
-	assert.Equal(t, true, result["respectGitignore"])
-	assert.Equal(t, "opus", result["model"])
-	assert.Equal(t, "concise", result["outputStyle"])
-	assert.Equal(t, ".plans", result["plansDirectory"])
+	expected := map[string]any{
+		"allow":            []any{"Read(*)", "Write(*)"},
+		"deny":             []any{"Delete(*)"},
+		"env":              map[string]any{"EXISTING": "value", "NEW": "new_value"},
+		"respectGitignore": true,
+		"model":            "opus",
+		"outputStyle":      "concise",
+		"plansDirectory":   ".plans",
+	}
+	assert.Equal(t, expected, result)
 }
 
 func TestClaudeAdapter_MergeSettingsConfig_Nil(t *testing.T) {
@@ -576,9 +610,10 @@ func TestClaudeAdapter_MergeSettingsConfig_Nil(t *testing.T) {
 
 	result := adapter.MergeSettingsConfig(nil, settings)
 
-	assert.NotNil(t, result)
-	allow := result["allow"].([]any)
-	assert.Contains(t, allow, "Bash(*)")
+	expected := map[string]any{
+		"allow": []any{"Bash(*)"},
+	}
+	assert.Equal(t, expected, result)
 }
 
 func TestClaudeAdapter_MergeAgentFile(t *testing.T) {
@@ -589,10 +624,14 @@ func TestClaudeAdapter_MergeAgentFile(t *testing.T) {
 
 	result := adapter.MergeAgentFile(existing, "my-plugin", content)
 
-	assert.Contains(t, result, "# Existing Content")
-	assert.Contains(t, result, "<!-- dex:my-plugin -->")
-	assert.Contains(t, result, "New rule content")
-	assert.Contains(t, result, "<!-- /dex:my-plugin -->")
+	expected := `# Existing Content
+
+Some existing content.
+
+<!-- dex:my-plugin -->
+New rule content
+<!-- /dex:my-plugin -->`
+	assert.Equal(t, expected, result)
 }
 
 func TestClaudeAdapter_MergeAgentFile_Update(t *testing.T) {
@@ -610,14 +649,14 @@ Other content`
 
 	result := adapter.MergeAgentFile(existing, "my-plugin", content)
 
-	assert.Contains(t, result, "# Existing Content")
-	assert.Contains(t, result, "Updated content")
-	assert.NotContains(t, result, "Old content")
-	assert.Contains(t, result, "Other content")
+	expected := `# Existing Content
 
-	// Should only have one pair of markers
-	assert.Equal(t, 1, countOccurrences(result, "<!-- dex:my-plugin -->"))
-	assert.Equal(t, 1, countOccurrences(result, "<!-- /dex:my-plugin -->"))
+<!-- dex:my-plugin -->
+Updated content
+<!-- /dex:my-plugin -->
+
+Other content`
+	assert.Equal(t, expected, result)
 }
 
 func TestClaudeAdapter_MergeAgentFile_Empty(t *testing.T) {
@@ -673,29 +712,32 @@ func TestMergePlans(t *testing.T) {
 	assert.Equal(t, "plugin1", merged.PluginName)
 
 	// Directories should be deduplicated by path
-	assert.Len(t, merged.Directories, 3)
-	dirPaths := make([]string, len(merged.Directories))
-	for i, d := range merged.Directories {
-		dirPaths[i] = d.Path
-	}
-	assert.Contains(t, dirPaths, "dir1")
-	assert.Contains(t, dirPaths, "dir2")
-	assert.Contains(t, dirPaths, "dir3")
+	assert.Equal(t, []DirectoryCreate{
+		{Path: "dir1", Parents: true},
+		{Path: "dir2", Parents: true},
+		{Path: "dir3", Parents: true},
+	}, merged.Directories)
 
 	// Files should be concatenated
-	assert.Len(t, merged.Files, 2)
+	assert.Equal(t, []FileWrite{
+		{Path: "file1.md", Content: "content1"},
+		{Path: "file2.md", Content: "content2"},
+	}, merged.Files)
 
 	// MCP entries should be merged
-	assert.Contains(t, merged.MCPEntries, "server1")
-	assert.Contains(t, merged.MCPEntries, "server2")
+	assert.Equal(t, map[string]any{
+		"server1": "config1",
+		"server2": "config2",
+	}, merged.MCPEntries)
 
 	// Settings entries should be merged
-	assert.Contains(t, merged.SettingsEntries, "allow")
-	assert.Contains(t, merged.SettingsEntries, "deny")
+	assert.Equal(t, map[string]any{
+		"allow": []string{"Bash(*)"},
+		"deny":  []string{"Write(*)"},
+	}, merged.SettingsEntries)
 
 	// Agent file content should be concatenated
-	assert.Contains(t, merged.AgentFileContent, "Rule 1")
-	assert.Contains(t, merged.AgentFileContent, "Rule 2")
+	assert.Equal(t, "Rule 1\nRule 2", merged.AgentFileContent)
 }
 
 func TestMergePlans_Empty(t *testing.T) {
@@ -764,23 +806,24 @@ func TestMergePlans_MCPDeepMerge(t *testing.T) {
 
 	merged := MergePlans(plan1, plan2, plan3)
 
-	// All three servers should be present
-	mcpServers, ok := merged.MCPEntries["mcpServers"].(map[string]any)
-	require.True(t, ok, "mcpServers should be a map")
-	assert.Len(t, mcpServers, 3, "should have 3 MCP servers after merge")
-	assert.Contains(t, mcpServers, "server1")
-	assert.Contains(t, mcpServers, "server2")
-	assert.Contains(t, mcpServers, "server3")
-
-	// Verify each server's config is preserved
-	server1 := mcpServers["server1"].(map[string]any)
-	assert.Equal(t, "cmd1", server1["command"])
-
-	server2 := mcpServers["server2"].(map[string]any)
-	assert.Equal(t, "cmd2", server2["command"])
-
-	server3 := mcpServers["server3"].(map[string]any)
-	assert.Equal(t, "cmd3", server3["command"])
+	// All three servers should be present with configs preserved
+	expected := map[string]any{
+		"mcpServers": map[string]any{
+			"server1": map[string]any{
+				"command": "cmd1",
+				"args":    []string{"arg1"},
+			},
+			"server2": map[string]any{
+				"command": "cmd2",
+				"args":    []string{"arg2"},
+			},
+			"server3": map[string]any{
+				"command": "cmd3",
+				"args":    []string{"arg3"},
+			},
+		},
+	}
+	assert.Equal(t, expected, merged.MCPEntries)
 }
 
 func TestMergePlans_SettingsArrayMerge(t *testing.T) {
@@ -802,18 +845,12 @@ func TestMergePlans_SettingsArrayMerge(t *testing.T) {
 
 	merged := MergePlans(plan1, plan2)
 
-	// allow should contain all entries from both plans
-	allow, ok := merged.SettingsEntries["allow"].([]string)
-	require.True(t, ok, "allow should be []string")
-	assert.Len(t, allow, 3)
-	assert.Contains(t, allow, "Bash(*)")
-	assert.Contains(t, allow, "Read(*)")
-	assert.Contains(t, allow, "Write(*)")
-
-	// deny should be present from plan2
-	deny, ok := merged.SettingsEntries["deny"].([]string)
-	require.True(t, ok, "deny should be []string")
-	assert.Contains(t, deny, "Delete(*)")
+	// Settings entries should be merged with arrays appended
+	expected := map[string]any{
+		"allow": []string{"Bash(*)", "Read(*)", "Write(*)"},
+		"deny":  []string{"Delete(*)"},
+	}
+	assert.Equal(t, expected, merged.SettingsEntries)
 }
 
 func TestMergePlans_MCPWithNilInitialServers(t *testing.T) {
@@ -836,9 +873,14 @@ func TestMergePlans_MCPWithNilInitialServers(t *testing.T) {
 
 	merged := MergePlans(plan1, plan2)
 
-	mcpServers, ok := merged.MCPEntries["mcpServers"].(map[string]any)
-	require.True(t, ok, "mcpServers should be a map")
-	assert.Contains(t, mcpServers, "server1")
+	expected := map[string]any{
+		"mcpServers": map[string]any{
+			"server1": map[string]any{
+				"command": "cmd1",
+			},
+		},
+	}
+	assert.Equal(t, expected, merged.MCPEntries)
 }
 
 func TestNewPlan(t *testing.T) {
@@ -949,7 +991,7 @@ func TestClaudeAdapter_PlanSkill_WithFiles(t *testing.T) {
 		}
 	}
 	require.NotNil(t, helperFile)
-	assert.Contains(t, helperFile.Content, "#!/bin/bash")
+	assert.Equal(t, "#!/bin/bash\necho hello", helperFile.Content)
 	assert.Equal(t, "755", helperFile.Chmod)
 }
 
@@ -976,8 +1018,12 @@ func TestClaudeAdapter_PlanSkill_ContentNotTemplated(t *testing.T) {
 	require.Len(t, plan.Files, 1)
 
 	// Content should be passed through as-is, not templated
-	assert.Contains(t, plan.Files[0].Content, "Plugin: {{ .PluginName }}")
-	assert.Contains(t, plan.Files[0].Content, "JSX: {{ borderColor: dynamic }}")
+	expectedContent := `---
+name: dynamic
+description: A dynamic skill
+---
+Plugin: {{ .PluginName }}, JSX: {{ borderColor: dynamic }}`
+	assert.Equal(t, expectedContent, plan.Files[0].Content)
 }
 
 func TestClaudeAdapter_PlanSkill_WithTemplateFiles(t *testing.T) {
@@ -1026,8 +1072,7 @@ func TestClaudeAdapter_PlanSkill_WithTemplateFiles(t *testing.T) {
 	require.NotNil(t, configFile)
 
 	// Template should be rendered with context and extra vars
-	assert.Contains(t, configFile.Content, "Config for my-plugin v1.0.0")
-	assert.Contains(t, configFile.Content, "Env: production")
+	assert.Equal(t, "Config for my-plugin v1.0.0\nEnv: production", configFile.Content)
 }
 
 func TestClaudeAdapter_PlanRule_ContentNotTemplated(t *testing.T) {
@@ -1051,8 +1096,7 @@ func TestClaudeAdapter_PlanRule_ContentNotTemplated(t *testing.T) {
 	require.NoError(t, err)
 
 	// Content should be passed through as-is, not templated
-	assert.Contains(t, plan.AgentFileContent, "{{ .PluginName }}")
-	assert.Contains(t, plan.AgentFileContent, "{{ .PluginVersion }}")
+	assert.Equal(t, "This rule is from {{ .PluginName }} version {{ .PluginVersion }}", plan.AgentFileContent)
 }
 
 func TestClaudeAdapter_GenerateFrontmatter_Subagent(t *testing.T) {
@@ -1116,17 +1160,6 @@ func TestClaudeAdapter_GenerateFrontmatter_UnknownType(t *testing.T) {
 	assert.Equal(t, "", frontmatter)
 }
 
-// Helper function to count occurrences of a substring
-func countOccurrences(s, substr string) int {
-	count := 0
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			count++
-		}
-	}
-	return count
-}
-
 func TestClaudeAdapter_GenerateFrontmatter_Skill_WithHooks(t *testing.T) {
 	adapter := &ClaudeAdapter{}
 
@@ -1158,17 +1191,19 @@ func TestClaudeAdapter_GenerateFrontmatter_Skill_WithHooks(t *testing.T) {
 
 	frontmatter := adapter.GenerateFrontmatter(skill, pkg)
 
-	// Verify basic frontmatter fields
-	assert.Contains(t, frontmatter, "name: test-skill")
-	assert.Contains(t, frontmatter, "description: A test skill with hooks")
-
-	// Verify hooks section is present
-	assert.Contains(t, frontmatter, "hooks:")
-	assert.Contains(t, frontmatter, "PreToolUse:")
-	assert.Contains(t, frontmatter, "matcher: Bash")
-	assert.Contains(t, frontmatter, "type: command")
-	assert.Contains(t, frontmatter, "command: ./scripts/check.sh")
-	assert.Contains(t, frontmatter, "timeout: 30")
+	expected := `---
+name: test-skill
+description: A test skill with hooks
+hooks:
+  PreToolUse:
+      - hooks:
+          - command: ./scripts/check.sh
+            timeout: 30
+            type: command
+        matcher: Bash
+---
+`
+	assert.Equal(t, expected, frontmatter)
 }
 
 func TestClaudeAdapter_GenerateFrontmatter_Skill_WithMultipleHooks(t *testing.T) {
@@ -1206,12 +1241,22 @@ func TestClaudeAdapter_GenerateFrontmatter_Skill_WithMultipleHooks(t *testing.T)
 
 	frontmatter := adapter.GenerateFrontmatter(skill, pkg)
 
-	// Verify multiple hook events
-	assert.Contains(t, frontmatter, "hooks:")
-	assert.Contains(t, frontmatter, "PreToolUse:")
-	assert.Contains(t, frontmatter, "SessionStart:")
-	assert.Contains(t, frontmatter, "type: command")
-	assert.Contains(t, frontmatter, "type: prompt")
+	expected := `---
+name: security-skill
+description: Skill with multiple hook types
+hooks:
+  PreToolUse:
+      - hooks:
+          - command: ./check.sh
+            type: command
+        matcher: Bash
+  SessionStart:
+      - hooks:
+          - prompt: Initialize security context
+            type: prompt
+---
+`
+	assert.Equal(t, expected, frontmatter)
 }
 
 func TestClaudeAdapter_GenerateFrontmatter_Skill_NoHooks(t *testing.T) {
@@ -1231,9 +1276,6 @@ description: Simple skill without hooks
 ---
 `
 	assert.Equal(t, expected, frontmatter)
-
-	// Ensure no hooks section when hooks map is nil or empty
-	assert.NotContains(t, frontmatter, "hooks:")
 }
 
 func TestClaudeAdapter_GenerateFrontmatter_Subagent_WithHooks(t *testing.T) {
@@ -1263,18 +1305,20 @@ func TestClaudeAdapter_GenerateFrontmatter_Subagent_WithHooks(t *testing.T) {
 
 	frontmatter := adapter.GenerateFrontmatter(agent, pkg)
 
-	// Verify basic frontmatter fields
-	assert.Contains(t, frontmatter, "name: security-agent")
-	assert.Contains(t, frontmatter, "description: Security agent with hooks")
-	assert.Contains(t, frontmatter, "model: sonnet")
-	assert.Contains(t, frontmatter, "color: red")
-
-	// Verify hooks section
-	assert.Contains(t, frontmatter, "hooks:")
-	assert.Contains(t, frontmatter, "SubagentStart:")
-	assert.Contains(t, frontmatter, "type: command")
-	assert.Contains(t, frontmatter, "command: ./init-security.sh")
-	assert.Contains(t, frontmatter, "async: true")
+	expected := `---
+name: security-agent
+description: Security agent with hooks
+model: sonnet
+color: red
+hooks:
+  SubagentStart:
+      - hooks:
+          - async: true
+            command: ./init-security.sh
+            type: command
+---
+`
+	assert.Equal(t, expected, frontmatter)
 }
 
 func TestClaudeAdapter_GenerateFrontmatter_Subagent_NoHooks(t *testing.T) {
@@ -1296,9 +1340,6 @@ model: haiku
 ---
 `
 	assert.Equal(t, expected, frontmatter)
-
-	// Ensure no hooks section when hooks map is nil or empty
-	assert.NotContains(t, frontmatter, "hooks:")
 }
 
 func TestClaudeAdapter_PlanSkill_WithHooks(t *testing.T) {
@@ -1338,12 +1379,19 @@ func TestClaudeAdapter_PlanSkill_WithHooks(t *testing.T) {
 	// Should have SKILL.md file with hooks
 	require.Len(t, plan.Files, 1)
 	assert.Equal(t, ".claude/skills/my-plugin-test-skill/SKILL.md", plan.Files[0].Path)
-	assert.Contains(t, plan.Files[0].Content, "name: test-skill")
-	assert.Contains(t, plan.Files[0].Content, "hooks:")
-	assert.Contains(t, plan.Files[0].Content, "PreToolUse:")
-	assert.Contains(t, plan.Files[0].Content, "matcher: Bash")
-	assert.Contains(t, plan.Files[0].Content, "statusMessage: Running security check")
-	assert.Contains(t, plan.Files[0].Content, "Skill content here")
+	expectedContent := `---
+name: test-skill
+description: A test skill with hooks
+hooks:
+  PreToolUse:
+      - hooks:
+          - command: ./check.sh
+            statusMessage: Running security check
+            type: command
+        matcher: Bash
+---
+Skill content here`
+	assert.Equal(t, expectedContent, plan.Files[0].Content)
 }
 
 func TestClaudeAdapter_PlanSubagent_WithHooks(t *testing.T) {
@@ -1383,9 +1431,19 @@ func TestClaudeAdapter_PlanSubagent_WithHooks(t *testing.T) {
 	// Should have agent file with hooks
 	require.Len(t, plan.Files, 1)
 	assert.Equal(t, ".claude/agents/my-plugin-researcher.md", plan.Files[0].Path)
-	assert.Contains(t, plan.Files[0].Content, "name: researcher")
-	assert.Contains(t, plan.Files[0].Content, "tools:")
-	assert.Contains(t, plan.Files[0].Content, "hooks:")
-	assert.Contains(t, plan.Files[0].Content, "SubagentStart:")
-	assert.Contains(t, plan.Files[0].Content, "type: prompt")
+	expectedContent := `---
+name: researcher
+description: Research agent with hooks
+model: opus
+tools:
+- Read
+- WebSearch
+hooks:
+  SubagentStart:
+      - hooks:
+          - prompt: Initialize research context
+            type: prompt
+---
+Research instructions`
+	assert.Equal(t, expectedContent, plan.Files[0].Content)
 }

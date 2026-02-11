@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -150,7 +151,7 @@ func TestHTTPSRegistry_GetPackageInfo_PackageMode(t *testing.T) {
 	t.Run("package mode not supported", func(t *testing.T) {
 		_, err := reg.GetPackageInfo("any-plugin")
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "do not support package mode")
+		assert.EqualError(t, err, fmt.Sprintf("registry error: fetch failed for %s: HTTPS sources do not support package mode; use registry mode or direct tarball URL", server.URL))
 	})
 }
 
@@ -226,7 +227,7 @@ func TestHTTPSRegistry_ResolvePackage(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "my-plugin", resolved.Name)
 		assert.Equal(t, "2.0.0", resolved.Version)
-		assert.Contains(t, resolved.URL, "my-plugin-2.0.0.tar.gz")
+		assert.Equal(t, server.URL+"/my-plugin-2.0.0.tar.gz", resolved.URL)
 	})
 
 	t.Run("resolve empty version (means latest)", func(t *testing.T) {
@@ -328,7 +329,7 @@ func TestHTTPSRegistry_FetchPackage(t *testing.T) {
 		// Verify extracted files
 		packageJSON, err := os.ReadFile(filepath.Join(extractedPath, "package.json"))
 		require.NoError(t, err)
-		assert.Contains(t, string(packageJSON), `"name": "my-plugin"`)
+		assert.Equal(t, `{"name": "my-plugin", "version": "1.0.0"}`, string(packageJSON))
 
 		readme, err := os.ReadFile(filepath.Join(extractedPath, "README.md"))
 		require.NoError(t, err)
@@ -356,10 +357,7 @@ func TestHTTPSRegistry_ListPackages(t *testing.T) {
 
 		packages, err := reg.ListPackages()
 		require.NoError(t, err)
-		assert.Len(t, packages, 3)
-		assert.Contains(t, packages, "plugin-a")
-		assert.Contains(t, packages, "plugin-b")
-		assert.Contains(t, packages, "plugin-c")
+		assert.ElementsMatch(t, []string{"plugin-a", "plugin-b", "plugin-c"}, packages)
 	})
 
 	t.Run("package mode not supported", func(t *testing.T) {
@@ -373,7 +371,7 @@ func TestHTTPSRegistry_ListPackages(t *testing.T) {
 
 		packages, err := reg.ListPackages()
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "do not support package mode")
+		assert.EqualError(t, err, fmt.Sprintf("registry error: list failed for %s: HTTPS sources do not support package mode; use registry mode or direct tarball URL", server.URL))
 		assert.Nil(t, packages)
 	})
 
@@ -452,7 +450,7 @@ func TestExtractTarGz(t *testing.T) {
 		destDir := t.TempDir()
 		_, err = extractTarGz(tarballPath, destDir)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid path")
+		assert.EqualError(t, err, "invalid path in tarball: ../evil.txt")
 	})
 }
 

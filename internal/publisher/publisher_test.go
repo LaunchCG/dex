@@ -182,7 +182,7 @@ func TestNew(t *testing.T) {
 	t.Run("unsupported protocol", func(t *testing.T) {
 		_, err := New("ftp://example.com/registry")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unsupported")
+		assert.EqualError(t, err, "publish error for package to ftp://example.com/registry during connect: unsupported source URL format: ftp://example.com/registry")
 	})
 
 	// Note: s3:// and az:// would require credentials, so we skip them in unit tests

@@ -2,6 +2,7 @@ package installer
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -141,7 +142,7 @@ func TestExecutor_WriteFile_Conflict(t *testing.T) {
 	// Attempt to write over it (should error)
 	err = executor.Execute(plan, nil)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "already exists and is not managed by dex")
+	assert.EqualError(t, err, "writing files: file existing.txt already exists and is not managed by dex (use --force to overwrite)")
 
 	// Verify original content unchanged
 	content, err := os.ReadFile(existingFile)
@@ -235,12 +236,14 @@ func TestExecutor_ApplyMCPConfig_New(t *testing.T) {
 	err = json.Unmarshal(content, &result)
 	require.NoError(t, err)
 
-	servers, ok := result["mcpServers"].(map[string]any)
-	require.True(t, ok)
-
-	server, ok := servers["test-server"].(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, "test-cmd", server["command"])
+	assert.Equal(t, map[string]any{
+		"mcpServers": map[string]any{
+			"test-server": map[string]any{
+				"command": "test-cmd",
+				"args":    []any{"--flag"},
+			},
+		},
+	}, result)
 }
 
 func TestExecutor_ApplyMCPConfig_Merge(t *testing.T) {
@@ -283,10 +286,16 @@ func TestExecutor_ApplyMCPConfig_Merge(t *testing.T) {
 	err = json.Unmarshal(content, &result)
 	require.NoError(t, err)
 
-	servers, ok := result["mcpServers"].(map[string]any)
-	require.True(t, ok)
-	assert.Contains(t, servers, "existing-server")
-	assert.Contains(t, servers, "new-server")
+	assert.Equal(t, map[string]any{
+		"mcpServers": map[string]any{
+			"existing-server": map[string]any{
+				"command": "existing-cmd",
+			},
+			"new-server": map[string]any{
+				"command": "new-cmd",
+			},
+		},
+	}, result)
 }
 
 func TestExecutor_ApplySettingsConfig_New(t *testing.T) {
@@ -313,9 +322,9 @@ func TestExecutor_ApplySettingsConfig_New(t *testing.T) {
 	err = json.Unmarshal(content, &result)
 	require.NoError(t, err)
 
-	allow, ok := result["allow"].([]any)
-	require.True(t, ok)
-	assert.Contains(t, allow, "Bash(npm:*)")
+	assert.Equal(t, map[string]any{
+		"allow": []any{"Bash(npm:*)"},
+	}, result)
 }
 
 func TestExecutor_ApplySettingsConfig_Merge(t *testing.T) {
@@ -353,10 +362,9 @@ func TestExecutor_ApplySettingsConfig_Merge(t *testing.T) {
 	err = json.Unmarshal(content, &result)
 	require.NoError(t, err)
 
-	allow, ok := result["allow"].([]any)
-	require.True(t, ok)
-	assert.Contains(t, allow, "Bash(git:*)")
-	assert.Contains(t, allow, "Bash(npm:*)")
+	assert.Equal(t, map[string]any{
+		"allow": []any{"Bash(git:*)", "Bash(npm:*)"},
+	}, result)
 }
 
 func TestExecutor_ApplyAgentFileContent_New(t *testing.T) {
@@ -995,8 +1003,7 @@ func TestReadJSONFile_Valid(t *testing.T) {
 
 	result, err := ReadJSONFile(jsonFile)
 	require.NoError(t, err)
-	assert.Equal(t, "value", result["key"])
-	assert.Equal(t, float64(42), result["number"])
+	assert.Equal(t, map[string]any{"key": "value", "number": float64(42)}, result)
 }
 
 func TestReadJSONFile_Invalid(t *testing.T) {
@@ -1008,8 +1015,7 @@ func TestReadJSONFile_Invalid(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = ReadJSONFile(jsonFile)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "parsing JSON file")
+	assert.EqualError(t, err, fmt.Sprintf("parsing JSON file %s: invalid character 'i' looking for beginning of object key string", jsonFile))
 }
 
 func TestReadJSONFile_Empty(t *testing.T) {
@@ -1192,8 +1198,14 @@ func TestExecutor_FullPlan(t *testing.T) {
 	var mcpResult map[string]any
 	err = json.Unmarshal(mcpContent, &mcpResult)
 	require.NoError(t, err)
-	servers := mcpResult["mcpServers"].(map[string]any)
-	assert.Contains(t, servers, "test-server")
+	assert.Equal(t, map[string]any{
+		"mcpServers": map[string]any{
+			"test-server": map[string]any{
+				"command": "npx",
+				"args":    []any{"-y", "test-mcp"},
+			},
+		},
+	}, mcpResult)
 
 	// Verify settings config
 	settingsContent, err := os.ReadFile(filepath.Join(tmpDir, ".claude/settings.json"))
@@ -1201,14 +1213,14 @@ func TestExecutor_FullPlan(t *testing.T) {
 	var settingsResult map[string]any
 	err = json.Unmarshal(settingsContent, &settingsResult)
 	require.NoError(t, err)
-	allow := settingsResult["allow"].([]any)
-	assert.Contains(t, allow, "Bash(npm:*)")
+	assert.Equal(t, map[string]any{
+		"allow": []any{"Bash(npm:*)"},
+	}, settingsResult)
 
 	// Verify CLAUDE.md
 	agentContent, err := os.ReadFile(filepath.Join(tmpDir, "CLAUDE.md"))
 	require.NoError(t, err)
-	assert.Contains(t, string(agentContent), "<!-- dex:full-test-plugin -->")
-	assert.Contains(t, string(agentContent), "# Test Plugin Rules")
+	assert.Equal(t, "<!-- dex:full-test-plugin -->\n# Test Plugin Rules\n\nFollow these rules.\n<!-- /dex:full-test-plugin -->", string(agentContent))
 }
 
 func TestManifestTracking(t *testing.T) {
@@ -1238,8 +1250,8 @@ func TestManifestTracking(t *testing.T) {
 	// Verify manifest tracking
 	plugin := m.GetPlugin("tracked-plugin")
 	require.NotNil(t, plugin)
-	assert.Contains(t, plugin.Files, "test-dir/file.txt")
-	assert.Contains(t, plugin.Directories, "test-dir")
+	assert.Equal(t, []string{"test-dir/file.txt"}, plugin.Files)
+	assert.Equal(t, []string{"test-dir"}, plugin.Directories)
 	assert.True(t, plugin.HasAgentContent)
 }
 
@@ -1375,19 +1387,22 @@ func TestSettingsDeduplicationOnUninstall(t *testing.T) {
 	err = json.Unmarshal(content, &settings)
 	require.NoError(t, err)
 
-	allow := settings["allow"].([]any)
-	assert.Len(t, allow, 3) // bash:npm run *, write:*.ts, bash:yarn *
+	assert.Equal(t, map[string]any{
+		"allow": []any{"bash:npm run *", "write:*.ts", "bash:yarn *"},
+	}, settings)
 
 	// Verify manifest tracks each plugin's contributions
 	pluginA := m.GetPlugin("plugin-a")
 	require.NotNil(t, pluginA)
-	assert.Contains(t, pluginA.SettingsValues["allow"], "bash:npm run *")
-	assert.Contains(t, pluginA.SettingsValues["allow"], "write:*.ts")
+	assert.Equal(t, map[string][]string{
+		"allow": {"bash:npm run *", "write:*.ts"},
+	}, pluginA.SettingsValues)
 
 	pluginB := m.GetPlugin("plugin-b")
 	require.NotNil(t, pluginB)
-	assert.Contains(t, pluginB.SettingsValues["allow"], "bash:npm run *")
-	assert.Contains(t, pluginB.SettingsValues["allow"], "bash:yarn *")
+	assert.Equal(t, map[string][]string{
+		"allow": {"bash:npm run *", "bash:yarn *"},
+	}, pluginB.SettingsValues)
 
 	// Verify IsSettingsValueUsedByOthers works correctly
 	assert.True(t, m.IsSettingsValueUsedByOthers("plugin-a", "allow", "bash:npm run *"),
@@ -1773,14 +1788,11 @@ project {
 
 	// core is depended on by both app and utils
 	coreDeps := inst.FindDependents("core")
-	assert.Len(t, coreDeps, 2)
-	assert.Contains(t, coreDeps, "app")
-	assert.Contains(t, coreDeps, "utils")
+	assert.Equal(t, []string{"app", "utils"}, coreDeps)
 
 	// utils is depended on by app
 	utilsDeps := inst.FindDependents("utils")
-	assert.Len(t, utilsDeps, 1)
-	assert.Contains(t, utilsDeps, "app")
+	assert.Equal(t, []string{"app"}, utilsDeps)
 
 	// app has no dependents
 	appDeps := inst.FindDependents("app")
@@ -1843,14 +1855,11 @@ plugin "app" {
 
 	// orphan-pkg is not in dex.hcl and not a dependency of anything
 	orphans := inst.FindOrphans(nil)
-	assert.Len(t, orphans, 1)
-	assert.Contains(t, orphans, "orphan-pkg")
+	assert.Equal(t, []string{"orphan-pkg"}, orphans)
 
 	// When excluding app, utils becomes orphaned too
 	orphansExcludingApp := inst.FindOrphans([]string{"app"})
-	assert.Len(t, orphansExcludingApp, 2)
-	assert.Contains(t, orphansExcludingApp, "orphan-pkg")
-	assert.Contains(t, orphansExcludingApp, "utils")
+	assert.Equal(t, []string{"orphan-pkg", "utils"}, orphansExcludingApp)
 }
 
 func TestUpdateResult_Fields(t *testing.T) {
@@ -1933,26 +1942,20 @@ plugin "app" {
 
 	// Direct dependents of core is just utils
 	coreDeps := inst.FindDependents("core")
-	assert.Len(t, coreDeps, 1)
-	assert.Contains(t, coreDeps, "utils")
+	assert.Equal(t, []string{"utils"}, coreDeps)
 
 	// Direct dependents of utils is just middleware
 	utilsDeps := inst.FindDependents("utils")
-	assert.Len(t, utilsDeps, 1)
-	assert.Contains(t, utilsDeps, "middleware")
+	assert.Equal(t, []string{"middleware"}, utilsDeps)
 
 	// Direct dependents of middleware is just app
 	middlewareDeps := inst.FindDependents("middleware")
-	assert.Len(t, middlewareDeps, 1)
-	assert.Contains(t, middlewareDeps, "app")
+	assert.Equal(t, []string{"app"}, middlewareDeps)
 
 	// To find ALL transitive dependents, caller must iterate
 	// This simulates what the uninstall command does
 	allDependents := findAllTransitiveDependents(inst, "core")
-	assert.Len(t, allDependents, 3)
-	assert.Contains(t, allDependents, "utils")
-	assert.Contains(t, allDependents, "middleware")
-	assert.Contains(t, allDependents, "app")
+	assert.ElementsMatch(t, []string{"utils", "middleware", "app"}, allDependents)
 }
 
 // TestInstaller_FindDependents_DiamondDependency tests diamond dependency pattern.
@@ -2021,16 +2024,11 @@ plugin "app" {
 
 	// shared-lib is depended on by both frontend and backend
 	sharedDeps := inst.FindDependents("shared-lib")
-	assert.Len(t, sharedDeps, 2)
-	assert.Contains(t, sharedDeps, "frontend")
-	assert.Contains(t, sharedDeps, "backend")
+	assert.Equal(t, []string{"backend", "frontend"}, sharedDeps)
 
 	// Transitive: uninstalling shared-lib should cascade to frontend, backend, and app
 	allDependents := findAllTransitiveDependents(inst, "shared-lib")
-	assert.Len(t, allDependents, 3)
-	assert.Contains(t, allDependents, "frontend")
-	assert.Contains(t, allDependents, "backend")
-	assert.Contains(t, allDependents, "app")
+	assert.ElementsMatch(t, []string{"frontend", "backend", "app"}, allDependents)
 }
 
 // TestInstaller_FindDependents_ComplexGraph tests a complex dependency graph.
@@ -2122,33 +2120,23 @@ plugin "app-b" {
 
 	// Direct dependents of core: lib-x, lib-y
 	coreDeps := inst.FindDependents("core")
-	assert.Len(t, coreDeps, 2)
-	assert.Contains(t, coreDeps, "lib-x")
-	assert.Contains(t, coreDeps, "lib-y")
+	assert.Equal(t, []string{"lib-x", "lib-y"}, coreDeps)
 
 	// lib-y is used by both app-a and app-b
 	libYDeps := inst.FindDependents("lib-y")
-	assert.Len(t, libYDeps, 2)
-	assert.Contains(t, libYDeps, "app-a")
-	assert.Contains(t, libYDeps, "app-b")
+	assert.Equal(t, []string{"app-a", "app-b"}, libYDeps)
 
 	// lib-z is only used by app-b
 	libZDeps := inst.FindDependents("lib-z")
-	assert.Len(t, libZDeps, 1)
-	assert.Contains(t, libZDeps, "app-b")
+	assert.Equal(t, []string{"app-b"}, libZDeps)
 
 	// Transitive: uninstalling core cascades to lib-x, lib-y, app-a, app-b
 	allDependents := findAllTransitiveDependents(inst, "core")
-	assert.Len(t, allDependents, 4)
-	assert.Contains(t, allDependents, "lib-x")
-	assert.Contains(t, allDependents, "lib-y")
-	assert.Contains(t, allDependents, "app-a")
-	assert.Contains(t, allDependents, "app-b")
+	assert.ElementsMatch(t, []string{"lib-x", "lib-y", "app-a", "app-b"}, allDependents)
 
 	// Uninstalling lib-z only affects app-b
 	libZAllDeps := findAllTransitiveDependents(inst, "lib-z")
-	assert.Len(t, libZAllDeps, 1)
-	assert.Contains(t, libZAllDeps, "app-b")
+	assert.ElementsMatch(t, []string{"app-b"}, libZAllDeps)
 }
 
 // findAllTransitiveDependents is a helper that simulates the uninstall cascade logic.
@@ -2207,11 +2195,11 @@ func TestExecutor_TracksMCPConfigFile(t *testing.T) {
 	// Verify .mcp.json is tracked as a merged file
 	plugin := m.GetPlugin("test-plugin")
 	require.NotNil(t, plugin)
-	assert.Contains(t, plugin.MergedFiles, ".mcp.json")
+	assert.Equal(t, []string{".mcp.json"}, plugin.MergedFiles)
 
 	// Verify it's included in AllFiles
 	allFiles := m.AllFiles()
-	assert.Contains(t, allFiles, ".mcp.json")
+	assert.ElementsMatch(t, []string{".mcp.json"}, allFiles)
 }
 
 func TestExecutor_TracksSettingsFile(t *testing.T) {
@@ -2232,11 +2220,11 @@ func TestExecutor_TracksSettingsFile(t *testing.T) {
 	// Verify settings.json is tracked as a merged file
 	plugin := m.GetPlugin("test-plugin")
 	require.NotNil(t, plugin)
-	assert.Contains(t, plugin.MergedFiles, filepath.Join(".claude", "settings.json"))
+	assert.Equal(t, []string{filepath.Join(".claude", "settings.json")}, plugin.MergedFiles)
 
 	// Verify it's included in AllFiles
 	allFiles := m.AllFiles()
-	assert.Contains(t, allFiles, filepath.Join(".claude", "settings.json"))
+	assert.ElementsMatch(t, []string{filepath.Join(".claude", "settings.json")}, allFiles)
 }
 
 func TestExecutor_TracksAgentFile(t *testing.T) {
@@ -2255,11 +2243,11 @@ func TestExecutor_TracksAgentFile(t *testing.T) {
 	// Verify CLAUDE.md is tracked as a merged file
 	plugin := m.GetPlugin("test-plugin")
 	require.NotNil(t, plugin)
-	assert.Contains(t, plugin.MergedFiles, "CLAUDE.md")
+	assert.Equal(t, []string{"CLAUDE.md"}, plugin.MergedFiles)
 
 	// Verify it's included in AllFiles
 	allFiles := m.AllFiles()
-	assert.Contains(t, allFiles, "CLAUDE.md")
+	assert.ElementsMatch(t, []string{"CLAUDE.md"}, allFiles)
 }
 
 func TestExecutor_TracksCustomAgentFilePath(t *testing.T) {
@@ -2280,11 +2268,11 @@ func TestExecutor_TracksCustomAgentFilePath(t *testing.T) {
 	// Verify custom path is tracked
 	plugin := m.GetPlugin("test-plugin")
 	require.NotNil(t, plugin)
-	assert.Contains(t, plugin.MergedFiles, customPath)
+	assert.Equal(t, []string{customPath}, plugin.MergedFiles)
 
 	// Verify it's included in AllFiles
 	allFiles := m.AllFiles()
-	assert.Contains(t, allFiles, customPath)
+	assert.ElementsMatch(t, []string{customPath}, allFiles)
 }
 
 func TestExecutor_MultiplPlugins_SharedMergedFiles(t *testing.T) {
@@ -2319,11 +2307,11 @@ func TestExecutor_MultiplPlugins_SharedMergedFiles(t *testing.T) {
 	// Both should track .mcp.json
 	plugin1 := m.GetPlugin("plugin1")
 	require.NotNil(t, plugin1)
-	assert.Contains(t, plugin1.MergedFiles, ".mcp.json")
+	assert.Equal(t, []string{".mcp.json"}, plugin1.MergedFiles)
 
 	plugin2 := m.GetPlugin("plugin2")
 	require.NotNil(t, plugin2)
-	assert.Contains(t, plugin2.MergedFiles, ".mcp.json")
+	assert.Equal(t, []string{".mcp.json"}, plugin2.MergedFiles)
 
 	// .mcp.json should appear only once in AllFiles
 	allFiles := m.AllFiles()
@@ -2428,9 +2416,11 @@ func TestUninstall_PreservesSharedMergedFile(t *testing.T) {
 	var result map[string]any
 	err = json.Unmarshal(content, &result)
 	require.NoError(t, err)
-	servers := result["mcpServers"].(map[string]any)
-	assert.NotContains(t, servers, "server1")
-	assert.Contains(t, servers, "server2")
+	assert.Equal(t, map[string]any{
+		"mcpServers": map[string]any{
+			"server2": map[string]any{"command": "cmd2"},
+		},
+	}, result)
 }
 
 // TestExecutor_ClaudeSettingsCreatesFile tests that claude_settings blocks
@@ -2468,9 +2458,9 @@ func TestExecutor_ClaudeSettingsCreatesFile(t *testing.T) {
 	err = json.Unmarshal(settingsContent, &settingsResult)
 	require.NoError(t, err)
 
-	allow, ok := settingsResult["allow"].([]any)
-	require.True(t, ok, "allow should be an array")
-	assert.Contains(t, allow, "mcp__dev-toolkit-mcp")
+	assert.Equal(t, map[string]any{
+		"allow": []any{"mcp__dev-toolkit-mcp"},
+	}, settingsResult)
 }
 
 // =============================================================================
@@ -2509,7 +2499,7 @@ plugin "my-plugin" {
 	claudePath := filepath.Join(projectDir, "CLAUDE.md")
 	content1, err := os.ReadFile(claudePath)
 	require.NoError(t, err)
-	assert.Contains(t, string(content1), "# Initial Instructions")
+	assert.Equal(t, "# Initial Instructions\n\n<!-- dex:my-plugin -->\nFollow this rule from my-plugin\n<!-- /dex:my-plugin -->", string(content1))
 
 	// Update agent_instructions in dex.hcl
 	projectContent = `project {
@@ -2534,18 +2524,12 @@ plugin "my-plugin" {
 	// Verify: Plugin was not updated (already at latest version)
 	require.Len(t, results, 1)
 	assert.True(t, results[0].Skipped)
-	assert.Contains(t, results[0].Reason, "already at latest compatible version")
+	assert.Equal(t, "already at latest compatible version", results[0].Reason)
 
 	// Verify: Agent file (CLAUDE.md) updated with new content
 	content2, err := os.ReadFile(claudePath)
 	require.NoError(t, err)
-	contentStr := string(content2)
-	assert.Contains(t, contentStr, "# Updated Instructions")
-	assert.Contains(t, contentStr, "This is the new content.")
-	assert.NotContains(t, contentStr, "# Initial Instructions")
-
-	// Verify: Plugin content still present
-	assert.Contains(t, contentStr, "<!-- dex:my-plugin -->")
+	assert.Equal(t, "# Updated Instructions\n\nThis is the new content.\n\n<!-- dex:my-plugin -->\nFollow this rule from my-plugin\n<!-- /dex:my-plugin -->", string(content2))
 
 	// Verify: Manifest was saved
 	plugin := installer2.manifest.GetPlugin("__project__")
@@ -2597,8 +2581,7 @@ plugin "test-plugin" {
 	claudePath := filepath.Join(projectDir, "CLAUDE.md")
 	content1, err := os.ReadFile(claudePath)
 	require.NoError(t, err)
-	assert.Contains(t, string(content1), "# V1 Instructions")
-	assert.Contains(t, string(content1), "This is version 1 content.")
+	assert.Equal(t, "# V1 Instructions\n\n<!-- dex:test-plugin -->\nThis is version 1 content.\n<!-- /dex:test-plugin -->", string(content1))
 
 	// Set up plugin v2 in a different directory
 	pluginV2Dir := t.TempDir()
@@ -2642,18 +2625,10 @@ plugin "test-plugin" {
 	assert.Equal(t, "1.0.0", results[0].OldVersion)
 	assert.Equal(t, "2.0.0", results[0].NewVersion)
 
-	// Verify: Agent instructions updated
+	// Verify: Agent instructions updated and plugin v2 content present
 	content2, err := os.ReadFile(claudePath)
 	require.NoError(t, err)
-	contentStr := string(content2)
-	assert.Contains(t, contentStr, "# V2 Instructions")
-	assert.Contains(t, contentStr, "Updated for version 2.")
-	assert.NotContains(t, contentStr, "# V1 Instructions")
-
-	// Verify: Plugin v2 content present
-	assert.Contains(t, contentStr, "<!-- dex:test-plugin -->")
-	assert.Contains(t, contentStr, "This is version 2 content - updated!")
-	assert.NotContains(t, contentStr, "This is version 1 content.")
+	assert.Equal(t, "# V2 Instructions\n\nUpdated for version 2.\n\n<!-- dex:test-plugin -->\nThis is version 2 content - updated!\n<!-- /dex:test-plugin -->", string(content2))
 }
 
 func TestInstaller_Update_DryRunMode(t *testing.T) {
@@ -2689,7 +2664,7 @@ plugin "my-plugin" {
 	content1, err := os.ReadFile(claudePath)
 	require.NoError(t, err)
 	initialContent := string(content1)
-	assert.Contains(t, initialContent, "# Initial Instructions")
+	assert.Equal(t, "# Initial Instructions\n\n<!-- dex:my-plugin -->\nFollow this rule from my-plugin\n<!-- /dex:my-plugin -->", initialContent)
 
 	// Update agent_instructions in dex.hcl
 	projectContent = `project {
@@ -2718,8 +2693,5 @@ plugin "my-plugin" {
 	// Verify: Agent file unchanged (dry-run should not apply changes)
 	content2, err := os.ReadFile(claudePath)
 	require.NoError(t, err)
-	contentStr := string(content2)
-	assert.Equal(t, initialContent, contentStr, "CLAUDE.md should be unchanged in dry-run mode")
-	assert.Contains(t, contentStr, "# Initial Instructions")
-	assert.NotContains(t, contentStr, "# Updated Instructions")
+	assert.Equal(t, initialContent, string(content2), "CLAUDE.md should be unchanged in dry-run mode")
 }

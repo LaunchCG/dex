@@ -82,22 +82,12 @@ plugin "test-settings-plugin" {
 	err = json.Unmarshal(settingsContent, &settings)
 	require.NoError(t, err, "settings.json should be valid JSON")
 
-	// Verify allow array
-	allow, ok := settings["allow"].([]any)
-	require.True(t, ok, "allow should be an array")
-	assert.Len(t, allow, 2)
-	assert.Contains(t, allow, "mcp__test-server")
-	assert.Contains(t, allow, "Bash(docker:*)")
-
-	// Verify deny array
-	deny, ok := settings["deny"].([]any)
-	require.True(t, ok, "deny should be an array")
-	assert.Contains(t, deny, "Bash(rm -rf /)")
-
-	// Verify env map
-	env, ok := settings["env"].(map[string]any)
-	require.True(t, ok, "env should be a map")
-	assert.Equal(t, "test_value", env["TEST_VAR"])
+	// Verify full settings content
+	assert.Equal(t, map[string]any{
+		"allow": []any{"mcp__test-server", "Bash(docker:*)"},
+		"deny":  []any{"Bash(rm -rf /)"},
+		"env":   map[string]any{"TEST_VAR": "test_value"},
+	}, settings)
 }
 
 // TestInstaller_ClaudeSettingsWithOtherResources tests that claude_settings
@@ -172,8 +162,14 @@ plugin "multi-resource-plugin" {
 	var mcpConfig map[string]any
 	err = json.Unmarshal(mcpContent, &mcpConfig)
 	require.NoError(t, err)
-	servers := mcpConfig["mcpServers"].(map[string]any)
-	assert.Contains(t, servers, "test-server")
+	assert.Equal(t, map[string]any{
+		"mcpServers": map[string]any{
+			"test-server": map[string]any{
+				"command": "npx",
+				"args":    []any{"-y", "test-mcp"},
+			},
+		},
+	}, mcpConfig)
 
 	// Verify settings file was created
 	settingsPath := filepath.Join(projectDir, ".claude/settings.json")
@@ -182,6 +178,7 @@ plugin "multi-resource-plugin" {
 	var settings map[string]any
 	err = json.Unmarshal(settingsContent, &settings)
 	require.NoError(t, err)
-	allow := settings["allow"].([]any)
-	assert.Contains(t, allow, "mcp__test-server")
+	assert.Equal(t, map[string]any{
+		"allow": []any{"mcp__test-server"},
+	}, settings)
 }

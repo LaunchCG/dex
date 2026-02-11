@@ -215,28 +215,26 @@ package {
 	// when credentials aren't available (which is expected in tests)
 	t.Run("s3 protocol attempts to create S3Registry", func(t *testing.T) {
 		// This will fail because no AWS credentials are available in test environment
-		// but it verifies the routing is correct
+		// but it verifies the routing is correct (not "unsupported protocol")
 		_, err := NewRegistry("s3://bucket/path", ModeRegistry)
-		// The error should be about credentials, not about unknown protocol
 		if err != nil {
-			assert.NotContains(t, err.Error(), "unsupported protocol")
+			assert.NotEqual(t, "unsupported protocol: s3", err.Error())
 		}
 	})
 
 	t.Run("az protocol attempts to create AzureRegistry", func(t *testing.T) {
 		// This will fail because no Azure credentials are available in test environment
-		// but it verifies the routing is correct
+		// but it verifies the routing is correct (not "unsupported protocol")
 		_, err := NewRegistry("az://account/container/path", ModeRegistry)
-		// The error should be about credentials, not about unknown protocol
 		if err != nil {
-			assert.NotContains(t, err.Error(), "unsupported protocol")
+			assert.NotEqual(t, "unsupported protocol: az", err.Error())
 		}
 	})
 
 	t.Run("unsupported protocol returns error", func(t *testing.T) {
 		_, err := NewRegistry("ftp://example.com/files", ModeRegistry)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "unsupported")
+		assert.EqualError(t, err, "unsupported source URL format: ftp://example.com/files")
 	})
 }
 

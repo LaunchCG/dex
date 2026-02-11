@@ -2,6 +2,7 @@ package registry
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -82,7 +83,10 @@ func TestNewLocalRegistry_RelativePath(t *testing.T) {
 	// Test relative path
 	reg, err := NewLocalRegistry("./plugins/my-plugin", ModePackage)
 	require.NoError(t, err)
-	assert.Contains(t, reg.BasePath(), "plugins/my-plugin")
+	// Resolve symlinks to handle macOS /var -> /private/var
+	resolvedTmpDir, err := filepath.EvalSymlinks(tmpDir)
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(resolvedTmpDir, "plugins", "my-plugin"), reg.BasePath())
 }
 
 func TestNewLocalRegistry_InvalidPath(t *testing.T) {
@@ -98,7 +102,7 @@ func TestNewLocalRegistry_FileNotDirectory(t *testing.T) {
 
 	_, err = NewLocalRegistry(filePath, ModePackage)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "not a directory")
+	assert.EqualError(t, err, fmt.Sprintf("registry error: connect failed for file:%s: path is not a directory: %s", filePath, filePath))
 }
 
 func TestNewLocalRegistry_ModeAutoDetectsRegistry(t *testing.T) {
@@ -178,10 +182,7 @@ func TestLocalRegistry_RegistryMode_ListPackages(t *testing.T) {
 
 	packages, err := reg.ListPackages()
 	require.NoError(t, err)
-	assert.Len(t, packages, 3)
-	assert.Contains(t, packages, "plugin-a")
-	assert.Contains(t, packages, "plugin-b")
-	assert.Contains(t, packages, "plugin-c")
+	assert.ElementsMatch(t, []string{"plugin-a", "plugin-b", "plugin-c"}, packages)
 }
 
 func TestLocalRegistry_RegistryMode_ResolvePackage(t *testing.T) {
@@ -211,8 +212,8 @@ func TestLocalRegistry_RegistryMode_ResolvePackage(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "my-plugin", resolved.Name)
 		assert.Equal(t, "2.0.0", resolved.Version)
-		assert.Contains(t, resolved.URL, "file:")
-		assert.NotEmpty(t, resolved.LocalPath)
+		assert.Equal(t, "file:"+filepath.Join(tmpDir, "my-plugin"), resolved.URL)
+		assert.Equal(t, filepath.Join(tmpDir, "my-plugin"), resolved.LocalPath)
 	})
 
 	t.Run("resolve empty version means latest", func(t *testing.T) {
@@ -432,8 +433,7 @@ func TestLocalRegistry_IntegrityComputation(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify integrity hash is computed
-	assert.NotEmpty(t, resolved.Integrity)
-	assert.Contains(t, resolved.Integrity, "sha256-")
+	assert.Equal(t, "sha256-uydHqstACv8xna+noaANfpMp67OMqhExI4l/8K0D8dw=", resolved.Integrity)
 }
 
 func TestLocalRegistry_IntegrityConsistency(t *testing.T) {

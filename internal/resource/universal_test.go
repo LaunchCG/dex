@@ -1,8 +1,10 @@
 package resource
 
 import (
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestFileValidation tests the validation logic for File resources.
@@ -48,7 +50,7 @@ func TestFileValidation(t *testing.T) {
 				Content: strPtr("test"),
 			},
 			wantErr: true,
-			errMsg:  "name is required",
+			errMsg:  "file: name is required",
 		},
 		{
 			name: "missing dest",
@@ -57,7 +59,7 @@ func TestFileValidation(t *testing.T) {
 				Content: strPtr("test"),
 			},
 			wantErr: true,
-			errMsg:  "dest is required",
+			errMsg:  `file "test": dest is required`,
 		},
 		{
 			name: "absolute dest path",
@@ -67,7 +69,7 @@ func TestFileValidation(t *testing.T) {
 				Content: strPtr("test"),
 			},
 			wantErr: true,
-			errMsg:  "must be a relative path",
+			errMsg:  `file "test": dest must be a relative path, got absolute path "/absolute/path"`,
 		},
 		{
 			name: "path traversal",
@@ -77,7 +79,7 @@ func TestFileValidation(t *testing.T) {
 				Content: strPtr("test"),
 			},
 			wantErr: true,
-			errMsg:  "must not escape project root",
+			errMsg:  `file "test": dest must not escape project root (no .. path traversal), got "../../../etc/passwd"`,
 		},
 		{
 			name: "neither content nor src",
@@ -86,7 +88,7 @@ func TestFileValidation(t *testing.T) {
 				Dest: "config/test.txt",
 			},
 			wantErr: true,
-			errMsg:  "must specify either 'content' or 'src'",
+			errMsg:  `file "test": must specify either 'content' or 'src'`,
 		},
 		{
 			name: "both content and src",
@@ -97,7 +99,7 @@ func TestFileValidation(t *testing.T) {
 				Src:     strPtr("files/test.txt"),
 			},
 			wantErr: true,
-			errMsg:  "cannot specify both 'content' and 'src'",
+			errMsg:  `file "test": cannot specify both 'content' and 'src'`,
 		},
 		{
 			name: "invalid chmod - too short",
@@ -108,7 +110,7 @@ func TestFileValidation(t *testing.T) {
 				Chmod:   "5",
 			},
 			wantErr: true,
-			errMsg:  "chmod must be 3-4 octal digits",
+			errMsg:  `file "test": chmod must be 3-4 octal digits, got "5"`,
 		},
 		{
 			name: "invalid chmod - too long",
@@ -119,7 +121,7 @@ func TestFileValidation(t *testing.T) {
 				Chmod:   "77777",
 			},
 			wantErr: true,
-			errMsg:  "chmod must be 3-4 octal digits",
+			errMsg:  `file "test": chmod must be 3-4 octal digits, got "77777"`,
 		},
 		{
 			name: "invalid chmod - not octal",
@@ -130,7 +132,7 @@ func TestFileValidation(t *testing.T) {
 				Chmod:   "999",
 			},
 			wantErr: true,
-			errMsg:  "chmod must be valid octal number",
+			errMsg:  `file "test": chmod must be valid octal number, got "999"`,
 		},
 		{
 			name: "valid chmod - 4 digits",
@@ -148,17 +150,10 @@ func TestFileValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.file.Validate()
 			if tt.wantErr {
-				if err == nil {
-					t.Errorf("expected error containing %q, got nil", tt.errMsg)
-					return
-				}
-				if !strings.Contains(err.Error(), tt.errMsg) {
-					t.Errorf("expected error containing %q, got %q", tt.errMsg, err.Error())
-				}
+				require.Error(t, err)
+				assert.EqualError(t, err, tt.errMsg)
 			} else {
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-				}
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -195,7 +190,7 @@ func TestDirectoryValidation(t *testing.T) {
 				Path: "data/cache",
 			},
 			wantErr: true,
-			errMsg:  "name is required",
+			errMsg:  "directory: name is required",
 		},
 		{
 			name: "missing path",
@@ -203,7 +198,7 @@ func TestDirectoryValidation(t *testing.T) {
 				Name: "test",
 			},
 			wantErr: true,
-			errMsg:  "path is required",
+			errMsg:  `directory "test": path is required`,
 		},
 		{
 			name: "absolute path",
@@ -212,7 +207,7 @@ func TestDirectoryValidation(t *testing.T) {
 				Path: "/absolute/path",
 			},
 			wantErr: true,
-			errMsg:  "must be relative",
+			errMsg:  `directory "test": path must be relative, got absolute path "/absolute/path"`,
 		},
 		{
 			name: "path traversal",
@@ -221,7 +216,7 @@ func TestDirectoryValidation(t *testing.T) {
 				Path: "../../etc",
 			},
 			wantErr: true,
-			errMsg:  "must not escape project root",
+			errMsg:  `directory "test": path must not escape project root (no .. path traversal), got "../../etc"`,
 		},
 	}
 
@@ -229,17 +224,10 @@ func TestDirectoryValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.dir.Validate()
 			if tt.wantErr {
-				if err == nil {
-					t.Errorf("expected error containing %q, got nil", tt.errMsg)
-					return
-				}
-				if !strings.Contains(err.Error(), tt.errMsg) {
-					t.Errorf("expected error containing %q, got %q", tt.errMsg, err.Error())
-				}
+				require.Error(t, err)
+				assert.EqualError(t, err, tt.errMsg)
 			} else {
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-				}
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -254,29 +242,12 @@ func TestFileResourceInterface(t *testing.T) {
 		Content: &content,
 	}
 
-	if file.ResourceType() != "file" {
-		t.Errorf("expected ResourceType() = %q, got %q", "file", file.ResourceType())
-	}
-
-	if file.ResourceName() != "test" {
-		t.Errorf("expected ResourceName() = %q, got %q", "test", file.ResourceName())
-	}
-
-	if file.Platform() != "universal" {
-		t.Errorf("expected Platform() = %q, got %q", "universal", file.Platform())
-	}
-
-	if file.GetContent() != "" {
-		t.Errorf("expected GetContent() = %q, got %q", "", file.GetContent())
-	}
-
-	if len(file.GetFiles()) != 0 {
-		t.Errorf("expected GetFiles() to return empty slice, got %d items", len(file.GetFiles()))
-	}
-
-	if len(file.GetTemplateFiles()) != 0 {
-		t.Errorf("expected GetTemplateFiles() to return empty slice, got %d items", len(file.GetTemplateFiles()))
-	}
+	assert.Equal(t, "file", file.ResourceType())
+	assert.Equal(t, "test", file.ResourceName())
+	assert.Equal(t, "universal", file.Platform())
+	assert.Equal(t, "", file.GetContent())
+	assert.Nil(t, file.GetFiles())
+	assert.Nil(t, file.GetTemplateFiles())
 }
 
 // TestDirectoryResourceInterface tests that Directory implements the Resource interface correctly.
@@ -286,29 +257,12 @@ func TestDirectoryResourceInterface(t *testing.T) {
 		Path: "data/cache",
 	}
 
-	if dir.ResourceType() != "directory" {
-		t.Errorf("expected ResourceType() = %q, got %q", "directory", dir.ResourceType())
-	}
-
-	if dir.ResourceName() != "test" {
-		t.Errorf("expected ResourceName() = %q, got %q", "test", dir.ResourceName())
-	}
-
-	if dir.Platform() != "universal" {
-		t.Errorf("expected Platform() = %q, got %q", "universal", dir.Platform())
-	}
-
-	if dir.GetContent() != "" {
-		t.Errorf("expected GetContent() = %q, got %q", "", dir.GetContent())
-	}
-
-	if len(dir.GetFiles()) != 0 {
-		t.Errorf("expected GetFiles() to return empty slice, got %d items", len(dir.GetFiles()))
-	}
-
-	if len(dir.GetTemplateFiles()) != 0 {
-		t.Errorf("expected GetTemplateFiles() to return empty slice, got %d items", len(dir.GetTemplateFiles()))
-	}
+	assert.Equal(t, "directory", dir.ResourceType())
+	assert.Equal(t, "test", dir.ResourceName())
+	assert.Equal(t, "universal", dir.Platform())
+	assert.Equal(t, "", dir.GetContent())
+	assert.Nil(t, dir.GetFiles())
+	assert.Nil(t, dir.GetTemplateFiles())
 }
 
 // strPtr is a helper to get a pointer to a string.

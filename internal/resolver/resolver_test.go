@@ -52,8 +52,12 @@ func TestResolver_ResolveForUpdate_EmptyNames(t *testing.T) {
 	_, err := r.ResolveForUpdate(nil)
 	assert.Error(t, err) // Expected to fail without proper registry
 
-	// The error should be about the plugin resolution
-	assert.Contains(t, err.Error(), "plugin")
+	// The error should be a PackageNotFoundError for one of the locked plugins
+	var pnfErr *PackageNotFoundError
+	require.ErrorAs(t, err, &pnfErr)
+	assert.Condition(t, func() bool {
+		return pnfErr.Package == "plugin-a" || pnfErr.Package == "plugin-b"
+	}, "expected error about plugin-a or plugin-b, got %q", pnfErr.Package)
 }
 
 func TestResolution_InstallOrder(t *testing.T) {
@@ -142,7 +146,7 @@ func TestResolver_detectConflicts_WithConflict(t *testing.T) {
 	conflicts := r.detectConflicts(graph, resolved)
 	require.Len(t, conflicts, 1, "should detect one conflict")
 	assert.Equal(t, "lib", conflicts[0].Package)
-	assert.Contains(t, conflicts[0].Required[0], "app requires lib@^2.0.0")
+	assert.Equal(t, "app requires lib@^2.0.0", conflicts[0].Required[0])
 }
 
 func TestResolver_loadPackageDependencies_FromLock(t *testing.T) {

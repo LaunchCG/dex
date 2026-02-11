@@ -109,7 +109,7 @@ func TestCursorRule_Validate(t *testing.T) {
 				Content:     "Rule content",
 			},
 			wantErr: true,
-			errMsg:  "name is required",
+			errMsg:  "cursor_rule: name is required",
 		},
 		{
 			name: "missing description",
@@ -118,7 +118,7 @@ func TestCursorRule_Validate(t *testing.T) {
 				Content: "Rule content",
 			},
 			wantErr: true,
-			errMsg:  "description is required",
+			errMsg:  `cursor_rule "test-rule": description is required`,
 		},
 		{
 			name: "missing content",
@@ -127,7 +127,7 @@ func TestCursorRule_Validate(t *testing.T) {
 				Description: "A test rule",
 			},
 			wantErr: true,
-			errMsg:  "content is required",
+			errMsg:  `cursor_rule "test-rule": content is required`,
 		},
 	}
 
@@ -136,7 +136,7 @@ func TestCursorRule_Validate(t *testing.T) {
 			err := tt.rule.Validate()
 			if tt.wantErr {
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errMsg)
+				assert.EqualError(t, err, tt.errMsg)
 			} else {
 				assert.NoError(t, err)
 			}
@@ -220,7 +220,7 @@ func TestCursorMCPServer_Validate(t *testing.T) {
 				Command: "npx",
 			},
 			wantErr: true,
-			errMsg:  "name is required",
+			errMsg:  "cursor_mcp_server: name is required",
 		},
 		{
 			name: "missing type",
@@ -229,7 +229,7 @@ func TestCursorMCPServer_Validate(t *testing.T) {
 				Command: "npx",
 			},
 			wantErr: true,
-			errMsg:  "type is required",
+			errMsg:  `cursor_mcp_server "test-server": type is required`,
 		},
 		{
 			name: "invalid type",
@@ -238,7 +238,7 @@ func TestCursorMCPServer_Validate(t *testing.T) {
 				Type: "invalid",
 			},
 			wantErr: true,
-			errMsg:  "type must be 'stdio', 'http', or 'sse'",
+			errMsg:  `cursor_mcp_server "test-server": type must be 'stdio', 'http', or 'sse', got "invalid"`,
 		},
 		{
 			name: "stdio missing command",
@@ -247,7 +247,7 @@ func TestCursorMCPServer_Validate(t *testing.T) {
 				Type: "stdio",
 			},
 			wantErr: true,
-			errMsg:  "command is required for type 'stdio'",
+			errMsg:  `cursor_mcp_server "test-server": command is required for type 'stdio'`,
 		},
 		{
 			name: "http missing url",
@@ -256,7 +256,7 @@ func TestCursorMCPServer_Validate(t *testing.T) {
 				Type: "http",
 			},
 			wantErr: true,
-			errMsg:  "url is required for type",
+			errMsg:  `cursor_mcp_server "test-server": url is required for type "http"`,
 		},
 		{
 			name: "sse missing url",
@@ -265,7 +265,7 @@ func TestCursorMCPServer_Validate(t *testing.T) {
 				Type: "sse",
 			},
 			wantErr: true,
-			errMsg:  "url is required for type",
+			errMsg:  `cursor_mcp_server "test-server": url is required for type "sse"`,
 		},
 	}
 
@@ -274,7 +274,7 @@ func TestCursorMCPServer_Validate(t *testing.T) {
 			err := tt.server.Validate()
 			if tt.wantErr {
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errMsg)
+				assert.EqualError(t, err, tt.errMsg)
 			} else {
 				assert.NoError(t, err)
 			}
@@ -423,7 +423,7 @@ func TestCursorRules_Validate(t *testing.T) {
 				Content:     "Rules content",
 			},
 			wantErr: true,
-			errMsg:  "name is required",
+			errMsg:  "cursor_rules: name is required",
 		},
 		{
 			name: "missing description",
@@ -432,7 +432,7 @@ func TestCursorRules_Validate(t *testing.T) {
 				Content: "Rules content",
 			},
 			wantErr: true,
-			errMsg:  "description is required",
+			errMsg:  `cursor_rules "test-rules": description is required`,
 		},
 		{
 			name: "missing content",
@@ -441,7 +441,7 @@ func TestCursorRules_Validate(t *testing.T) {
 				Description: "Test rules",
 			},
 			wantErr: true,
-			errMsg:  "content is required",
+			errMsg:  `cursor_rules "test-rules": content is required`,
 		},
 	}
 
@@ -450,7 +450,7 @@ func TestCursorRules_Validate(t *testing.T) {
 			err := tt.rules.Validate()
 			if tt.wantErr {
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errMsg)
+				assert.EqualError(t, err, tt.errMsg)
 			} else {
 				assert.NoError(t, err)
 			}
@@ -579,7 +579,7 @@ func TestCursorCommand_Validate(t *testing.T) {
 				Content:     "Command content",
 			},
 			wantErr: true,
-			errMsg:  "name is required",
+			errMsg:  "cursor_command: name is required",
 		},
 		{
 			name: "missing description",
@@ -588,7 +588,7 @@ func TestCursorCommand_Validate(t *testing.T) {
 				Content: "Command content",
 			},
 			wantErr: true,
-			errMsg:  "description is required",
+			errMsg:  `cursor_command "test-command": description is required`,
 		},
 		{
 			name: "missing content",
@@ -597,7 +597,7 @@ func TestCursorCommand_Validate(t *testing.T) {
 				Description: "A test command",
 			},
 			wantErr: true,
-			errMsg:  "content is required",
+			errMsg:  `cursor_command "test-command": content is required`,
 		},
 	}
 
@@ -606,7 +606,7 @@ func TestCursorCommand_Validate(t *testing.T) {
 			err := tt.cmd.Validate()
 			if tt.wantErr {
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errMsg)
+				assert.EqualError(t, err, tt.errMsg)
 			} else {
 				assert.NoError(t, err)
 			}
@@ -659,10 +659,29 @@ func TestNewResource_CursorTypes(t *testing.T) {
 func TestRegisteredTypes_IncludesCursor(t *testing.T) {
 	types := RegisteredTypes()
 
-	assert.Contains(t, types, "cursor_rule")
-	assert.Contains(t, types, "cursor_mcp_server")
-	assert.Contains(t, types, "cursor_rules")
-	assert.Contains(t, types, "cursor_command")
+	// Full expected list is validated in TestRegisteredTypes; verify cursor subset here
+	expected := []string{
+		"claude_command",
+		"claude_mcp_server",
+		"claude_rule",
+		"claude_rules",
+		"claude_settings",
+		"claude_skill",
+		"claude_subagent",
+		"copilot_agent",
+		"copilot_instruction",
+		"copilot_instructions",
+		"copilot_mcp_server",
+		"copilot_prompt",
+		"copilot_skill",
+		"cursor_command",
+		"cursor_mcp_server",
+		"cursor_rule",
+		"cursor_rules",
+		"directory",
+		"file",
+	}
+	assert.Equal(t, expected, types)
 }
 
 func TestIsRegisteredType_CursorTypes(t *testing.T) {
