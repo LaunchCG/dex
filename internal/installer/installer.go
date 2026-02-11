@@ -183,6 +183,11 @@ func (i *Installer) Install(specs []PluginSpec) ([]InstalledPlugin, error) {
 		installed = append(installed, *info)
 	}
 
+	// Apply project-level agent instructions and resources
+	if err := i.applyLocalResources(); err != nil {
+		return nil, err
+	}
+
 	// Save manifest and lock file
 	if err := i.manifest.Save(); err != nil {
 		return nil, errors.Wrap(err, "failed to save manifest")

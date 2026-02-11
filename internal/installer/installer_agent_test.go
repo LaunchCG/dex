@@ -432,3 +432,58 @@ func TestInstaller_ProjectAgentInstructions_NoInstructionsNoPlugins(t *testing.T
 	_, err = os.Stat(claudePath)
 	assert.True(t, os.IsNotExist(err), "CLAUDE.md should not exist when there are no instructions or plugins")
 }
+
+func TestInstall_SpecificPlugins_TracksProjectResources(t *testing.T) {
+	// Set up the project directory
+	projectDir := t.TempDir()
+
+	// Set up a local plugin
+	pluginDir := t.TempDir()
+	createTestPlugin(t, pluginDir, "my-plugin", "1.0.0", "Test plugin")
+
+	// Create project config with agent instructions AND a plugin
+	projectContent := `project {
+  name = "test-project"
+  agentic_platform = "claude-code"
+  agent_instructions = "# Project Rules\n\nAlways follow these rules."
+}
+
+plugin "my-plugin" {
+  source = "file:` + pluginDir + `"
+}
+`
+	err := os.WriteFile(filepath.Join(projectDir, "dex.hcl"), []byte(projectContent), 0644)
+	require.NoError(t, err)
+
+	// Install specific plugin (not bare install)
+	installer, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+
+	_, err = installer.Install([]PluginSpec{
+		{
+			Name:   "my-plugin",
+			Source: "file:" + pluginDir,
+		},
+	})
+	require.NoError(t, err)
+
+	// Assert __project__ appears in manifest with exact expected tracking
+	projectPlugin := installer.manifest.GetPlugin("__project__")
+	require.NotNil(t, projectPlugin, "__project__ should be tracked in manifest after Install(specs)")
+	assert.Equal(t, true, projectPlugin.HasAgentContent)
+	assert.Equal(t, []string{"CLAUDE.md"}, projectPlugin.MergedFiles)
+
+	// Assert the plugin is also tracked
+	myPlugin := installer.manifest.GetPlugin("my-plugin")
+	require.NotNil(t, myPlugin, "my-plugin should be tracked in manifest")
+	assert.Equal(t, true, myPlugin.HasAgentContent)
+	assert.Equal(t, []string{"CLAUDE.md"}, myPlugin.MergedFiles)
+
+	// Assert exact CLAUDE.md content
+	claudePath := filepath.Join(projectDir, "CLAUDE.md")
+	content, err := os.ReadFile(claudePath)
+	require.NoError(t, err)
+
+	expectedCLAUDE := "# Project Rules\n\nAlways follow these rules.\n\n<!-- dex:my-plugin -->\nFollow this rule from my-plugin\n<!-- /dex:my-plugin -->"
+	assert.Equal(t, expectedCLAUDE, string(content))
+}

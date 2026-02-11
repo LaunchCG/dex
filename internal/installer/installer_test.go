@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -1240,6 +1241,97 @@ func TestManifestTracking(t *testing.T) {
 	assert.Contains(t, plugin.Files, "test-dir/file.txt")
 	assert.Contains(t, plugin.Directories, "test-dir")
 	assert.True(t, plugin.HasAgentContent)
+}
+
+func TestExecutor_MultiplePlugins_AllTrackedInManifest(t *testing.T) {
+	tmpDir := t.TempDir()
+	m := newTestManifest(t, tmpDir)
+	executor := NewExecutor(tmpDir, m, false)
+
+	// Plugin A: agent + mcp + settings
+	planA := &adapter.Plan{
+		PluginName:       "plugin-a",
+		AgentFileContent: "Plugin A rules",
+		MCPEntries: map[string]any{
+			"mcpServers": map[string]any{
+				"server-a": map[string]any{"command": "cmd-a"},
+			},
+		},
+		SettingsEntries: map[string]any{
+			"allow": []any{"Bash(a:*)"},
+		},
+	}
+	err := executor.Execute(planA, nil)
+	require.NoError(t, err)
+
+	// Plugin B: agent + mcp + skill file
+	planB := &adapter.Plan{
+		PluginName:       "plugin-b",
+		AgentFileContent: "Plugin B rules",
+		MCPEntries: map[string]any{
+			"mcpServers": map[string]any{
+				"server-b": map[string]any{"command": "cmd-b"},
+			},
+		},
+		Directories: []adapter.DirectoryCreate{
+			{Path: ".claude/skills", Parents: true},
+		},
+		Files: []adapter.FileWrite{
+			{Path: ".claude/skills/b-skill.md", Content: "# B Skill"},
+		},
+	}
+	err = executor.Execute(planB, nil)
+	require.NoError(t, err)
+
+	// Plugin C: agent + settings
+	planC := &adapter.Plan{
+		PluginName:       "plugin-c",
+		AgentFileContent: "Plugin C rules",
+		SettingsEntries: map[string]any{
+			"allow": []any{"Bash(c:*)"},
+		},
+	}
+	err = executor.Execute(planC, nil)
+	require.NoError(t, err)
+
+	// Assert exact plugin names in manifest
+	pluginNames := m.GetPluginNames()
+	sort.Strings(pluginNames)
+	assert.Equal(t, []string{"plugin-a", "plugin-b", "plugin-c"}, pluginNames)
+
+	// Assert exact AllFiles output (sorted)
+	allFiles := m.AllFiles()
+	sort.Strings(allFiles)
+	expected := []string{
+		".claude/settings.json",
+		".claude/skills/b-skill.md",
+		".mcp.json",
+		"CLAUDE.md",
+	}
+	assert.Equal(t, expected, allFiles)
+
+	// Assert exact merged files per plugin
+	pluginA := m.GetPlugin("plugin-a")
+	require.NotNil(t, pluginA)
+	sortedA := make([]string, len(pluginA.MergedFiles))
+	copy(sortedA, pluginA.MergedFiles)
+	sort.Strings(sortedA)
+	assert.Equal(t, []string{".claude/settings.json", ".mcp.json", "CLAUDE.md"}, sortedA)
+
+	pluginB := m.GetPlugin("plugin-b")
+	require.NotNil(t, pluginB)
+	sortedB := make([]string, len(pluginB.MergedFiles))
+	copy(sortedB, pluginB.MergedFiles)
+	sort.Strings(sortedB)
+	assert.Equal(t, []string{".mcp.json", "CLAUDE.md"}, sortedB)
+	assert.Equal(t, []string{".claude/skills/b-skill.md"}, pluginB.Files)
+
+	pluginC := m.GetPlugin("plugin-c")
+	require.NotNil(t, pluginC)
+	sortedC := make([]string, len(pluginC.MergedFiles))
+	copy(sortedC, pluginC.MergedFiles)
+	sort.Strings(sortedC)
+	assert.Equal(t, []string{".claude/settings.json", "CLAUDE.md"}, sortedC)
 }
 
 func TestSettingsDeduplicationOnUninstall(t *testing.T) {

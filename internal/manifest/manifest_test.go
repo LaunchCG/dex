@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -230,6 +231,39 @@ func TestManifest_ProjectPlugin_MergedFiles(t *testing.T) {
 	plugin := m.GetPlugin("plugin1")
 	require.NotNil(t, plugin)
 	assert.Contains(t, plugin.MergedFiles, "CLAUDE.md")
+}
+
+func TestManifest_AllFiles_MultiplePlugins_ExactOutput(t *testing.T) {
+	tmpDir := t.TempDir()
+	m, err := Load(tmpDir)
+	require.NoError(t, err)
+
+	// Track 3 plugins with different merged files
+	m.Track("plugin-a", []string{".claude/skills/a-skill.md"}, nil)
+	m.TrackMergedFile("plugin-a", ".mcp.json")
+	m.TrackMergedFile("plugin-a", ".claude/settings.json")
+	m.TrackMergedFile("plugin-a", "CLAUDE.md")
+
+	m.Track("plugin-b", []string{".claude/skills/b-skill.md"}, nil)
+	m.TrackMergedFile("plugin-b", ".mcp.json")
+	m.TrackMergedFile("plugin-b", "CLAUDE.md")
+
+	m.Track("plugin-c", []string{".claude/skills/c-skill.md"}, nil)
+	m.TrackMergedFile("plugin-c", ".claude/settings.json")
+	m.TrackMergedFile("plugin-c", "CLAUDE.md")
+
+	allFiles := m.AllFiles()
+	sort.Strings(allFiles)
+
+	expected := []string{
+		".claude/settings.json",
+		".claude/skills/a-skill.md",
+		".claude/skills/b-skill.md",
+		".claude/skills/c-skill.md",
+		".mcp.json",
+		"CLAUDE.md",
+	}
+	assert.Equal(t, expected, allFiles)
 }
 
 func TestManifest_RemoveString_Helper(t *testing.T) {
