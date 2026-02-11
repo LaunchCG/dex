@@ -119,6 +119,7 @@ func (a *CopilotAdapter) MergeMCPConfig(existing map[string]any, pluginName stri
 
 // MergeCopilotMCPConfig merges Copilot MCP servers into .vscode/mcp.json format.
 // Format: {"servers": {"name": {"type": "...", "command": "...", "args": [...], "env": {...}}}}
+// When servers declare inputs, they are collected into a top-level "inputs" array.
 func (a *CopilotAdapter) MergeCopilotMCPConfig(existing map[string]any, pluginName string, servers []*resource.CopilotMCPServer) map[string]any {
 	if existing == nil {
 		existing = make(map[string]any)
@@ -129,6 +130,9 @@ func (a *CopilotAdapter) MergeCopilotMCPConfig(existing map[string]any, pluginNa
 	if !ok {
 		serversMap = make(map[string]any)
 	}
+
+	// Collect inputs from all servers
+	var newInputs []any
 
 	// Add each server
 	for _, server := range servers {
@@ -157,10 +161,67 @@ func (a *CopilotAdapter) MergeCopilotMCPConfig(existing map[string]any, pluginNa
 		}
 
 		serversMap[server.Name] = serverConfig
+
+		// Collect inputs
+		for _, input := range server.Inputs {
+			inputMap := map[string]any{
+				"id":          input.ID,
+				"type":        input.Type,
+				"description": input.Description,
+			}
+			if input.Default != "" {
+				inputMap["default"] = input.Default
+			}
+			if input.Password {
+				inputMap["password"] = input.Password
+			}
+			newInputs = append(newInputs, inputMap)
+		}
 	}
 
 	existing["servers"] = serversMap
+
+	// Add inputs to top-level config (only when inputs exist)
+	if len(newInputs) > 0 {
+		if existingInputs, ok := existing["inputs"].([]any); ok {
+			existing["inputs"] = deduplicateInputs(existingInputs, newInputs)
+		} else {
+			existing["inputs"] = newInputs
+		}
+	}
+
 	return existing
+}
+
+// deduplicateInputs merges two input arrays, deduplicating by "id" field.
+// When both arrays contain an input with the same "id", the overlay version wins.
+func deduplicateInputs(base, overlay []any) []any {
+	seen := make(map[string]int) // id -> index in result
+	result := make([]any, 0, len(base)+len(overlay))
+
+	for _, item := range base {
+		if m, ok := item.(map[string]any); ok {
+			if id, ok := m["id"].(string); ok {
+				seen[id] = len(result)
+			}
+		}
+		result = append(result, item)
+	}
+
+	for _, item := range overlay {
+		if m, ok := item.(map[string]any); ok {
+			if id, ok := m["id"].(string); ok {
+				if idx, exists := seen[id]; exists {
+					result[idx] = item // replace existing
+					continue
+				}
+				seen[id] = len(result)
+			}
+		}
+		result = append(result, item)
+	}
+
+	return result
 }
 
 // MergeSettingsConfig is not used for Copilot (no settings.json equivalent).

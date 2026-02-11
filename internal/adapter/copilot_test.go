@@ -805,6 +805,270 @@ func TestRegisteredAdapters_IncludesCopilot(t *testing.T) {
 	assert.Equal(t, []string{"claude-code", "cursor", "github-copilot"}, adapters)
 }
 
+func TestCopilotAdapter_PlanMCPServer_WithInputs(t *testing.T) {
+	adapter := &CopilotAdapter{}
+
+	server := &resource.CopilotMCPServer{
+		Name:    "ado",
+		Type:    "stdio",
+		Command: "npx",
+		Args:    []string{"-y", "@azure-devops/mcp", "${input:ado_org}"},
+		Inputs: []resource.MCPInput{
+			{
+				ID:          "ado_org",
+				Type:        "promptString",
+				Description: "Azure DevOps organization name",
+			},
+		},
+	}
+
+	pkg := &config.PackageConfig{
+		Package: config.PackageBlock{
+			Name:    "my-plugin",
+			Version: "1.0.0",
+		},
+	}
+
+	plan, err := adapter.PlanInstallation(server, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: false})
+	require.NoError(t, err)
+	require.NotNil(t, plan)
+
+	assert.Equal(t, filepath.Join(".vscode", "mcp.json"), plan.MCPPath)
+	assert.Equal(t, "servers", plan.MCPKey)
+
+	expectedMCPEntries := map[string]any{
+		"servers": map[string]any{
+			"ado": map[string]any{
+				"type":    "stdio",
+				"command": "npx",
+				"args":    []string{"-y", "@azure-devops/mcp", "${input:ado_org}"},
+			},
+		},
+		"inputs": []any{
+			map[string]any{
+				"id":          "ado_org",
+				"type":        "promptString",
+				"description": "Azure DevOps organization name",
+			},
+		},
+	}
+	assert.Equal(t, expectedMCPEntries, plan.MCPEntries)
+}
+
+func TestCopilotAdapter_PlanMCPServer_WithInputs_DefaultAndPassword(t *testing.T) {
+	adapter := &CopilotAdapter{}
+
+	server := &resource.CopilotMCPServer{
+		Name:    "db",
+		Type:    "stdio",
+		Command: "db-server",
+		Inputs: []resource.MCPInput{
+			{
+				ID:          "db_host",
+				Type:        "promptString",
+				Description: "Database host",
+				Default:     "localhost",
+			},
+			{
+				ID:          "db_password",
+				Type:        "promptString",
+				Description: "Database password",
+				Password:    true,
+			},
+		},
+	}
+
+	pkg := &config.PackageConfig{
+		Package: config.PackageBlock{
+			Name:    "my-plugin",
+			Version: "1.0.0",
+		},
+	}
+
+	plan, err := adapter.PlanInstallation(server, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: false})
+	require.NoError(t, err)
+
+	expectedMCPEntries := map[string]any{
+		"servers": map[string]any{
+			"db": map[string]any{
+				"type":    "stdio",
+				"command": "db-server",
+			},
+		},
+		"inputs": []any{
+			map[string]any{
+				"id":          "db_host",
+				"type":        "promptString",
+				"description": "Database host",
+				"default":     "localhost",
+			},
+			map[string]any{
+				"id":          "db_password",
+				"type":        "promptString",
+				"description": "Database password",
+				"password":    true,
+			},
+		},
+	}
+	assert.Equal(t, expectedMCPEntries, plan.MCPEntries)
+}
+
+func TestCopilotAdapter_MergeCopilotMCPConfig_WithInputs(t *testing.T) {
+	adapter := &CopilotAdapter{}
+
+	servers := []*resource.CopilotMCPServer{
+		{
+			Name:    "ado",
+			Type:    "stdio",
+			Command: "npx",
+			Args:    []string{"-y", "@azure-devops/mcp", "${input:ado_org}"},
+			Inputs: []resource.MCPInput{
+				{
+					ID:          "ado_org",
+					Type:        "promptString",
+					Description: "Azure DevOps organization name",
+				},
+			},
+		},
+	}
+
+	result := adapter.MergeCopilotMCPConfig(nil, "my-plugin", servers)
+
+	expected := map[string]any{
+		"servers": map[string]any{
+			"ado": map[string]any{
+				"type":    "stdio",
+				"command": "npx",
+				"args":    []string{"-y", "@azure-devops/mcp", "${input:ado_org}"},
+			},
+		},
+		"inputs": []any{
+			map[string]any{
+				"id":          "ado_org",
+				"type":        "promptString",
+				"description": "Azure DevOps organization name",
+			},
+		},
+	}
+	assert.Equal(t, expected, result)
+}
+
+func TestCopilotAdapter_MergeCopilotMCPConfig_DeduplicatesInputs(t *testing.T) {
+	adapter := &CopilotAdapter{}
+
+	existing := map[string]any{
+		"servers": map[string]any{},
+		"inputs": []any{
+			map[string]any{
+				"id":          "shared_token",
+				"type":        "promptString",
+				"description": "Old description",
+			},
+		},
+	}
+
+	servers := []*resource.CopilotMCPServer{
+		{
+			Name:    "server1",
+			Type:    "stdio",
+			Command: "cmd1",
+			Inputs: []resource.MCPInput{
+				{
+					ID:          "shared_token",
+					Type:        "promptString",
+					Description: "Updated description",
+				},
+				{
+					ID:          "new_input",
+					Type:        "promptString",
+					Description: "A new input",
+				},
+			},
+		},
+	}
+
+	result := adapter.MergeCopilotMCPConfig(existing, "my-plugin", servers)
+
+	expectedInputs := []any{
+		map[string]any{
+			"id":          "shared_token",
+			"type":        "promptString",
+			"description": "Updated description",
+		},
+		map[string]any{
+			"id":          "new_input",
+			"type":        "promptString",
+			"description": "A new input",
+		},
+	}
+	assert.Equal(t, expectedInputs, result["inputs"])
+}
+
+func TestCopilotAdapter_MergeCopilotMCPConfig_NoInputs(t *testing.T) {
+	adapter := &CopilotAdapter{}
+
+	servers := []*resource.CopilotMCPServer{
+		{
+			Name:    "server1",
+			Type:    "stdio",
+			Command: "cmd1",
+		},
+	}
+
+	result := adapter.MergeCopilotMCPConfig(nil, "my-plugin", servers)
+
+	// "inputs" key should not exist when no inputs are declared
+	_, hasInputs := result["inputs"]
+	assert.False(t, hasInputs, "inputs key should not be present when no inputs exist")
+}
+
+func TestMergePlans_WithCopilotInputs(t *testing.T) {
+	plan1 := &Plan{
+		PluginName: "plugin1",
+		MCPEntries: map[string]any{
+			"servers": map[string]any{
+				"server1": map[string]any{"type": "stdio", "command": "cmd1"},
+			},
+			"inputs": []any{
+				map[string]any{"id": "input1", "type": "promptString", "description": "Input 1"},
+			},
+		},
+		MCPPath:         ".vscode/mcp.json",
+		MCPKey:          "servers",
+		SettingsEntries: make(map[string]any),
+	}
+
+	plan2 := &Plan{
+		PluginName: "plugin1",
+		MCPEntries: map[string]any{
+			"servers": map[string]any{
+				"server2": map[string]any{"type": "stdio", "command": "cmd2"},
+			},
+			"inputs": []any{
+				map[string]any{"id": "input1", "type": "promptString", "description": "Updated Input 1"},
+				map[string]any{"id": "input2", "type": "promptString", "description": "Input 2"},
+			},
+		},
+		MCPPath:         ".vscode/mcp.json",
+		MCPKey:          "servers",
+		SettingsEntries: make(map[string]any),
+	}
+
+	merged := MergePlans(plan1, plan2)
+
+	// Servers should be merged
+	servers := merged.MCPEntries["servers"].(map[string]any)
+	assert.Contains(t, servers, "server1")
+	assert.Contains(t, servers, "server2")
+
+	// Inputs should be merged with deduplication (plan2's "input1" replaces plan1's)
+	inputs := merged.MCPEntries["inputs"].([]any)
+	assert.Len(t, inputs, 2)
+	assert.Equal(t, "input1", inputs[0].(map[string]any)["id"])
+	assert.Equal(t, "Updated Input 1", inputs[0].(map[string]any)["description"])
+	assert.Equal(t, "input2", inputs[1].(map[string]any)["id"])
+}
+
 func TestMergePlans_WithCopilotPaths(t *testing.T) {
 	plan1 := &Plan{
 		PluginName: "plugin1",

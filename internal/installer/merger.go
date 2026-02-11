@@ -93,6 +93,7 @@ func MergeMCPServers(base, overlay map[string]any) map[string]any {
 // MergeMCPServersWithKey merges MCP server configurations using a custom key.
 // The format is: {key: {"name": {...}}} where key is "mcpServers" (Claude) or "servers" (Copilot).
 // Servers from overlay replace servers with the same name in base.
+// Non-server keys (e.g., "inputs") are also merged: arrays are deduplicated by "id" field.
 func MergeMCPServersWithKey(base, overlay map[string]any, key string) map[string]any {
 	if base == nil {
 		base = make(map[string]any)
@@ -108,8 +109,8 @@ func MergeMCPServersWithKey(base, overlay map[string]any, key string) map[string
 	}
 
 	// Get the servers map from overlay
-	overlayServers, ok := overlay[key].(map[string]any)
-	if !ok {
+	overlayServers, hasKey := overlay[key].(map[string]any)
+	if !hasKey {
 		// Check if overlay itself contains server configs directly
 		overlayServers = overlay
 	}
@@ -129,7 +130,57 @@ func MergeMCPServersWithKey(base, overlay map[string]any, key string) map[string
 	}
 
 	base[key] = baseServers
+
+	// Handle non-server keys (e.g., "inputs") when overlay has the proper structure
+	if hasKey {
+		for k, v := range overlay {
+			if k == key {
+				continue
+			}
+			if overlayArr, ok := v.([]any); ok {
+				if baseArr, ok := base[k].([]any); ok {
+					base[k] = mergeInputArrays(baseArr, overlayArr)
+				} else {
+					base[k] = overlayArr
+				}
+			} else {
+				base[k] = v
+			}
+		}
+	}
+
 	return base
+}
+
+// mergeInputArrays merges two arrays of objects, deduplicating by "id" field.
+// When both arrays contain an object with the same "id", the overlay version wins.
+func mergeInputArrays(base, overlay []any) []any {
+	seen := make(map[string]int) // id -> index in result
+	result := make([]any, 0, len(base)+len(overlay))
+
+	for _, item := range base {
+		if m, ok := item.(map[string]any); ok {
+			if id, ok := m["id"].(string); ok {
+				seen[id] = len(result)
+			}
+		}
+		result = append(result, item)
+	}
+
+	for _, item := range overlay {
+		if m, ok := item.(map[string]any); ok {
+			if id, ok := m["id"].(string); ok {
+				if idx, exists := seen[id]; exists {
+					result[idx] = item // replace existing
+					continue
+				}
+				seen[id] = len(result)
+			}
+		}
+		result = append(result, item)
+	}
+
+	return result
 }
 
 // RemoveMCPServers removes specified servers from the MCP config.

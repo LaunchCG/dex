@@ -32,6 +32,25 @@ type MCPServer struct {
 	Platforms []string `hcl:"platforms,optional"`
 }
 
+// MCPInput represents a VS Code/Copilot input prompt for dynamic configuration.
+// Inputs are referenced via ${input:id} in server args/env values.
+type MCPInput struct {
+	// ID is the label identifier for this input (used as ${input:ID})
+	ID string `hcl:"id,label"`
+
+	// Type is the input type (e.g., "promptString")
+	Type string `hcl:"type,attr"`
+
+	// Description explains what value is being requested
+	Description string `hcl:"description,attr"`
+
+	// Default is an optional default value
+	Default string `hcl:"default,optional"`
+
+	// Password controls whether input should be masked
+	Password bool `hcl:"password,optional"`
+}
+
 // MCPServerPlatformOverride allows platform-specific customization of MCP server configuration.
 type MCPServerPlatformOverride struct {
 	Command  string            `hcl:"command,optional"`
@@ -41,6 +60,7 @@ type MCPServerPlatformOverride struct {
 	EnvFile  string            `hcl:"env_file,optional"`
 	Headers  map[string]string `hcl:"headers,optional"`
 	Disabled bool              `hcl:"disabled,optional"`
+	Inputs   []MCPInput        `hcl:"input,block"`
 }
 
 // ResourceType returns the HCL block type for unified MCP servers.

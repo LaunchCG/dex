@@ -458,6 +458,163 @@ plugin "multi-mcp" {
 	}, mcpConfig)
 }
 
+func TestInstaller_MCPServer_Copilot_WithInputs(t *testing.T) {
+	// Set up the project directory
+	projectDir := t.TempDir()
+
+	// Set up a local plugin with a copilot_mcp_server that has inputs
+	pluginDir := t.TempDir()
+	pluginContent := `package {
+  name = "ado-plugin"
+  version = "1.0.0"
+  description = "Plugin with MCP server inputs"
+}
+
+copilot_mcp_server "ado" {
+  type    = "stdio"
+  command = "npx"
+  args    = ["-y", "@azure-devops/mcp", "$${input:ado_org}"]
+
+  input "ado_org" {
+    type        = "promptString"
+    description = "Azure DevOps organization name"
+  }
+}
+`
+	err := os.WriteFile(filepath.Join(pluginDir, "package.hcl"), []byte(pluginContent), 0644)
+	require.NoError(t, err)
+
+	// Create project config for GitHub Copilot
+	projectContent := `project {
+  name = "test-project"
+  agentic_platform = "github-copilot"
+}
+
+plugin "ado-plugin" {
+  source = "file:` + pluginDir + `"
+}
+`
+	err = os.WriteFile(filepath.Join(projectDir, "dex.hcl"), []byte(projectContent), 0644)
+	require.NoError(t, err)
+
+	// Create installer
+	installer, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+
+	// Install
+	err = installer.InstallAll()
+	require.NoError(t, err)
+
+	// Verify .vscode/mcp.json was created
+	mcpPath := filepath.Join(projectDir, ".vscode", "mcp.json")
+	require.FileExists(t, mcpPath)
+
+	// Read and parse MCP config
+	mcpData, err := os.ReadFile(mcpPath)
+	require.NoError(t, err)
+
+	var mcpConfig map[string]any
+	err = json.Unmarshal(mcpData, &mcpConfig)
+	require.NoError(t, err)
+
+	// Verify full MCP config with inputs
+	assert.Equal(t, map[string]any{
+		"inputs": []any{
+			map[string]any{
+				"id":          "ado_org",
+				"type":        "promptString",
+				"description": "Azure DevOps organization name",
+			},
+		},
+		"servers": map[string]any{
+			"ado": map[string]any{
+				"type":    "stdio",
+				"command": "npx",
+				"args":    []any{"-y", "@azure-devops/mcp", "${input:ado_org}"},
+			},
+		},
+	}, mcpConfig)
+}
+
+func TestInstaller_MCPServer_Universal_WithCopilotInputOverride(t *testing.T) {
+	// Set up the project directory
+	projectDir := t.TempDir()
+
+	// Set up a local plugin with a universal mcp_server + copilot input override
+	pluginDir := t.TempDir()
+	pluginContent := `package {
+  name = "ado-plugin"
+  version = "1.0.0"
+  description = "Plugin with universal MCP server and copilot input override"
+}
+
+mcp_server "ado" {
+  command = "npx"
+  args    = ["-y", "@azure-devops/mcp", "$${input:ado_org}"]
+
+  copilot {
+    input "ado_org" {
+      type        = "promptString"
+      description = "Azure DevOps organization name"
+    }
+  }
+}
+`
+	err := os.WriteFile(filepath.Join(pluginDir, "package.hcl"), []byte(pluginContent), 0644)
+	require.NoError(t, err)
+
+	// Create project config for GitHub Copilot
+	projectContent := `project {
+  name = "test-project"
+  agentic_platform = "github-copilot"
+}
+
+plugin "ado-plugin" {
+  source = "file:` + pluginDir + `"
+}
+`
+	err = os.WriteFile(filepath.Join(projectDir, "dex.hcl"), []byte(projectContent), 0644)
+	require.NoError(t, err)
+
+	// Create installer
+	installer, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+
+	// Install
+	err = installer.InstallAll()
+	require.NoError(t, err)
+
+	// Verify .vscode/mcp.json was created
+	mcpPath := filepath.Join(projectDir, ".vscode", "mcp.json")
+	require.FileExists(t, mcpPath)
+
+	// Read and parse MCP config
+	mcpData, err := os.ReadFile(mcpPath)
+	require.NoError(t, err)
+
+	var mcpConfig map[string]any
+	err = json.Unmarshal(mcpData, &mcpConfig)
+	require.NoError(t, err)
+
+	// Verify full MCP config with inputs from copilot override
+	assert.Equal(t, map[string]any{
+		"inputs": []any{
+			map[string]any{
+				"id":          "ado_org",
+				"type":        "promptString",
+				"description": "Azure DevOps organization name",
+			},
+		},
+		"servers": map[string]any{
+			"ado": map[string]any{
+				"type":    "stdio",
+				"command": "npx",
+				"args":    []any{"-y", "@azure-devops/mcp", "${input:ado_org}"},
+			},
+		},
+	}, mcpConfig)
+}
+
 func TestInstaller_MCPServer_Uninstall(t *testing.T) {
 	// Set up the project directory
 	projectDir := t.TempDir()

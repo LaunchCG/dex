@@ -99,6 +99,10 @@ type CopilotMCPServer struct {
 
 	// Headers contains HTTP headers for http/sse type servers
 	Headers map[string]string `hcl:"headers,optional"`
+
+	// Inputs defines VS Code input prompts for dynamic configuration.
+	// Referenced via ${input:id} in server args/env values.
+	Inputs []MCPInput `hcl:"input,block"`
 }
 
 // ResourceType returns the HCL block type for Copilot MCP servers.

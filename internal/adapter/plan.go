@@ -169,26 +169,64 @@ func (p *Plan) FilePaths() []string {
 	return paths
 }
 
-// mergeMCPEntries deep merges MCP entries, properly combining mcpServers maps.
+// mergeMCPEntries deep merges MCP entries, properly combining server maps and input arrays.
+// Maps (e.g., "mcpServers", "servers") are deep-merged by key.
+// Arrays (e.g., "inputs") are merged with deduplication by "id" field.
 func mergeMCPEntries(dst, src map[string]any) {
 	for k, v := range src {
-		if k == "mcpServers" {
-			// Deep merge the mcpServers map
-			srcServers, srcOK := v.(map[string]any)
-			dstServers, dstOK := dst[k].(map[string]any)
-			if srcOK {
-				if !dstOK {
-					dstServers = make(map[string]any)
-				}
-				for name, config := range srcServers {
-					dstServers[name] = config
-				}
-				dst[k] = dstServers
+		switch srcVal := v.(type) {
+		case map[string]any:
+			// Deep merge any map value (handles "mcpServers", "servers", etc.)
+			dstMap, dstOK := dst[k].(map[string]any)
+			if !dstOK {
+				dstMap = make(map[string]any)
 			}
-		} else {
+			for name, config := range srcVal {
+				dstMap[name] = config
+			}
+			dst[k] = dstMap
+		case []any:
+			// Merge arrays with deduplication by "id" field (handles "inputs")
+			if dstArr, ok := dst[k].([]any); ok {
+				dst[k] = deduplicateInputArrays(dstArr, srcVal)
+			} else {
+				dst[k] = srcVal
+			}
+		default:
 			dst[k] = v
 		}
 	}
+}
+
+// deduplicateInputArrays merges two arrays of objects, deduplicating by "id" field.
+// When both arrays contain an object with the same "id", the overlay version wins.
+func deduplicateInputArrays(base, overlay []any) []any {
+	seen := make(map[string]int) // id -> index in result
+	result := make([]any, 0, len(base)+len(overlay))
+
+	for _, item := range base {
+		if m, ok := item.(map[string]any); ok {
+			if id, ok := m["id"].(string); ok {
+				seen[id] = len(result)
+			}
+		}
+		result = append(result, item)
+	}
+
+	for _, item := range overlay {
+		if m, ok := item.(map[string]any); ok {
+			if id, ok := m["id"].(string); ok {
+				if idx, exists := seen[id]; exists {
+					result[idx] = item // replace existing
+					continue
+				}
+				seen[id] = len(result)
+			}
+		}
+		result = append(result, item)
+	}
+
+	return result
 }
 
 // mergeSettingsEntries deep merges settings entries, appending arrays.

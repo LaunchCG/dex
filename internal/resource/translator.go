@@ -176,4 +176,7 @@ func applyCopilotOverride(server *CopilotMCPServer, override *MCPServerPlatformO
 	if len(override.Headers) > 0 {
 		server.Headers = override.Headers
 	}
+	if len(override.Inputs) > 0 {
+		server.Inputs = override.Inputs
+	}
 }
