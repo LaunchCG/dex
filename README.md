@@ -17,17 +17,38 @@ Dex is a universal package manager for AI coding agents. It provides a standardi
 
 ## Installation
 
-Build from source using Go:
+### Quick Install (Latest: v0.1.0)
+
+**macOS / Linux:**
 
 ```bash
-# Clone the repository
+curl -fsSL https://dexartifactsproduction.z13.web.core.windows.net/install.sh | bash
+```
+
+**Windows (PowerShell):**
+
+```powershell
+irm https://dexartifactsproduction.z13.web.core.windows.net/install.ps1 | iex
+```
+
+**Install a specific version:**
+
+```bash
+# macOS / Linux
+curl -fsSL https://dexartifactsproduction.z13.web.core.windows.net/install.sh | bash -s -- --version 0.1.0
+
+# Windows (PowerShell)
+& ([scriptblock]::Create((irm https://dexartifactsproduction.z13.web.core.windows.net/install.ps1))) -Version 0.1.0
+```
+
+The binary installs to `~/.bin/dex`. Make sure `~/.bin` is in your `PATH`.
+
+### Build from Source
+
+```bash
 git clone https://github.com/launchcg/dex.git
 cd dex
-
-# Build the binary
 make build
-
-# (Optional) Install to GOPATH/bin
 make install
 ```
 

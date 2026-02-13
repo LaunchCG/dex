@@ -22,3 +22,6 @@ __marimo__/
 
 bin/
 tmp/
+build/
+infrastructure/config.sh
+infrastructure/parameters.json
