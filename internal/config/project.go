@@ -344,3 +344,51 @@ func AddPlugin(dir string, name string, source string, version string) error {
 
 	return nil
 }
+
+// AddRegistry adds a registry block to the dex.hcl file.
+// It appends the registry block to the end of the file.
+// Exactly one of url or path must be provided.
+func AddRegistry(dir string, name string, url string, path string) error {
+	// Validate exactly one of url or path is provided
+	if url == "" && path == "" {
+		return fmt.Errorf("exactly one of --url or --local must be provided")
+	}
+	if url != "" && path != "" {
+		return fmt.Errorf("cannot specify both --url and --local")
+	}
+
+	filename := filepath.Join(dir, "dex.hcl")
+
+	// Read existing content
+	content, err := os.ReadFile(filename)
+	if err != nil {
+		return fmt.Errorf("failed to read %s: %w", filename, err)
+	}
+
+	// Check if registry already exists
+	existingConfig, err := LoadProject(dir)
+	if err == nil {
+		for _, r := range existingConfig.Registries {
+			if r.Name == name {
+				// Registry already exists, skip
+				return nil
+			}
+		}
+	}
+
+	// Build the registry block
+	var registryBlock string
+	if url != "" {
+		registryBlock = fmt.Sprintf("\nregistry %q {\n  url = %q\n}\n", name, url)
+	} else {
+		registryBlock = fmt.Sprintf("\nregistry %q {\n  path = %q\n}\n", name, path)
+	}
+
+	// Append to file
+	newContent := string(content) + registryBlock
+	if err := os.WriteFile(filename, []byte(newContent), 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %w", filename, err)
+	}
+
+	return nil
+}

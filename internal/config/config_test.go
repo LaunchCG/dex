@@ -1227,6 +1227,124 @@ claude_mcp_server "test-server" {
 	assert.Equal(t, []string{"--arg", "default-arg"}, config.MCPServers[0].Args)
 }
 
+func TestAddRegistry_WithURL(t *testing.T) {
+	tmpDir := t.TempDir()
+	initialContent := `project {
+  name             = "test-project"
+  agentic_platform = "claude-code"
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(initialContent), 0644)
+	require.NoError(t, err)
+
+	err = AddRegistry(tmpDir, "my-registry", "https://example.com/registry", "")
+	require.NoError(t, err)
+
+	// Read back and assert exact content
+	content, err := os.ReadFile(filepath.Join(tmpDir, "dex.hcl"))
+	require.NoError(t, err)
+	expected := `project {
+  name             = "test-project"
+  agentic_platform = "claude-code"
+}
+
+registry "my-registry" {
+  url = "https://example.com/registry"
+}
+`
+	assert.Equal(t, expected, string(content))
+}
+
+func TestAddRegistry_WithPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	initialContent := `project {
+  name             = "test-project"
+  agentic_platform = "claude-code"
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(initialContent), 0644)
+	require.NoError(t, err)
+
+	err = AddRegistry(tmpDir, "local-registry", "", "/path/to/local/registry")
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(filepath.Join(tmpDir, "dex.hcl"))
+	require.NoError(t, err)
+	expected := `project {
+  name             = "test-project"
+  agentic_platform = "claude-code"
+}
+
+registry "local-registry" {
+  path = "/path/to/local/registry"
+}
+`
+	assert.Equal(t, expected, string(content))
+}
+
+func TestAddRegistry_DuplicateSkipped(t *testing.T) {
+	tmpDir := t.TempDir()
+	initialContent := `project {
+  name             = "test-project"
+  agentic_platform = "claude-code"
+}
+
+registry "existing" {
+  url = "https://example.com/registry"
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(initialContent), 0644)
+	require.NoError(t, err)
+
+	err = AddRegistry(tmpDir, "existing", "https://other.com/registry", "")
+	require.NoError(t, err)
+
+	// File should be unchanged
+	content, err := os.ReadFile(filepath.Join(tmpDir, "dex.hcl"))
+	require.NoError(t, err)
+	assert.Equal(t, initialContent, string(content))
+}
+
+func TestAddRegistry_ErrorBothURLAndPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	initialContent := `project {
+  name             = "test-project"
+  agentic_platform = "claude-code"
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(initialContent), 0644)
+	require.NoError(t, err)
+
+	err = AddRegistry(tmpDir, "bad-registry", "https://example.com", "/local/path")
+	require.Error(t, err)
+	assert.EqualError(t, err, "cannot specify both --url and --local")
+}
+
+func TestAddRegistry_ErrorNeitherURLNorPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	initialContent := `project {
+  name             = "test-project"
+  agentic_platform = "claude-code"
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(initialContent), 0644)
+	require.NoError(t, err)
+
+	err = AddRegistry(tmpDir, "bad-registry", "", "")
+	require.Error(t, err)
+	assert.EqualError(t, err, "exactly one of --url or --local must be provided")
+}
+
+func TestAddRegistry_ErrorNoDexHCL(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Don't create dex.hcl
+
+	err := AddRegistry(tmpDir, "my-registry", "https://example.com", "")
+	require.Error(t, err)
+	expectedPrefix := fmt.Sprintf("failed to read %s:", filepath.Join(tmpDir, "dex.hcl"))
+	assert.Equal(t, expectedPrefix, err.Error()[:len(expectedPrefix)])
+}
+
 func TestLoadProject_ResourcesWithEnvVarInterpolation(t *testing.T) {
 	// Set env var
 	os.Setenv("TEST_RESOURCE_VAR", "env-value")
