@@ -47,6 +47,21 @@ tasks:
     command: "make install-user"
     type: oneshot
 
+  build-all:
+    description: "Cross-compile for all platforms"
+    command: "./scripts/build-all.sh"
+    type: oneshot
+
+  deploy:
+    description: "Build and deploy artifacts to Azure"
+    command: "./deploy.sh"
+    type: oneshot
+
+  deploy-infra:
+    description: "Deploy Azure infrastructure"
+    command: "./deploy.sh --infra"
+    type: oneshot
+
 # Task groups organize related tasks
 task_groups:
   ci:
