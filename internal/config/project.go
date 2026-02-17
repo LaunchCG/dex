@@ -289,10 +289,7 @@ func (p *ProjectConfig) Validate() error {
 		}
 		pluginNames[plugin.Name] = true
 
-		// Must have either source or registry
-		if plugin.Source == "" && plugin.Registry == "" {
-			return fmt.Errorf("plugin %q must have either source or registry", plugin.Name)
-		}
+		// Cannot have both source and registry
 		if plugin.Source != "" && plugin.Registry != "" {
 			return fmt.Errorf("plugin %q cannot have both source and registry", plugin.Name)
 		}
@@ -306,9 +303,20 @@ func (p *ProjectConfig) Validate() error {
 	return nil
 }
 
-// AddPlugin adds a plugin block to the dex.hcl file.
+// AddPlugin adds a plugin block with a source to the dex.hcl file.
 // It appends the plugin block to the end of the file.
 func AddPlugin(dir string, name string, source string, version string) error {
+	return AddPluginToConfig(dir, name, source, "", version)
+}
+
+// AddPluginToConfig adds a plugin block to the dex.hcl file.
+// Supports both source-based and registry-based plugins.
+// Exactly one of source or registryName must be non-empty.
+func AddPluginToConfig(dir, name, source, registryName, version string) error {
+	if source == "" && registryName == "" {
+		return fmt.Errorf("either source or registry must be specified for plugin %q", name)
+	}
+
 	filename := filepath.Join(dir, "dex.hcl")
 
 	// Read existing content
@@ -330,10 +338,18 @@ func AddPlugin(dir string, name string, source string, version string) error {
 
 	// Build the plugin block
 	var pluginBlock string
-	if version != "" {
-		pluginBlock = fmt.Sprintf("\nplugin %q {\n  source  = %q\n  version = %q\n}\n", name, source, version)
+	if source != "" {
+		if version != "" {
+			pluginBlock = fmt.Sprintf("\nplugin %q {\n  source  = %q\n  version = %q\n}\n", name, source, version)
+		} else {
+			pluginBlock = fmt.Sprintf("\nplugin %q {\n  source = %q\n}\n", name, source)
+		}
 	} else {
-		pluginBlock = fmt.Sprintf("\nplugin %q {\n  source = %q\n}\n", name, source)
+		if version != "" {
+			pluginBlock = fmt.Sprintf("\nplugin %q {\n  registry = %q\n  version  = %q\n}\n", name, registryName, version)
+		} else {
+			pluginBlock = fmt.Sprintf("\nplugin %q {\n  registry = %q\n}\n", name, registryName)
+		}
 	}
 
 	// Append to file

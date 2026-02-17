@@ -11,6 +11,7 @@ package installer
 
 import (
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -67,6 +68,9 @@ type InstalledPlugin struct {
 
 	// Source is the source URL used
 	Source string
+
+	// Registry is the registry name used (for registry-based installs)
+	Registry string
 }
 
 // NewInstaller creates a new installer for the given project root.
@@ -278,7 +282,7 @@ func (i *Installer) applyLocalResources() error {
 // installPlugin installs a single plugin.
 func (i *Installer) installPlugin(spec PluginSpec) (*InstalledPlugin, error) {
 	// Resolve the registry to use
-	reg, err := i.resolveRegistry(spec)
+	reg, err := i.resolveRegistry(&spec)
 	if err != nil {
 		return nil, errors.NewInstallError(spec.Name, "resolve", err)
 	}
@@ -405,9 +409,10 @@ func (i *Installer) installPlugin(spec PluginSpec) (*InstalledPlugin, error) {
 
 	// Return installed plugin info
 	return &InstalledPlugin{
-		Name:    pluginName,
-		Version: resolved.Version,
-		Source:  spec.Source,
+		Name:     pluginName,
+		Version:  resolved.Version,
+		Source:   spec.Source,
+		Registry: spec.Registry,
 	}, nil
 }
 
@@ -573,7 +578,7 @@ func (i *Installer) installProjectAgentInstructions() error {
 }
 
 // resolveRegistry determines which registry to use for fetching a plugin.
-func (i *Installer) resolveRegistry(spec PluginSpec) (registry.Registry, error) {
+func (i *Installer) resolveRegistry(spec *PluginSpec) (registry.Registry, error) {
 	// If direct source is specified, use it
 	if spec.Source != "" {
 		return registry.NewRegistry(spec.Source, registry.ModePackage)
@@ -602,15 +607,76 @@ func (i *Installer) resolveRegistry(spec PluginSpec) (registry.Registry, error) 
 			}
 			if plugin.Registry != "" {
 				// Recursively resolve with registry name
-				return i.resolveRegistry(PluginSpec{
-					Name:     spec.Name,
-					Registry: plugin.Registry,
-				})
+				spec.Registry = plugin.Registry
+				return i.resolveRegistry(spec)
 			}
 		}
 	}
 
+	// Auto-search configured registries
+	if spec.Name != "" && len(i.project.Registries) > 0 {
+		registryName, reg, err := i.searchRegistries(spec.Name)
+		if err != nil {
+			return nil, err
+		}
+		spec.Registry = registryName
+		return reg, nil
+	}
+
 	return nil, fmt.Errorf("no source or registry specified for plugin %q", spec.Name)
+}
+
+// searchRegistries searches all configured registries for a plugin by name.
+// Returns the registry name and registry instance if found in exactly one registry.
+// Returns an error if found in multiple registries (ambiguous) or not found in any.
+func (i *Installer) searchRegistries(pluginName string) (string, registry.Registry, error) {
+	type found struct {
+		name string
+		reg  registry.Registry
+	}
+
+	var matches []found
+
+	for _, regConfig := range i.project.Registries {
+		var regSource string
+		if regConfig.Path != "" {
+			regSource = "file:" + regConfig.Path
+		} else if regConfig.URL != "" {
+			regSource = regConfig.URL
+		} else {
+			continue
+		}
+
+		reg, err := registry.NewRegistry(regSource, registry.ModeRegistry)
+		if err != nil {
+			continue
+		}
+
+		_, err = reg.GetPackageInfo(pluginName)
+		if err != nil {
+			var notFound *errors.NotFoundError
+			if stderrors.As(err, &notFound) {
+				continue
+			}
+			// Real error (network, permission, etc.) - skip this registry
+			continue
+		}
+
+		matches = append(matches, found{name: regConfig.Name, reg: reg})
+	}
+
+	switch len(matches) {
+	case 0:
+		return "", nil, fmt.Errorf("plugin %q not found in any configured registry", pluginName)
+	case 1:
+		return matches[0].name, matches[0].reg, nil
+	default:
+		var names []string
+		for _, m := range matches {
+			names = append(names, m.name)
+		}
+		return "", nil, fmt.Errorf("plugin %q found in multiple registries: %s (use --registry to specify which one)", pluginName, strings.Join(names, ", "))
+	}
 }
 
 // resolveVariables resolves variable values from environment and config.
@@ -960,7 +1026,7 @@ func (i *Installer) updatePlugin(name string, dryRun bool) (*UpdateResult, error
 	}
 
 	// Resolve the registry
-	reg, err := i.resolveRegistry(spec)
+	reg, err := i.resolveRegistry(&spec)
 	if err != nil {
 		return nil, errors.NewInstallError(name, "resolve", err)
 	}

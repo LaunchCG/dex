@@ -204,20 +204,19 @@ func TestProjectConfig_Validate_RegistryBothPathAndURL(t *testing.T) {
 	assert.EqualError(t, err, `registry "both-registry" cannot have both path and url`)
 }
 
-func TestProjectConfig_Validate_PluginMissingSourceOrRegistry(t *testing.T) {
+func TestProjectConfig_Validate_PluginWithoutSourceOrRegistry(t *testing.T) {
 	config := &ProjectConfig{
 		Project: ProjectBlock{
 			Name:            "test-project",
 			AgenticPlatform: "claude-code",
 		},
 		Plugins: []PluginBlock{
-			{Name: "orphan-plugin"}, // Missing both source and registry
+			{Name: "auto-search-plugin"}, // No source or registry - will be resolved via auto-search at install time
 		},
 	}
 
 	err := config.Validate()
-	require.Error(t, err)
-	assert.EqualError(t, err, `plugin "orphan-plugin" must have either source or registry`)
+	require.NoError(t, err) // Plugins without source/registry are valid - dex will auto-search registries
 }
 
 func TestProjectConfig_Validate_PluginBothSourceAndRegistry(t *testing.T) {
@@ -1490,4 +1489,118 @@ dependency "extra" {
 	}
 	assert.True(t, depNames["core"])
 	assert.True(t, depNames["extra"])
+}
+
+func TestAddPluginToConfig_WithRegistry(t *testing.T) {
+	tmpDir := t.TempDir()
+	initialContent := `project {
+  name             = "test-project"
+  agentic_platform = "claude-code"
+}
+
+registry "my-registry" {
+  url = "https://example.com/registry"
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(initialContent), 0644)
+	require.NoError(t, err)
+
+	err = AddPluginToConfig(tmpDir, "my-plugin", "", "my-registry", "1.0.0")
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(filepath.Join(tmpDir, "dex.hcl"))
+	require.NoError(t, err)
+	expected := `project {
+  name             = "test-project"
+  agentic_platform = "claude-code"
+}
+
+registry "my-registry" {
+  url = "https://example.com/registry"
+}
+
+plugin "my-plugin" {
+  registry = "my-registry"
+  version  = "1.0.0"
+}
+`
+	assert.Equal(t, expected, string(content))
+}
+
+func TestAddPluginToConfig_WithRegistryNoVersion(t *testing.T) {
+	tmpDir := t.TempDir()
+	initialContent := `project {
+  name             = "test-project"
+  agentic_platform = "claude-code"
+}
+
+registry "my-registry" {
+  url = "https://example.com/registry"
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(initialContent), 0644)
+	require.NoError(t, err)
+
+	err = AddPluginToConfig(tmpDir, "my-plugin", "", "my-registry", "")
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(filepath.Join(tmpDir, "dex.hcl"))
+	require.NoError(t, err)
+	expected := `project {
+  name             = "test-project"
+  agentic_platform = "claude-code"
+}
+
+registry "my-registry" {
+  url = "https://example.com/registry"
+}
+
+plugin "my-plugin" {
+  registry = "my-registry"
+}
+`
+	assert.Equal(t, expected, string(content))
+}
+
+func TestAddPluginToConfig_WithSource(t *testing.T) {
+	tmpDir := t.TempDir()
+	initialContent := `project {
+  name             = "test-project"
+  agentic_platform = "claude-code"
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(initialContent), 0644)
+	require.NoError(t, err)
+
+	err = AddPluginToConfig(tmpDir, "my-plugin", "git+https://example.com/plugin.git", "", "2.0.0")
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(filepath.Join(tmpDir, "dex.hcl"))
+	require.NoError(t, err)
+	expected := `project {
+  name             = "test-project"
+  agentic_platform = "claude-code"
+}
+
+plugin "my-plugin" {
+  source  = "git+https://example.com/plugin.git"
+  version = "2.0.0"
+}
+`
+	assert.Equal(t, expected, string(content))
+}
+
+func TestAddPluginToConfig_ErrorNoSourceOrRegistry(t *testing.T) {
+	tmpDir := t.TempDir()
+	initialContent := `project {
+  name             = "test-project"
+  agentic_platform = "claude-code"
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(initialContent), 0644)
+	require.NoError(t, err)
+
+	err = AddPluginToConfig(tmpDir, "my-plugin", "", "", "1.0.0")
+	require.Error(t, err)
+	assert.EqualError(t, err, `either source or registry must be specified for plugin "my-plugin"`)
 }

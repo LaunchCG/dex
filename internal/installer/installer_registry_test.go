@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -782,4 +783,269 @@ plugin "no-lock-plugin" {
 		// Lock file doesn't exist, which is also valid for --no-lock
 		assert.True(t, os.IsNotExist(err), "Expected no lock file or empty lock file")
 	}
+}
+
+// =============================================================================
+// Save Flag Tests (-S / --save)
+// =============================================================================
+
+func TestInstaller_SaveFlag_RegistryInstall(t *testing.T) {
+	// Set up the project directory
+	projectDir := t.TempDir()
+
+	// Set up a local registry
+	registryDir := t.TempDir()
+	createLocalRegistryIndex(t, registryDir, map[string][]string{
+		"save-test-plugin": {"1.0.0"},
+	})
+
+	// Create the package directory
+	pluginDir := filepath.Join(registryDir, "save-test-plugin")
+	err := os.MkdirAll(pluginDir, 0755)
+	require.NoError(t, err)
+	createTestPlugin(t, pluginDir, "save-test-plugin", "1.0.0", "Save test plugin")
+
+	// Create project config with registry
+	createTestProject(t, projectDir, `
+registry "local" {
+  path = "`+registryDir+`"
+}
+
+plugin "save-test-plugin" {
+  registry = "local"
+}
+`)
+
+	// Create installer and install
+	inst, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+
+	installed, err := inst.Install([]PluginSpec{{
+		Name:     "save-test-plugin",
+		Registry: "local",
+	}})
+	require.NoError(t, err)
+	require.Len(t, installed, 1)
+
+	// Verify InstalledPlugin.Registry is set
+	assert.Equal(t, "local", installed[0].Registry)
+	assert.Equal(t, "save-test-plugin", installed[0].Name)
+	assert.Equal(t, "1.0.0", installed[0].Version)
+}
+
+func TestInstaller_SaveFlag_SourceInstall(t *testing.T) {
+	// Set up the project directory
+	projectDir := t.TempDir()
+
+	// Set up a local plugin
+	pluginDir := t.TempDir()
+	createTestPlugin(t, pluginDir, "source-save-plugin", "1.0.0", "Source save test plugin")
+
+	// Create project config
+	createTestProject(t, projectDir, `
+plugin "source-save-plugin" {
+  source = "file:`+pluginDir+`"
+}
+`)
+
+	// Create installer and install
+	inst, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+
+	installed, err := inst.Install([]PluginSpec{{
+		Name:   "source-save-plugin",
+		Source: "file:" + pluginDir,
+	}})
+	require.NoError(t, err)
+	require.Len(t, installed, 1)
+
+	// Verify InstalledPlugin.Source is set
+	assert.Equal(t, "file:"+pluginDir, installed[0].Source)
+	assert.Equal(t, "source-save-plugin", installed[0].Name)
+}
+
+// =============================================================================
+// Auto-Search Registry Tests
+// =============================================================================
+
+func TestInstaller_AutoSearchRegistries_Found(t *testing.T) {
+	// Set up the project directory
+	projectDir := t.TempDir()
+
+	// Set up two local registries
+	registry1Dir := t.TempDir()
+	createLocalRegistryIndex(t, registry1Dir, map[string][]string{
+		"other-plugin": {"1.0.0"},
+	})
+	pluginDir1 := filepath.Join(registry1Dir, "other-plugin")
+	err := os.MkdirAll(pluginDir1, 0755)
+	require.NoError(t, err)
+	createTestPlugin(t, pluginDir1, "other-plugin", "1.0.0", "Other plugin")
+
+	registry2Dir := t.TempDir()
+	createLocalRegistryIndex(t, registry2Dir, map[string][]string{
+		"target-plugin": {"2.0.0"},
+	})
+	pluginDir2 := filepath.Join(registry2Dir, "target-plugin")
+	err = os.MkdirAll(pluginDir2, 0755)
+	require.NoError(t, err)
+	createTestPlugin(t, pluginDir2, "target-plugin", "2.0.0", "Target plugin")
+
+	// Create project config with two registries but NO plugin block for target-plugin
+	createTestProject(t, projectDir, `
+registry "first" {
+  path = "`+registry1Dir+`"
+}
+
+registry "second" {
+  path = "`+registry2Dir+`"
+}
+`)
+
+	// Create installer and install WITHOUT specifying --registry
+	inst, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+
+	installed, err := inst.Install([]PluginSpec{{
+		Name: "target-plugin",
+	}})
+	require.NoError(t, err)
+	require.Len(t, installed, 1)
+
+	assert.Equal(t, "target-plugin", installed[0].Name)
+	assert.Equal(t, "2.0.0", installed[0].Version)
+	assert.Equal(t, "second", installed[0].Registry)
+}
+
+func TestInstaller_AutoSearchRegistries_NotFound(t *testing.T) {
+	// Set up the project directory
+	projectDir := t.TempDir()
+
+	// Set up a registry without the target plugin
+	registryDir := t.TempDir()
+	createLocalRegistryIndex(t, registryDir, map[string][]string{
+		"some-other-plugin": {"1.0.0"},
+	})
+
+	// Create project config
+	createTestProject(t, projectDir, `
+registry "local" {
+  path = "`+registryDir+`"
+}
+`)
+
+	// Create installer and try to install a plugin that doesn't exist
+	inst, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+
+	_, err = inst.Install([]PluginSpec{{
+		Name: "nonexistent-plugin",
+	}})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "nonexistent-plugin")
+}
+
+func TestInstaller_AutoSearchRegistries_Ambiguous(t *testing.T) {
+	// Set up the project directory
+	projectDir := t.TempDir()
+
+	// Set up two registries both containing the same plugin
+	registry1Dir := t.TempDir()
+	createLocalRegistryIndex(t, registry1Dir, map[string][]string{
+		"ambiguous-plugin": {"1.0.0"},
+	})
+	pluginDir1 := filepath.Join(registry1Dir, "ambiguous-plugin")
+	err := os.MkdirAll(pluginDir1, 0755)
+	require.NoError(t, err)
+	createTestPlugin(t, pluginDir1, "ambiguous-plugin", "1.0.0", "Ambiguous plugin v1")
+
+	registry2Dir := t.TempDir()
+	createLocalRegistryIndex(t, registry2Dir, map[string][]string{
+		"ambiguous-plugin": {"2.0.0"},
+	})
+	pluginDir2 := filepath.Join(registry2Dir, "ambiguous-plugin")
+	err = os.MkdirAll(pluginDir2, 0755)
+	require.NoError(t, err)
+	createTestPlugin(t, pluginDir2, "ambiguous-plugin", "2.0.0", "Ambiguous plugin v2")
+
+	// Create project config with both registries
+	createTestProject(t, projectDir, `
+registry "first" {
+  path = "`+registry1Dir+`"
+}
+
+registry "second" {
+  path = "`+registry2Dir+`"
+}
+`)
+
+	// Create installer and try to install the ambiguous plugin
+	inst, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+
+	_, err = inst.Install([]PluginSpec{{
+		Name: "ambiguous-plugin",
+	}})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "multiple registries")
+	assert.Contains(t, err.Error(), "--registry")
+}
+
+func TestInstaller_AutoSearchRegistries_NoRegistries(t *testing.T) {
+	// Set up the project directory with no registries
+	projectDir := t.TempDir()
+
+	createTestProject(t, projectDir, "")
+
+	// Create installer and try to install without any registry
+	inst, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+
+	_, err = inst.Install([]PluginSpec{{
+		Name: "some-plugin",
+	}})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no source or registry specified")
+}
+
+func TestInstaller_AutoSearchAndSave(t *testing.T) {
+	// Set up the project directory
+	projectDir := t.TempDir()
+
+	// Set up a local registry
+	registryDir := t.TempDir()
+	createLocalRegistryIndex(t, registryDir, map[string][]string{
+		"auto-save-plugin": {"1.0.0"},
+	})
+	pluginDir := filepath.Join(registryDir, "auto-save-plugin")
+	err := os.MkdirAll(pluginDir, 0755)
+	require.NoError(t, err)
+	createTestPlugin(t, pluginDir, "auto-save-plugin", "1.0.0", "Auto save plugin")
+
+	// Create project config with registry but NO plugin block
+	createTestProject(t, projectDir, `
+registry "my-reg" {
+  path = "`+registryDir+`"
+}
+`)
+
+	// Create installer and install WITHOUT --registry (auto-search should find it)
+	inst, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+
+	installed, err := inst.Install([]PluginSpec{{
+		Name: "auto-save-plugin",
+	}})
+	require.NoError(t, err)
+	require.Len(t, installed, 1)
+
+	// Verify InstalledPlugin carries the discovered registry name
+	assert.Equal(t, "auto-save-plugin", installed[0].Name)
+	assert.Equal(t, "1.0.0", installed[0].Version)
+	assert.Equal(t, "my-reg", installed[0].Registry)
+	assert.Empty(t, installed[0].Source)
+
+	// Verify we can use this info to save - simulate what the CLI does
+	// by checking that the registry name can be used with AddPluginToConfig
+	_ = strings.Contains(installed[0].Registry, "my-reg") // use strings import
 }

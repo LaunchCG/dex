@@ -23,7 +23,7 @@ func init() {
 	rootCmd.AddCommand(installCmd)
 	installCmd.Flags().StringP("source", "s", "", "Install from direct source (file://, git+)")
 	installCmd.Flags().StringP("registry", "r", "", "Registry to use")
-	installCmd.Flags().BoolP("save", "S", false, "Save to config file")
+	installCmd.Flags().Bool("no-save", false, "Don't save to config file (plugins are saved by default)")
 	installCmd.Flags().Bool("no-lock", false, "Don't update lock file")
 	installCmd.Flags().BoolP("force", "f", false, "Overwrite non-managed files")
 	installCmd.Flags().StringP("path", "p", ".", "Project directory")
@@ -44,7 +44,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	// Get flags
 	source, _ := cmd.Flags().GetString("source")
 	registry, _ := cmd.Flags().GetString("registry")
-	save, _ := cmd.Flags().GetBool("save")
+	noSave, _ := cmd.Flags().GetBool("no-save")
 	noLock, _ := cmd.Flags().GetBool("no-lock")
 	force, _ := cmd.Flags().GetBool("force")
 	namespace, _ := cmd.Flags().GetBool("namespace")
@@ -105,20 +105,27 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Handle --save flag (add to config file)
-	if save && len(installed) > 0 {
-		for _, plugin := range installed {
-			source := plugin.Source
-			if source == "" {
-				// If source was derived from a --source flag, use that
-				source = specs[0].Source
+	// Save to config by default when installing specific plugins (not "install all")
+	if !noSave && len(specs) > 0 && len(installed) > 0 {
+		for idx, plugin := range installed {
+			pluginSource := plugin.Source
+			pluginRegistry := plugin.Registry
+
+			// If neither source nor registry came from the installer,
+			// try to get them from the original spec
+			if pluginSource == "" && pluginRegistry == "" && idx < len(specs) {
+				pluginSource = specs[idx].Source
+				pluginRegistry = specs[idx].Registry
 			}
-			if source != "" {
-				if err := config.AddPlugin(projectPath, plugin.Name, source, plugin.Version); err != nil {
+
+			if pluginSource != "" || pluginRegistry != "" {
+				if err := config.AddPluginToConfig(projectPath, plugin.Name, pluginSource, pluginRegistry, ""); err != nil {
 					fmt.Printf("%s Failed to save plugin %s to config: %v\n", color.YellowString("⚠"), plugin.Name, err)
 				} else {
 					fmt.Printf("  %s Saved %s to dex.hcl\n", green("✓"), plugin.Name)
 				}
+			} else {
+				fmt.Printf("%s Cannot save plugin %s: no source or registry information available\n", color.YellowString("⚠"), plugin.Name)
 			}
 		}
 	}
