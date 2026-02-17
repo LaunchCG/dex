@@ -42,6 +42,29 @@ func runUpdateIgnore(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to resolve path: %w", err)
 	}
 
+	if printOnly {
+		return printIgnoreSection(absPath)
+	}
+
+	return updateIgnoreForProject(absPath)
+}
+
+// printIgnoreSection prints the dex gitignore section without modifying files.
+func printIgnoreSection(absPath string) error {
+	mf, err := manifest.Load(absPath)
+	if err != nil {
+		return fmt.Errorf("failed to load manifest: %w", err)
+	}
+
+	dexSection := buildDexIgnoreSection(mf.AllFiles())
+	fmt.Println(dexSection)
+	return nil
+}
+
+// updateIgnoreForProject updates the .gitignore in the given project directory
+// with dex-managed files. This is used by both the standalone update-ignore
+// command and the sync command.
+func updateIgnoreForProject(absPath string) error {
 	// Load manifest
 	mf, err := manifest.Load(absPath)
 	if err != nil {
@@ -52,6 +75,32 @@ func runUpdateIgnore(cmd *cobra.Command, args []string) error {
 	allFiles := mf.AllFiles()
 
 	// Build the dex section
+	dexSection := buildDexIgnoreSection(allFiles)
+
+	// Read existing .gitignore
+	gitignorePath := filepath.Join(absPath, ".gitignore")
+	existingContent := ""
+
+	if data, err := os.ReadFile(gitignorePath); err == nil {
+		existingContent = string(data)
+	}
+
+	// Update the dex section
+	newContent := updateDexSection(existingContent, dexSection)
+
+	// Write the updated .gitignore
+	if err := os.WriteFile(gitignorePath, []byte(newContent), 0644); err != nil {
+		return fmt.Errorf("failed to write .gitignore: %w", err)
+	}
+
+	green := color.New(color.FgGreen).SprintFunc()
+	fmt.Printf("%s Updated .gitignore with %d managed file(s)\n", green("✓"), len(allFiles)+2)
+
+	return nil
+}
+
+// buildDexIgnoreSection builds the dex-managed section content for .gitignore.
+func buildDexIgnoreSection(allFiles []string) string {
 	var dexSection strings.Builder
 	dexSection.WriteString(dexIgnoreStart)
 	dexSection.WriteString("\n")
@@ -67,32 +116,7 @@ func runUpdateIgnore(cmd *cobra.Command, args []string) error {
 
 	dexSection.WriteString(dexIgnoreEnd)
 	dexSection.WriteString("\n")
-
-	if printOnly {
-		fmt.Println(dexSection.String())
-		return nil
-	}
-
-	// Read existing .gitignore
-	gitignorePath := filepath.Join(absPath, ".gitignore")
-	existingContent := ""
-
-	if data, err := os.ReadFile(gitignorePath); err == nil {
-		existingContent = string(data)
-	}
-
-	// Update the dex section
-	newContent := updateDexSection(existingContent, dexSection.String())
-
-	// Write the updated .gitignore
-	if err := os.WriteFile(gitignorePath, []byte(newContent), 0644); err != nil {
-		return fmt.Errorf("failed to write .gitignore: %w", err)
-	}
-
-	green := color.New(color.FgGreen).SprintFunc()
-	fmt.Printf("%s Updated .gitignore with %d managed file(s)\n", green("✓"), len(allFiles)+2)
-
-	return nil
+	return dexSection.String()
 }
 
 // updateDexSection replaces or appends the dex section in gitignore content.

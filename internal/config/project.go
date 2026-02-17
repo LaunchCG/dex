@@ -75,6 +75,10 @@ type ProjectBlock struct {
 	// of agent files (CLAUDE.md, AGENTS.md, copilot-instructions.md) before any
 	// plugin-contributed content. This content is owned by the project, not plugins.
 	AgentInstructions string `hcl:"agent_instructions,optional"`
+
+	// UpdateGitignore controls whether dex sync automatically updates .gitignore
+	// with dex-managed files
+	UpdateGitignore bool `hcl:"update_gitignore,optional"`
 }
 
 // RegistryBlock defines a plugin registry source.
