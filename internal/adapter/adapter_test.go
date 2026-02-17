@@ -616,60 +616,6 @@ func TestClaudeAdapter_MergeSettingsConfig_Nil(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
-func TestClaudeAdapter_MergeAgentFile(t *testing.T) {
-	adapter := &ClaudeAdapter{}
-
-	existing := "# Existing Content\n\nSome existing content."
-	content := "New rule content"
-
-	result := adapter.MergeAgentFile(existing, "my-plugin", content)
-
-	expected := `# Existing Content
-
-Some existing content.
-
-<!-- dex:my-plugin -->
-New rule content
-<!-- /dex:my-plugin -->`
-	assert.Equal(t, expected, result)
-}
-
-func TestClaudeAdapter_MergeAgentFile_Update(t *testing.T) {
-	adapter := &ClaudeAdapter{}
-
-	existing := `# Existing Content
-
-<!-- dex:my-plugin -->
-Old content
-<!-- /dex:my-plugin -->
-
-Other content`
-
-	content := "Updated content"
-
-	result := adapter.MergeAgentFile(existing, "my-plugin", content)
-
-	expected := `# Existing Content
-
-<!-- dex:my-plugin -->
-Updated content
-<!-- /dex:my-plugin -->
-
-Other content`
-	assert.Equal(t, expected, result)
-}
-
-func TestClaudeAdapter_MergeAgentFile_Empty(t *testing.T) {
-	adapter := &ClaudeAdapter{}
-
-	result := adapter.MergeAgentFile("", "my-plugin", "New content")
-
-	expected := `<!-- dex:my-plugin -->
-New content
-<!-- /dex:my-plugin -->`
-	assert.Equal(t, expected, result)
-}
-
 func TestMergePlans(t *testing.T) {
 	plan1 := &Plan{
 		PluginName: "plugin1",

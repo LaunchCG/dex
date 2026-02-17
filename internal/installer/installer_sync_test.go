@@ -43,7 +43,7 @@ plugin "new-plugin" {
 	// Verify it was actually installed
 	claudeContent, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
 	require.NoError(t, err)
-	expected := "<!-- dex:new-plugin -->\nFollow this rule from new-plugin\n<!-- /dex:new-plugin -->"
+	expected := "Follow this rule from new-plugin"
 	assert.Equal(t, expected, string(claudeContent))
 
 	// Verify lock file
@@ -408,6 +408,127 @@ plugin "new-plugin" {
 	assert.NotContains(t, plugins, "orphan-plugin")
 	assert.Equal(t, "1.1.0", plugins["existing-plugin"].(map[string]any)["version"])
 	assert.Equal(t, "2.0.0", plugins["new-plugin"].(map[string]any)["version"])
+}
+
+func TestSync_AlwaysReinstallsUpToDatePlugins(t *testing.T) {
+	projectDir := t.TempDir()
+
+	// Set up a local plugin with an MCP server
+	pluginDir := t.TempDir()
+	pluginContent := `package {
+  name = "mcp-plugin"
+  version = "1.0.0"
+  description = "Plugin with MCP server"
+}
+
+mcp_server "test-server" {
+  description = "Test MCP server"
+  command = "npx"
+  args = ["-y", "test-server"]
+}
+
+claude_rule "mcp-plugin-rule" {
+  description = "Rule from mcp-plugin"
+  content = "Follow this rule from mcp-plugin"
+}
+`
+	err := os.WriteFile(filepath.Join(pluginDir, "package.hcl"), []byte(pluginContent), 0644)
+	require.NoError(t, err)
+
+	// Create project config
+	createTestProject(t, projectDir, `
+plugin "mcp-plugin" {
+  source = "file:`+pluginDir+`"
+}
+`)
+
+	// First install
+	inst1, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	err = inst1.InstallAll()
+	require.NoError(t, err)
+
+	// Verify .mcp.json was created
+	mcpPath := filepath.Join(projectDir, ".mcp.json")
+	require.FileExists(t, mcpPath)
+
+	mcpData, err := os.ReadFile(mcpPath)
+	require.NoError(t, err)
+	var mcpConfig map[string]any
+	err = json.Unmarshal(mcpData, &mcpConfig)
+	require.NoError(t, err)
+	servers := mcpConfig["mcpServers"].(map[string]any)
+	require.Contains(t, servers, "test-server")
+
+	// Delete .mcp.json to simulate user deletion or corruption
+	err = os.Remove(mcpPath)
+	require.NoError(t, err)
+
+	// Sync should reinstall the plugin and recreate .mcp.json
+	inst2, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+
+	results, err := inst2.Sync(false)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	// The plugin should be reinstalled, not just marked "up to date"
+	assert.Equal(t, "mcp-plugin", results[0].Name)
+
+	// Verify .mcp.json was recreated
+	require.FileExists(t, mcpPath, ".mcp.json should be recreated by sync")
+
+	mcpData, err = os.ReadFile(mcpPath)
+	require.NoError(t, err)
+	err = json.Unmarshal(mcpData, &mcpConfig)
+	require.NoError(t, err)
+	servers = mcpConfig["mcpServers"].(map[string]any)
+	assert.Contains(t, servers, "test-server", "MCP server should be present after sync recreates .mcp.json")
+}
+
+func TestSync_ReinstallsWhenRegularFilesDeleted(t *testing.T) {
+	projectDir := t.TempDir()
+
+	// Set up a local plugin
+	pluginDir := t.TempDir()
+	createTestPlugin(t, pluginDir, "file-plugin", "1.0.0", "Plugin with files")
+
+	// Create project config
+	createTestProject(t, projectDir, `
+plugin "file-plugin" {
+  source = "file:`+pluginDir+`"
+}
+`)
+
+	// First install
+	inst1, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	err = inst1.InstallAll()
+	require.NoError(t, err)
+
+	// Verify CLAUDE.md was created with plugin content
+	claudePath := filepath.Join(projectDir, "CLAUDE.md")
+	claudeContent, err := os.ReadFile(claudePath)
+	require.NoError(t, err)
+	assert.Contains(t, string(claudeContent), "Follow this rule from file-plugin")
+
+	// Delete CLAUDE.md
+	err = os.Remove(claudePath)
+	require.NoError(t, err)
+
+	// Sync should reinstall and recreate CLAUDE.md
+	inst2, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+
+	_, err = inst2.Sync(false)
+	require.NoError(t, err)
+
+	// Verify CLAUDE.md was recreated
+	require.FileExists(t, claudePath, "CLAUDE.md should be recreated by sync")
+	claudeContent, err = os.ReadFile(claudePath)
+	require.NoError(t, err)
+	assert.Contains(t, string(claudeContent), "Follow this rule from file-plugin",
+		"CLAUDE.md should contain plugin content after sync")
 }
 
 func TestSync_EmptyConfig(t *testing.T) {

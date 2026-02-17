@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
+
 	"strings"
 
 	"github.com/launchcg/dex/internal/config"
@@ -216,31 +216,6 @@ func (a *ClaudeAdapter) MergeSettingsConfig(existing map[string]any, settings *r
 	}
 
 	return existing
-}
-
-// MergeAgentFile merges rule content into CLAUDE.md with markers.
-// Format:
-// <!-- dex:{plugin-name} -->
-// {content}
-// <!-- /dex:{plugin-name} -->
-func (a *ClaudeAdapter) MergeAgentFile(existing, pluginName, content string) string {
-	startMarker := fmt.Sprintf("<!-- dex:%s -->", pluginName)
-	endMarker := fmt.Sprintf("<!-- /dex:%s -->", pluginName)
-	markedContent := fmt.Sprintf("%s\n%s\n%s", startMarker, content, endMarker)
-
-	// Check if markers already exist
-	pattern := regexp.MustCompile(fmt.Sprintf(`(?s)<!-- dex:%s -->.*?<!-- /dex:%s -->`, regexp.QuoteMeta(pluginName), regexp.QuoteMeta(pluginName)))
-
-	if pattern.MatchString(existing) {
-		// Replace existing marked section
-		return pattern.ReplaceAllString(existing, markedContent)
-	}
-
-	// Append new section
-	if existing == "" {
-		return markedContent
-	}
-	return existing + "\n\n" + markedContent
 }
 
 // hasFrontmatter checks if content already starts with YAML frontmatter.

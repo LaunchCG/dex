@@ -746,60 +746,6 @@ func TestCopilotAdapter_MergeCopilotMCPConfig_Nil(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
-func TestCopilotAdapter_MergeAgentFile_New(t *testing.T) {
-	adapter := &CopilotAdapter{}
-
-	result := adapter.MergeAgentFile("", "my-plugin", "New content")
-
-	expected := `<!-- dex:my-plugin -->
-New content
-<!-- /dex:my-plugin -->`
-	assert.Equal(t, expected, result)
-}
-
-func TestCopilotAdapter_MergeAgentFile_Append(t *testing.T) {
-	adapter := &CopilotAdapter{}
-
-	existing := "# Existing Content\n\nSome existing content."
-	content := "New instruction content"
-
-	result := adapter.MergeAgentFile(existing, "my-plugin", content)
-
-	expected := `# Existing Content
-
-Some existing content.
-
-<!-- dex:my-plugin -->
-New instruction content
-<!-- /dex:my-plugin -->`
-	assert.Equal(t, expected, result)
-}
-
-func TestCopilotAdapter_MergeAgentFile_Update(t *testing.T) {
-	adapter := &CopilotAdapter{}
-
-	existing := `# Existing Content
-
-<!-- dex:my-plugin -->
-Old content
-<!-- /dex:my-plugin -->
-
-Other content`
-
-	content := "Updated content"
-
-	result := adapter.MergeAgentFile(existing, "my-plugin", content)
-
-	expected := `# Existing Content
-
-<!-- dex:my-plugin -->
-Updated content
-<!-- /dex:my-plugin -->
-
-Other content`
-	assert.Equal(t, expected, result)
-}
-
 func TestRegisteredAdapters_IncludesCopilot(t *testing.T) {
 	adapters := RegisteredAdapters()
 	assert.Equal(t, []string{"claude-code", "cursor", "github-copilot"}, adapters)

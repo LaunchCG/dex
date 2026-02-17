@@ -7,6 +7,10 @@
 //   - Planning and executing installations via adapters
 //   - Tracking installed files in the manifest
 //   - Updating the lock file with resolved versions
+//
+// All shared files (CLAUDE.md, .mcp.json, settings.json) are regenerated from
+// scratch after all plugins are processed, using hash comparison to avoid
+// unnecessary writes.
 package installer
 
 import (
@@ -28,6 +32,18 @@ import (
 	"github.com/launchcg/dex/pkg/version"
 )
 
+// pluginContribution holds a plugin's shared file contributions for deferred generation.
+type pluginContribution struct {
+	pluginName      string
+	mcpEntries      map[string]any
+	mcpPath         string
+	mcpKey          string
+	settingsEntries map[string]any
+	settingsPath    string
+	agentContent    string
+	agentFilePath   string
+}
+
 // Installer handles plugin installation for a project.
 type Installer struct {
 	projectRoot string
@@ -38,6 +54,16 @@ type Installer struct {
 	force       bool // Overwrite non-managed files
 	noLock      bool // Don't update lock file
 	namespace   bool // Namespace resources with package name
+
+	// contributions collects shared file contributions from all plugins
+	// for deferred generation by generateSharedFiles().
+	contributions []pluginContribution
+
+	// removedServers tracks MCP server names from uninstalled plugins,
+	// so generateMCPConfig knows to remove them from the config file.
+	removedServers map[string]bool
+	// removedSettings tracks settings values from uninstalled plugins.
+	removedSettings map[string]map[string]bool
 }
 
 // PluginSpec specifies a plugin to install.
@@ -178,6 +204,8 @@ func (i *Installer) Install(specs []PluginSpec) ([]InstalledPlugin, error) {
 		return nil, i.InstallAll()
 	}
 
+	i.contributions = nil
+
 	var installed []InstalledPlugin
 	for _, spec := range specs {
 		info, err := i.installPlugin(spec)
@@ -187,8 +215,18 @@ func (i *Installer) Install(specs []PluginSpec) ([]InstalledPlugin, error) {
 		installed = append(installed, *info)
 	}
 
-	// Apply project-level agent instructions and resources
-	if err := i.applyLocalResources(); err != nil {
+	// Collect contributions from remaining locked plugins
+	if err := i.collectAllContributions(); err != nil {
+		return nil, err
+	}
+
+	// Install project-level resources (dedicated files only)
+	if err := i.installProjectResources(); err != nil {
+		return nil, err
+	}
+
+	// Generate all shared files from scratch
+	if err := i.generateSharedFiles(); err != nil {
 		return nil, err
 	}
 
@@ -216,6 +254,8 @@ func (i *Installer) InstallAll() error {
 		return nil
 	}
 
+	i.contributions = nil
+
 	var specs []PluginSpec
 
 	for _, plugin := range i.project.Plugins {
@@ -242,8 +282,13 @@ func (i *Installer) InstallAll() error {
 		}
 	}
 
-	// Apply project-level agent instructions and resources
-	if err := i.applyLocalResources(); err != nil {
+	// Install project-level resources (dedicated files only)
+	if err := i.installProjectResources(); err != nil {
+		return err
+	}
+
+	// Generate all shared files from scratch
+	if err := i.generateSharedFiles(); err != nil {
 		return err
 	}
 
@@ -262,24 +307,9 @@ func (i *Installer) InstallAll() error {
 	return nil
 }
 
-// applyLocalResources applies project-level agent instructions and resources.
-// This is called by both InstallAll and Update to ensure local dex.hcl changes
-// are always reflected in the installation.
-func (i *Installer) applyLocalResources() error {
-	// Install project-level agent instructions first
-	if err := i.installProjectAgentInstructions(); err != nil {
-		return err
-	}
-
-	// Install resources defined directly in dex.hcl
-	if err := i.installProjectResources(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // installPlugin installs a single plugin.
+// It creates directories and writes dedicated files via the executor,
+// and collects shared file contributions for later generation.
 func (i *Installer) installPlugin(spec PluginSpec) (*InstalledPlugin, error) {
 	// Resolve the registry to use
 	reg, err := i.resolveRegistry(&spec)
@@ -386,10 +416,22 @@ func (i *Installer) installPlugin(spec PluginSpec) (*InstalledPlugin, error) {
 	// Merge all plans
 	mergedPlan := adapter.MergePlans(allPlans...)
 
-	// Execute the merged plan
+	// Execute the merged plan (creates dirs, writes dedicated files, tracks in manifest)
 	if err := executor.Execute(mergedPlan, vars); err != nil {
 		return nil, errors.NewInstallError(pluginName, "install", err)
 	}
+
+	// Collect shared file contributions for deferred generation
+	i.contributions = append(i.contributions, pluginContribution{
+		pluginName:      pluginName,
+		mcpEntries:      mergedPlan.MCPEntries,
+		mcpPath:         mergedPlan.MCPPath,
+		mcpKey:          mergedPlan.MCPKey,
+		settingsEntries: mergedPlan.SettingsEntries,
+		settingsPath:    mergedPlan.SettingsPath,
+		agentContent:    mergedPlan.AgentFileContent,
+		agentFilePath:   mergedPlan.AgentFilePath,
+	})
 
 	// Update lock file with dependencies
 	if !i.noLock {
@@ -414,6 +456,40 @@ func (i *Installer) installPlugin(spec PluginSpec) (*InstalledPlugin, error) {
 		Source:   spec.Source,
 		Registry: spec.Registry,
 	}, nil
+}
+
+// collectAllContributions reinstalls all locked plugins that haven't already
+// been installed in the current session to collect their shared file contributions.
+// This ensures generateSharedFiles() has complete data from all plugins.
+func (i *Installer) collectAllContributions() error {
+	// Build set of plugins already collected
+	collected := make(map[string]bool)
+	for _, c := range i.contributions {
+		collected[c.pluginName] = true
+	}
+
+	// Re-install remaining locked plugins to collect their contributions
+	for _, plugin := range i.project.Plugins {
+		if collected[plugin.Name] {
+			continue
+		}
+		locked := i.lock.Get(plugin.Name)
+		if locked == nil {
+			continue
+		}
+		spec := PluginSpec{
+			Name:     plugin.Name,
+			Version:  locked.Version,
+			Source:   plugin.Source,
+			Registry: plugin.Registry,
+			Config:   plugin.Config,
+		}
+		if _, err := i.installPlugin(spec); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // installDependencies installs the dependencies of a package.
@@ -470,6 +546,8 @@ func (i *Installer) installDependencies(deps []config.DependencyBlock, parentNam
 }
 
 // installProjectResources installs resources defined directly in dex.hcl.
+// This creates directories and writes dedicated files. Shared file contributions
+// are collected for deferred generation.
 func (i *Installer) installProjectResources() error {
 	// Skip if no resources are defined in the project config
 	if len(i.project.Resources) == 0 {
@@ -530,47 +608,302 @@ func (i *Installer) installProjectResources() error {
 		return errors.Wrap(err, "failed to install project resources")
 	}
 
+	// Collect shared file contributions
+	i.contributions = append(i.contributions, pluginContribution{
+		pluginName:      mergedPlan.PluginName,
+		mcpEntries:      mergedPlan.MCPEntries,
+		mcpPath:         mergedPlan.MCPPath,
+		mcpKey:          mergedPlan.MCPKey,
+		settingsEntries: mergedPlan.SettingsEntries,
+		settingsPath:    mergedPlan.SettingsPath,
+		agentContent:    mergedPlan.AgentFileContent,
+		agentFilePath:   mergedPlan.AgentFilePath,
+	})
+
 	fmt.Printf("  ✓ Installed project resources\n")
 	return nil
 }
 
-// installProjectAgentInstructions installs project-level agent instructions.
-// These appear at the top of agent files (CLAUDE.md, AGENTS.md, etc.) before any plugin sections.
-func (i *Installer) installProjectAgentInstructions() error {
-	// Determine the agent file path based on platform
-	var agentPath string
+// generateSharedFiles regenerates all shared files (agent file, MCP config, settings)
+// from scratch using collected plugin contributions. Uses hash comparison to avoid
+// unnecessary writes. Non-dex entries in MCP and settings files are preserved.
+func (i *Installer) generateSharedFiles() error {
+	// Determine default paths from platform
+	agentPath := "CLAUDE.md"
+	mcpPath := ".mcp.json"
+	mcpKey := "mcpServers"
+	settingsPath := filepath.Join(".claude", "settings.json")
+
 	switch i.project.Project.AgenticPlatform {
-	case "claude-code":
-		agentPath = "CLAUDE.md"
 	case "cursor":
 		agentPath = "AGENTS.md"
 	case "github-copilot":
 		agentPath = filepath.Join(".github", "copilot-instructions.md")
-	default:
-		// Default to CLAUDE.md for unknown platforms
-		agentPath = "CLAUDE.md"
 	}
 
-	// Create executor
-	executor := NewExecutor(i.projectRoot, i.manifest, i.force)
-
-	// Always apply project instructions (even if empty) to handle removal case
-	// The merge function will properly remove project content when instructions are empty
-	if err := executor.applyProjectAgentInstructions(i.project.Project.AgentInstructions, agentPath); err != nil {
-		return errors.Wrap(err, "failed to apply project agent instructions")
+	// Override from contributions if specified
+	for _, c := range i.contributions {
+		if c.agentFilePath != "" {
+			agentPath = c.agentFilePath
+			break
+		}
+	}
+	for _, c := range i.contributions {
+		if c.mcpPath != "" {
+			mcpPath = c.mcpPath
+			break
+		}
+	}
+	for _, c := range i.contributions {
+		if c.mcpKey != "" {
+			mcpKey = c.mcpKey
+			break
+		}
+	}
+	for _, c := range i.contributions {
+		if c.settingsPath != "" {
+			settingsPath = c.settingsPath
+			break
+		}
 	}
 
-	// Track in manifest only if we have content
+	// 1. Generate agent file (project instructions + plugin content, no markers)
+	if err := i.generateAgentFile(agentPath); err != nil {
+		return err
+	}
+
+	// 2. Generate MCP config from scratch (preserving non-dex entries)
+	if err := i.generateMCPConfig(mcpPath, mcpKey); err != nil {
+		return err
+	}
+
+	// 3. Generate settings config from scratch (preserving non-dex entries)
+	if err := i.generateSettingsConfig(settingsPath); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// generateAgentFile regenerates the agent file (e.g., CLAUDE.md) from scratch.
+// Content is: project instructions + all plugin agent content (no markers).
+func (i *Installer) generateAgentFile(agentPath string) error {
+	var content strings.Builder
+
+	// Project instructions first
+	if i.project.Project.AgentInstructions != "" {
+		content.WriteString(strings.TrimSpace(i.project.Project.AgentInstructions))
+	}
+
+	// Plugin contributions
+	for _, c := range i.contributions {
+		if c.agentContent != "" {
+			if content.Len() > 0 {
+				content.WriteString("\n\n")
+			}
+			content.WriteString(c.agentContent)
+		}
+	}
+
+	fullPath := filepath.Join(i.projectRoot, agentPath)
+
+	if content.Len() > 0 {
+		newContent := []byte(content.String())
+		if contentChanged(fullPath, newContent) {
+			if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+				return fmt.Errorf("creating directory for agent file: %w", err)
+			}
+			if err := os.WriteFile(fullPath, newContent, 0644); err != nil {
+				return fmt.Errorf("writing agent file: %w", err)
+			}
+		}
+	} else {
+		// No content — delete the file if it exists
+		if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("removing empty agent file: %w", err)
+		}
+	}
+
+	// Track project agent content in manifest
 	if i.project.Project.AgentInstructions != "" {
 		i.manifest.TrackAgentContent("__project__")
 		i.manifest.TrackMergedFile("__project__", agentPath)
 	} else {
-		// Remove tracking if instructions are empty
 		plugin := i.manifest.GetPlugin("__project__")
 		if plugin != nil {
 			plugin.HasAgentContent = false
-			// Remove the merged file tracking
 			plugin.MergedFiles = removeString(plugin.MergedFiles, agentPath)
+		}
+	}
+
+	return nil
+}
+
+// generateMCPConfig regenerates the MCP config file from scratch.
+// Non-dex entries are preserved by reading the existing file, removing
+// all dex-managed servers, and adding back current contributions.
+func (i *Installer) generateMCPConfig(mcpPath, mcpKey string) error {
+	fullPath := filepath.Join(i.projectRoot, mcpPath)
+
+	// Build the set of servers that current contributions will provide
+	contributedServers := make(map[string]bool)
+	for _, c := range i.contributions {
+		for name := range c.mcpEntries {
+			contributedServers[name] = true
+		}
+	}
+
+	// Read existing config (preserves non-dex entries)
+	existing, err := ReadJSONFile(fullPath)
+	if err != nil {
+		return fmt.Errorf("reading MCP config: %w", err)
+	}
+
+	// Remove all previously dex-managed servers from existing config.
+	// A server is considered dex-managed if it was tracked in the manifest,
+	// being contributed by current plugins, or was recently uninstalled.
+	dexServers := make(map[string]bool)
+	for _, plugin := range i.manifest.Plugins {
+		for _, server := range plugin.MCPServers {
+			dexServers[server] = true
+		}
+	}
+	for name := range contributedServers {
+		dexServers[name] = true
+	}
+	for name := range i.removedServers {
+		dexServers[name] = true
+	}
+	if servers, ok := existing[mcpKey].(map[string]any); ok {
+		for name := range servers {
+			if dexServers[name] {
+				delete(servers, name)
+			}
+		}
+		existing[mcpKey] = servers
+	}
+
+	// Add all current contributions
+	for _, c := range i.contributions {
+		if len(c.mcpEntries) > 0 {
+			existing = MergeMCPServersWithKey(existing, c.mcpEntries, mcpKey)
+		}
+	}
+
+	// Check if there are any servers or other content
+	hasContent := len(existing) > 0
+	if hasContent {
+		// Check if the only key is an empty servers map
+		if len(existing) == 1 {
+			if servers, ok := existing[mcpKey].(map[string]any); ok && len(servers) == 0 {
+				hasContent = false
+			}
+		}
+	}
+
+	if hasContent {
+		content, marshalErr := json.MarshalIndent(existing, "", "  ")
+		if marshalErr != nil {
+			return fmt.Errorf("marshaling MCP config: %w", marshalErr)
+		}
+		content = append(content, '\n')
+		if contentChanged(fullPath, content) {
+			if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+				return fmt.Errorf("creating directory for MCP config: %w", err)
+			}
+			if err := os.WriteFile(fullPath, content, 0644); err != nil {
+				return fmt.Errorf("writing MCP config: %w", err)
+			}
+		}
+	} else {
+		// No content — delete the file if it exists
+		if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("removing empty MCP config: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// generateSettingsConfig regenerates the settings config file from scratch.
+// Non-dex entries are preserved by reading the existing file, removing
+// all dex-managed settings values, and adding back current contributions.
+func (i *Installer) generateSettingsConfig(settingsPath string) error {
+	fullPath := filepath.Join(i.projectRoot, settingsPath)
+
+	// Collect all dex-managed settings values from manifest and recently removed plugins
+	dexValues := make(map[string]map[string]bool)
+	for _, plugin := range i.manifest.Plugins {
+		for key, vals := range plugin.SettingsValues {
+			if dexValues[key] == nil {
+				dexValues[key] = make(map[string]bool)
+			}
+			for _, v := range vals {
+				dexValues[key][v] = true
+			}
+		}
+	}
+	for key, vals := range i.removedSettings {
+		if dexValues[key] == nil {
+			dexValues[key] = make(map[string]bool)
+		}
+		for v := range vals {
+			dexValues[key][v] = true
+		}
+	}
+
+	// Read existing config (preserves non-dex entries)
+	existing, err := ReadJSONFile(fullPath)
+	if err != nil {
+		return fmt.Errorf("reading settings config: %w", err)
+	}
+
+	// Remove all dex-managed values from existing config
+	for key, managed := range dexValues {
+		if arr, ok := existing[key].([]any); ok {
+			filtered := make([]any, 0, len(arr))
+			for _, v := range arr {
+				if s, ok := v.(string); ok {
+					if !managed[s] {
+						filtered = append(filtered, v)
+					}
+				} else {
+					filtered = append(filtered, v)
+				}
+			}
+			if len(filtered) == 0 {
+				delete(existing, key)
+			} else {
+				existing[key] = filtered
+			}
+		}
+	}
+
+	// Add all current contributions
+	for _, c := range i.contributions {
+		if len(c.settingsEntries) > 0 {
+			existing = MergeJSON(existing, c.settingsEntries)
+		}
+	}
+
+	// Write if there's content, delete if empty
+	if len(existing) > 0 {
+		content, marshalErr := json.MarshalIndent(existing, "", "  ")
+		if marshalErr != nil {
+			return fmt.Errorf("marshaling settings config: %w", marshalErr)
+		}
+		content = append(content, '\n')
+		if contentChanged(fullPath, content) {
+			if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+				return fmt.Errorf("creating directory for settings config: %w", err)
+			}
+			if err := os.WriteFile(fullPath, content, 0644); err != nil {
+				return fmt.Errorf("writing settings config: %w", err)
+			}
+		}
+	} else {
+		if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("removing empty settings config: %w", err)
 		}
 	}
 
@@ -697,10 +1030,47 @@ func (i *Installer) resolveVariables(pkg *config.PackageConfig, pluginConfig map
 // Uninstall removes installed plugins.
 // If removeFromConfig is true, also removes the plugin from dex.hcl.
 func (i *Installer) Uninstall(names []string, removeFromConfig bool) error {
+	// Track servers and settings from plugins being uninstalled so
+	// generateSharedFiles knows to remove them from config files.
+	i.removedServers = make(map[string]bool)
+	i.removedSettings = make(map[string]map[string]bool)
+	for _, name := range names {
+		if pm := i.manifest.GetPlugin(name); pm != nil {
+			for _, server := range pm.MCPServers {
+				i.removedServers[server] = true
+			}
+			for key, vals := range pm.SettingsValues {
+				if i.removedSettings[key] == nil {
+					i.removedSettings[key] = make(map[string]bool)
+				}
+				for _, v := range vals {
+					i.removedSettings[key][v] = true
+				}
+			}
+		}
+	}
+
 	for _, name := range names {
 		if err := i.uninstallPlugin(name); err != nil {
 			return err
 		}
+		// Remove from lock immediately so collectAllContributions
+		// won't re-install the uninstalled plugin.
+		if !i.noLock {
+			i.lock.Remove(name)
+		}
+	}
+
+	// Regenerate shared files from remaining plugins
+	i.contributions = nil
+	if err := i.collectAllContributions(); err != nil {
+		return err
+	}
+	if err := i.installProjectResources(); err != nil {
+		return err
+	}
+	if err := i.generateSharedFiles(); err != nil {
+		return err
 	}
 
 	// Save manifest
@@ -708,11 +1078,8 @@ func (i *Installer) Uninstall(names []string, removeFromConfig bool) error {
 		return errors.Wrap(err, "failed to save manifest")
 	}
 
-	// Update lock file
+	// Save lock file
 	if !i.noLock {
-		for _, name := range names {
-			i.lock.Remove(name)
-		}
 		if err := i.lock.Save(); err != nil {
 			return errors.Wrap(err, "failed to save lock file")
 		}
@@ -721,7 +1088,9 @@ func (i *Installer) Uninstall(names []string, removeFromConfig bool) error {
 	return nil
 }
 
-// uninstallPlugin removes a single plugin.
+// uninstallPlugin removes a single plugin's dedicated files and manifest entries.
+// Shared files (MCP, settings, agent content) are NOT cleaned up here;
+// they are regenerated from scratch by generateSharedFiles().
 func (i *Installer) uninstallPlugin(name string) error {
 	// Get files to remove from manifest
 	result := i.manifest.Untrack(name)
@@ -743,130 +1112,6 @@ func (i *Installer) uninstallPlugin(name string) error {
 		entries, err := os.ReadDir(path)
 		if err == nil && len(entries) == 0 {
 			os.Remove(path)
-		}
-	}
-
-	// Remove MCP servers from .mcp.json
-	if len(result.MCPServers) > 0 {
-		mcpPath := filepath.Join(i.projectRoot, ".mcp.json")
-		mcpConfig, err := ReadJSONFile(mcpPath)
-		if err == nil {
-			mcpConfig = RemoveMCPServers(mcpConfig, result.MCPServers)
-			if err := WriteJSONFile(mcpPath, mcpConfig); err != nil {
-				return errors.NewInstallError(name, "uninstall",
-					fmt.Errorf("failed to update .mcp.json: %w", err))
-			}
-		}
-	}
-
-	// Remove settings values from .claude/settings.json (only values not used by other plugins)
-	if len(result.SettingsValues) > 0 {
-		settingsPath := filepath.Join(i.projectRoot, ".claude", "settings.json")
-		settingsConfig, err := ReadJSONFile(settingsPath)
-		if err == nil {
-			// For each key (allow, ask, deny, etc.), remove values not used by other plugins
-			for key, values := range result.SettingsValues {
-				if existing, ok := settingsConfig[key].([]any); ok {
-					filtered := make([]any, 0)
-					for _, v := range existing {
-						vStr, ok := v.(string)
-						if !ok {
-							filtered = append(filtered, v)
-							continue
-						}
-						// Check if this value was contributed by this plugin
-						wasContributed := false
-						for _, contributed := range values {
-							if contributed == vStr {
-								wasContributed = true
-								break
-							}
-						}
-						// Keep the value if it wasn't contributed by this plugin
-						// OR if another plugin also uses it
-						if !wasContributed || i.manifest.IsSettingsValueUsedByOthers(name, key, vStr) {
-							filtered = append(filtered, v)
-						}
-					}
-					// Remove the key entirely if no values remain
-					if len(filtered) == 0 {
-						delete(settingsConfig, key)
-					} else {
-						settingsConfig[key] = filtered
-					}
-				}
-			}
-			if err := WriteJSONFile(settingsPath, settingsConfig); err != nil {
-				return errors.NewInstallError(name, "uninstall",
-					fmt.Errorf("failed to update settings.json: %w", err))
-			}
-		}
-	}
-
-	// Remove agent content from CLAUDE.md
-	if result.HasAgentContent {
-		agentPath := filepath.Join(i.projectRoot, "CLAUDE.md")
-		content, err := os.ReadFile(agentPath)
-		if err == nil {
-			newContent := RemoveAgentContent(string(content), name)
-			if err := os.WriteFile(agentPath, []byte(newContent), 0644); err != nil {
-				return errors.NewInstallError(name, "uninstall",
-					fmt.Errorf("failed to update CLAUDE.md: %w", err))
-			}
-		}
-	}
-
-	// Check if merged files should be cleaned up
-	// Only delete merged files if they're no longer used by any other plugin
-	// and if they contain no meaningful content
-	for _, mergedFile := range result.MergedFiles {
-		// Skip if any other plugin still uses this merged file
-		if i.manifest.IsMergedFileUsedByOthers(name, mergedFile) {
-			continue
-		}
-
-		// File is not used by any other plugin - check if it should be removed
-		fullPath := filepath.Join(i.projectRoot, mergedFile)
-
-		// Read the file to check if it's essentially empty
-		data, err := os.ReadFile(fullPath)
-		if err != nil {
-			if !os.IsNotExist(err) {
-				return errors.NewInstallError(name, "uninstall",
-					fmt.Errorf("failed to read merged file %s: %w", mergedFile, err))
-			}
-			continue // File doesn't exist, nothing to do
-		}
-
-		// Check if file is effectively empty
-		isEmpty := false
-		if strings.HasSuffix(mergedFile, ".json") {
-			// Parse JSON and check if it's effectively empty
-			var obj map[string]any
-			if err := json.Unmarshal(data, &obj); err == nil {
-				// For MCP config files, check if mcpServers is empty
-				if strings.Contains(mergedFile, ".mcp.json") {
-					if servers, ok := obj["mcpServers"].(map[string]any); ok {
-						isEmpty = len(servers) == 0
-					} else {
-						isEmpty = len(obj) == 0
-					}
-				} else {
-					// For other JSON files (like settings.json), check if truly empty
-					isEmpty = len(obj) == 0
-				}
-			}
-		} else if strings.HasSuffix(mergedFile, ".md") {
-			// For markdown, check if it's empty or just whitespace
-			isEmpty = len(strings.TrimSpace(string(data))) == 0
-		}
-
-		// Remove the file if it's empty
-		if isEmpty {
-			if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
-				return errors.NewInstallError(name, "uninstall",
-					fmt.Errorf("failed to remove empty merged file %s: %w", mergedFile, err))
-			}
 		}
 	}
 
@@ -986,6 +1231,8 @@ func (i *Installer) Update(names []string, dryRun bool) ([]UpdateResult, error) 
 		}
 	}
 
+	i.contributions = nil
+
 	var results []UpdateResult
 
 	for _, name := range names {
@@ -996,9 +1243,20 @@ func (i *Installer) Update(names []string, dryRun bool) ([]UpdateResult, error) 
 		results = append(results, *result)
 	}
 
-	// Apply local resources (agent instructions and project resources) if not dry run
+	// Generate shared files if not dry run
 	if !dryRun {
-		if err := i.applyLocalResources(); err != nil {
+		// Collect contributions from non-updated plugins
+		if err := i.collectAllContributions(); err != nil {
+			return nil, err
+		}
+
+		// Install project-level resources
+		if err := i.installProjectResources(); err != nil {
+			return nil, err
+		}
+
+		// Generate all shared files from scratch
+		if err := i.generateSharedFiles(); err != nil {
 			return nil, err
 		}
 	}
@@ -1095,11 +1353,15 @@ func (i *Installer) checkForUpdate(name string) (bestVersion string, spec Plugin
 }
 
 // Sync synchronizes the project to match dex.hcl.
-// For each plugin in config: installs if missing, updates if outdated, skips if current.
+// For each plugin in config: installs (always, even if up-to-date).
 // For each plugin in lock file but not in config: prunes (uninstalls).
+// The version check only affects the reported SyncAction.
+// All shared files are regenerated from scratch after processing.
 // If dryRun is true, only reports what would change without making modifications.
 func (i *Installer) Sync(dryRun bool) ([]SyncResult, error) {
 	var results []SyncResult
+
+	i.contributions = nil
 
 	// Build set of config plugin names
 	configPlugins := make(map[string]bool)
@@ -1160,14 +1422,26 @@ func (i *Installer) Sync(dryRun bool) ([]SyncResult, error) {
 				})
 			}
 		} else {
-			// Already installed → check for update
+			// Already installed → check for update, but always reinstall
 			bestVersion, spec, err := i.checkForUpdate(plugin.Name)
 			if err != nil {
 				return nil, err
 			}
 
 			if bestVersion == "" {
-				// Up to date
+				// Up to date — still reinstall to regenerate files
+				if !dryRun {
+					spec = PluginSpec{
+						Name:     plugin.Name,
+						Version:  locked.Version,
+						Source:   plugin.Source,
+						Registry: plugin.Registry,
+						Config:   plugin.Config,
+					}
+					if _, err := i.installPlugin(spec); err != nil {
+						return nil, err
+					}
+				}
 				results = append(results, SyncResult{
 					Name:       plugin.Name,
 					Action:     SyncUpToDate,
@@ -1238,11 +1512,18 @@ func (i *Installer) Sync(dryRun bool) ([]SyncResult, error) {
 		return results[a].Name < results[b].Name
 	})
 
-	// Apply local resources and save if not dry-run
+	// Generate shared files and save if not dry-run
 	if !dryRun {
-		if err := i.applyLocalResources(); err != nil {
+		// Install project-level resources
+		if err := i.installProjectResources(); err != nil {
 			return nil, err
 		}
+
+		// Generate all shared files from scratch
+		if err := i.generateSharedFiles(); err != nil {
+			return nil, err
+		}
+
 		if err := i.manifest.Save(); err != nil {
 			return nil, errors.Wrap(err, "failed to save manifest")
 		}

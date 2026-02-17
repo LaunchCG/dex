@@ -3,7 +3,7 @@ package adapter
 import (
 	"fmt"
 	"path/filepath"
-	"regexp"
+
 	"strings"
 
 	"github.com/launchcg/dex/internal/config"
@@ -155,31 +155,6 @@ func (a *CursorAdapter) MergeCursorMCPConfig(existing map[string]any, pluginName
 // This method is kept for interface compatibility.
 func (a *CursorAdapter) MergeSettingsConfig(existing map[string]any, settings *resource.ClaudeSettings) map[string]any {
 	return existing
-}
-
-// MergeAgentFile merges rule content into AGENTS.md with HTML comment markers.
-// Format:
-// <!-- dex:{plugin-name} -->
-// {content}
-// <!-- /dex:{plugin-name} -->
-func (a *CursorAdapter) MergeAgentFile(existing, pluginName, content string) string {
-	startMarker := fmt.Sprintf("<!-- dex:%s -->", pluginName)
-	endMarker := fmt.Sprintf("<!-- /dex:%s -->", pluginName)
-	markedContent := fmt.Sprintf("%s\n%s\n%s", startMarker, content, endMarker)
-
-	// Check if markers already exist
-	pattern := regexp.MustCompile(fmt.Sprintf(`(?s)<!-- dex:%s -->.*?<!-- /dex:%s -->`, regexp.QuoteMeta(pluginName), regexp.QuoteMeta(pluginName)))
-
-	if pattern.MatchString(existing) {
-		// Replace existing marked section
-		return pattern.ReplaceAllString(existing, markedContent)
-	}
-
-	// Append new section
-	if existing == "" {
-		return markedContent
-	}
-	return existing + "\n\n" + markedContent
 }
 
 // planRule creates an installation plan for a Cursor rule (singular).

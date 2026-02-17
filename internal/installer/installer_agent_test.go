@@ -110,7 +110,7 @@ plugin "linting-rules" {
 	content, err := os.ReadFile(claudePath)
 	require.NoError(t, err)
 
-	expected := "# My Project\n\nThis is my project's main context.\n\n<!-- dex:linting-rules -->\nAlways run ESLint before committing.\n<!-- /dex:linting-rules -->"
+	expected := "# My Project\n\nThis is my project's main context.\n\nAlways run ESLint before committing."
 	assert.Equal(t, expected, string(content))
 }
 
@@ -145,7 +145,7 @@ plugin "my-plugin" {
 	// Verify v1 content
 	content1, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
 	require.NoError(t, err)
-	expected1 := "# V1 Instructions\n\n<!-- dex:my-plugin -->\nFollow this rule from my-plugin\n<!-- /dex:my-plugin -->"
+	expected1 := "# V1 Instructions\n\nFollow this rule from my-plugin"
 	assert.Equal(t, expected1, string(content1))
 
 	// Update project config to v2
@@ -171,7 +171,7 @@ plugin "my-plugin" {
 	// Verify v2 content: V2 instructions replace V1, plugin content preserved
 	content2, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
 	require.NoError(t, err)
-	expected2 := "# V2 Updated Instructions\n\nThis is the new version.\n\n<!-- dex:my-plugin -->\nFollow this rule from my-plugin\n<!-- /dex:my-plugin -->"
+	expected2 := "# V2 Updated Instructions\n\nThis is the new version.\n\nFollow this rule from my-plugin"
 	assert.Equal(t, expected2, string(content2))
 }
 
@@ -206,7 +206,7 @@ plugin "my-plugin" {
 	// Verify instructions are there
 	content1, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
 	require.NoError(t, err)
-	expected1 := "# Project Instructions\n\n<!-- dex:my-plugin -->\nFollow this rule from my-plugin\n<!-- /dex:my-plugin -->"
+	expected1 := "# Project Instructions\n\nFollow this rule from my-plugin"
 	assert.Equal(t, expected1, string(content1))
 
 	// Remove agent_instructions from config
@@ -231,7 +231,7 @@ plugin "my-plugin" {
 	// Verify project instructions are gone, plugin content remains
 	content2, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
 	require.NoError(t, err)
-	expected2 := "<!-- dex:my-plugin -->\nFollow this rule from my-plugin\n<!-- /dex:my-plugin -->"
+	expected2 := "Follow this rule from my-plugin"
 	assert.Equal(t, expected2, string(content2))
 }
 
@@ -351,11 +351,11 @@ plugin "plugin-c" {
 	require.NoError(t, err)
 	contentStr := string(content)
 
-	// Verify full content: project instructions at top, then all three plugin sections
+	// Verify full content: project instructions at top, then all plugin content
 	expected := "# Main Project Guidelines\n\nThese are the overarching project rules.\nAll plugins must follow these.\n\n" +
-		"<!-- dex:plugin-a -->\nFollow this rule from plugin-a\n<!-- /dex:plugin-a -->\n\n" +
-		"<!-- dex:plugin-b -->\nFollow this rule from plugin-b\n<!-- /dex:plugin-b -->\n\n" +
-		"<!-- dex:plugin-c -->\nFollow this rule from plugin-c\n<!-- /dex:plugin-c -->"
+		"Follow this rule from plugin-a\n\n" +
+		"Follow this rule from plugin-b\n\n" +
+		"Follow this rule from plugin-c"
 	assert.Equal(t, expected, contentStr)
 }
 
@@ -435,6 +435,6 @@ plugin "my-plugin" {
 	content, err := os.ReadFile(claudePath)
 	require.NoError(t, err)
 
-	expectedCLAUDE := "# Project Rules\n\nAlways follow these rules.\n\n<!-- dex:my-plugin -->\nFollow this rule from my-plugin\n<!-- /dex:my-plugin -->"
+	expectedCLAUDE := "# Project Rules\n\nAlways follow these rules.\n\nFollow this rule from my-plugin"
 	assert.Equal(t, expectedCLAUDE, string(content))
 }

@@ -98,7 +98,7 @@ plugin "my-test-plugin" {
 	// Verify CLAUDE.md was created with the rule content
 	claudeContent, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
 	require.NoError(t, err)
-	expectedCLAUDE := "<!-- dex:my-test-plugin -->\nFollow this rule from my-test-plugin\n<!-- /dex:my-test-plugin -->"
+	expectedCLAUDE := "Follow this rule from my-test-plugin"
 	assert.Equal(t, expectedCLAUDE, string(claudeContent))
 
 	// Verify lock file was updated (JSON format)
@@ -170,8 +170,7 @@ plugin "plugin-b" {
 	// Verify both plugins' rules were installed
 	claudeContent, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
 	require.NoError(t, err)
-	expectedCLAUDE := "<!-- dex:plugin-a -->\nFollow this rule from plugin-a\n<!-- /dex:plugin-a -->\n\n" +
-		"<!-- dex:plugin-b -->\nFollow this rule from plugin-b\n<!-- /dex:plugin-b -->"
+	expectedCLAUDE := "Follow this rule from plugin-a\n\nFollow this rule from plugin-b"
 	assert.Equal(t, expectedCLAUDE, string(claudeContent))
 
 	// Verify lock file has both plugins
@@ -260,7 +259,7 @@ plugin "reinstall-plugin" {
 	// Verify first install
 	claudeContent1, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
 	require.NoError(t, err)
-	expectedCLAUDE1 := "<!-- dex:reinstall-plugin -->\nFollow this rule from reinstall-plugin\n<!-- /dex:reinstall-plugin -->"
+	expectedCLAUDE1 := "Follow this rule from reinstall-plugin"
 	assert.Equal(t, expectedCLAUDE1, string(claudeContent1))
 
 	// Update the plugin content
@@ -287,7 +286,7 @@ claude_rule "reinstall-plugin-rule" {
 	// Verify updated content
 	claudeContent2, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
 	require.NoError(t, err)
-	expectedCLAUDE2 := "<!-- dex:reinstall-plugin -->\nThis is the updated rule content\n<!-- /dex:reinstall-plugin -->"
+	expectedCLAUDE2 := "This is the updated rule content"
 	assert.Equal(t, expectedCLAUDE2, string(claudeContent2))
 }
 
@@ -337,7 +336,7 @@ plugin "var-plugin" {
 	// Verify the plugin was installed (variable resolution tested separately)
 	claudeContent, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
 	require.NoError(t, err)
-	expectedCLAUDE := "<!-- dex:var-plugin -->\nStatic content for var test\n<!-- /dex:var-plugin -->"
+	expectedCLAUDE := "Static content for var test"
 	assert.Equal(t, expectedCLAUDE, string(claudeContent))
 }
 
@@ -575,8 +574,7 @@ plugin "plugin-two" {
 	// Verify both plugins' content
 	claudeContent, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
 	require.NoError(t, err)
-	expectedCLAUDE := "<!-- dex:plugin-one -->\nFollow this rule from plugin-one\n<!-- /dex:plugin-one -->\n\n" +
-		"<!-- dex:plugin-two -->\nFollow this rule from plugin-two\n<!-- /dex:plugin-two -->"
+	expectedCLAUDE := "Follow this rule from plugin-one\n\nFollow this rule from plugin-two"
 	assert.Equal(t, expectedCLAUDE, string(claudeContent))
 
 	// Verify lock file has both

@@ -1,6 +1,7 @@
 package installer
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -13,7 +14,9 @@ import (
 )
 
 // Executor executes installation plans by creating directories, writing files,
-// and merging configuration files.
+// and tracking resources in the manifest.
+// Shared files (MCP config, settings, agent files) are NOT written by the executor;
+// they are handled by generateSharedFiles() in the installer after all plugins are processed.
 type Executor struct {
 	projectRoot string
 	manifest    *manifest.Manifest
@@ -30,7 +33,9 @@ func NewExecutor(projectRoot string, m *manifest.Manifest, force bool) *Executor
 }
 
 // Execute executes an installation plan.
-// It creates directories, writes files, and merges configuration files.
+// It creates directories, writes dedicated files, and tracks all resources in the manifest.
+// Shared files (MCP, settings, agent content) are tracked but NOT written;
+// use generateSharedFiles() to write them after all plugins are processed.
 func (e *Executor) Execute(plan *adapter.Plan, vars map[string]string) error {
 	if plan == nil || plan.IsEmpty() {
 		return nil
@@ -41,7 +46,7 @@ func (e *Executor) Execute(plan *adapter.Plan, vars map[string]string) error {
 		return fmt.Errorf("creating directories: %w", err)
 	}
 
-	// Write files
+	// Write dedicated files
 	if err := e.writeFiles(plan.Files, vars); err != nil {
 		return fmt.Errorf("writing files: %w", err)
 	}
@@ -52,13 +57,8 @@ func (e *Executor) Execute(plan *adapter.Plan, vars map[string]string) error {
 		mcpKey = "mcpServers"
 	}
 
-	// Apply MCP configuration
+	// Track MCP entries in manifest (but don't write shared files)
 	if len(plan.MCPEntries) > 0 {
-		if err := e.applyMCPConfig(plan.MCPEntries, plan.MCPPath, plan.MCPKey); err != nil {
-			return fmt.Errorf("applying MCP config: %w", err)
-		}
-
-		// Track the merged MCP config file
 		mcpPath := plan.MCPPath
 		if mcpPath == "" {
 			mcpPath = ".mcp.json"
@@ -67,8 +67,6 @@ func (e *Executor) Execute(plan *adapter.Plan, vars map[string]string) error {
 
 		// Track MCP servers in manifest
 		for serverName := range plan.MCPEntries {
-			// The MCPEntries map contains the server configs, but we need to extract
-			// server names from within the mcpServers/servers key
 			if serverName == mcpKey {
 				if servers, ok := plan.MCPEntries[serverName].(map[string]any); ok {
 					for name := range servers {
@@ -79,13 +77,8 @@ func (e *Executor) Execute(plan *adapter.Plan, vars map[string]string) error {
 		}
 	}
 
-	// Apply settings configuration
+	// Track settings entries in manifest (but don't write shared files)
 	if len(plan.SettingsEntries) > 0 {
-		if err := e.applySettingsConfig(plan.SettingsEntries, plan.SettingsPath); err != nil {
-			return fmt.Errorf("applying settings config: %w", err)
-		}
-
-		// Track the merged settings file
 		settingsPath := plan.SettingsPath
 		if settingsPath == "" {
 			settingsPath = filepath.Join(".claude", "settings.json")
@@ -95,7 +88,6 @@ func (e *Executor) Execute(plan *adapter.Plan, vars map[string]string) error {
 		// Track settings values in manifest (key -> []values)
 		settingsValues := make(map[string][]string)
 		for key, val := range plan.SettingsEntries {
-			// Convert the values to string slice
 			switch v := val.(type) {
 			case []string:
 				settingsValues[key] = v
@@ -112,20 +104,13 @@ func (e *Executor) Execute(plan *adapter.Plan, vars map[string]string) error {
 		e.manifest.TrackSettings(plan.PluginName, settingsValues)
 	}
 
-	// Apply agent file content
+	// Track agent file content in manifest (but don't write shared files)
 	if plan.AgentFileContent != "" {
-		if err := e.applyAgentFileContent(plan.PluginName, plan.AgentFileContent, plan.AgentFilePath); err != nil {
-			return fmt.Errorf("applying agent file content: %w", err)
-		}
-
-		// Track the merged agent file
 		agentPath := plan.AgentFilePath
 		if agentPath == "" {
 			agentPath = "CLAUDE.md"
 		}
 		e.manifest.TrackMergedFile(plan.PluginName, agentPath)
-
-		// Track agent content in manifest
 		e.manifest.TrackAgentContent(plan.PluginName)
 	}
 
@@ -217,124 +202,6 @@ func (e *Executor) writeFile(fw adapter.FileWrite, vars map[string]string) error
 	return nil
 }
 
-// applyMCPConfig merges MCP config into the MCP config file.
-// Uses mcpPath if provided, otherwise defaults to ".mcp.json".
-// Uses mcpKey if provided, otherwise defaults to "mcpServers".
-func (e *Executor) applyMCPConfig(entries map[string]any, mcpPath, mcpKey string) error {
-	// Default paths
-	if mcpPath == "" {
-		mcpPath = ".mcp.json"
-	}
-	if mcpKey == "" {
-		mcpKey = "mcpServers"
-	}
-
-	fullPath := filepath.Join(e.projectRoot, mcpPath)
-
-	// Read existing config
-	existing, err := ReadJSONFile(fullPath)
-	if err != nil {
-		return err
-	}
-
-	// Merge the new entries using the specified key
-	merged := MergeMCPServersWithKey(existing, entries, mcpKey)
-
-	// Write back
-	return WriteJSONFile(fullPath, merged)
-}
-
-// applySettingsConfig merges settings into the settings file.
-// Uses settingsPath if provided, otherwise defaults to ".claude/settings.json".
-func (e *Executor) applySettingsConfig(entries map[string]any, settingsPath string) error {
-	// Default path
-	if settingsPath == "" {
-		settingsPath = filepath.Join(".claude", "settings.json")
-	}
-
-	fullPath := filepath.Join(e.projectRoot, settingsPath)
-
-	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-		return err
-	}
-
-	// Read existing config
-	existing, err := ReadJSONFile(fullPath)
-	if err != nil {
-		return err
-	}
-
-	// Merge the new entries
-	merged := MergeJSON(existing, entries)
-
-	// Write back
-	return WriteJSONFile(fullPath, merged)
-}
-
-// applyAgentFileContent merges content into the agent file.
-// Uses agentPath if provided, otherwise defaults to "CLAUDE.md".
-func (e *Executor) applyAgentFileContent(pluginName, content, agentPath string) error {
-	// Default path
-	if agentPath == "" {
-		agentPath = "CLAUDE.md"
-	}
-
-	fullPath := filepath.Join(e.projectRoot, agentPath)
-
-	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-		return err
-	}
-
-	// Read existing content
-	existing := ""
-	data, err := os.ReadFile(fullPath)
-	if err == nil {
-		existing = string(data)
-	} else if !os.IsNotExist(err) {
-		return err
-	}
-
-	// Merge content with markers
-	merged := MergeAgentContent(existing, pluginName, content)
-
-	// Write back
-	return os.WriteFile(fullPath, []byte(merged), 0644)
-}
-
-// applyProjectAgentInstructions merges project-level instructions into the agent file.
-// Project instructions appear at the top without markers, before any plugin sections.
-// Uses agentPath if provided, otherwise defaults to "CLAUDE.md".
-func (e *Executor) applyProjectAgentInstructions(content, agentPath string) error {
-	// Default path
-	if agentPath == "" {
-		agentPath = "CLAUDE.md"
-	}
-
-	fullPath := filepath.Join(e.projectRoot, agentPath)
-
-	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-		return err
-	}
-
-	// Read existing content
-	existing := ""
-	data, err := os.ReadFile(fullPath)
-	if err == nil {
-		existing = string(data)
-	} else if !os.IsNotExist(err) {
-		return err
-	}
-
-	// Merge project instructions with existing plugin sections
-	merged := MergeProjectAgentContent(existing, content)
-
-	// Write back
-	return os.WriteFile(fullPath, []byte(merged), 0644)
-}
-
 // processTemplate performs simple variable substitution on content.
 // Variables are in the format ${var_name} or {{var_name}}.
 func processTemplate(content string, vars map[string]string) string {
@@ -394,4 +261,14 @@ func WriteJSONFile(path string, data map[string]any) error {
 	content = append(content, '\n')
 
 	return os.WriteFile(path, content, 0644)
+}
+
+// contentChanged returns true if the file at path doesn't exist or has
+// different content than newContent.
+func contentChanged(path string, newContent []byte) bool {
+	existing, err := os.ReadFile(path)
+	if err != nil {
+		return true // file doesn't exist or can't read, needs write
+	}
+	return !bytes.Equal(existing, newContent)
 }

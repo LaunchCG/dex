@@ -56,10 +56,6 @@ type Adapter interface {
 	// MergeSettingsConfig merges settings configurations into existing config.
 	// Handles merging of arrays (allow, deny, ask) and maps (env).
 	MergeSettingsConfig(existing map[string]any, settings *resource.ClaudeSettings) map[string]any
-
-	// MergeAgentFile merges content into the agent file (e.g., CLAUDE.md) with markers.
-	// Uses marker comments to allow multiple plugins to contribute content.
-	MergeAgentFile(existing, pluginName, content string) string
 }
 
 // adapters holds registered adapters

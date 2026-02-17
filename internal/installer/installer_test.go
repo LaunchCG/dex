@@ -1,7 +1,6 @@
 package installer
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -205,241 +204,6 @@ func TestExecutor_WriteFile_Tracked(t *testing.T) {
 	content, err := os.ReadFile(existingFile)
 	require.NoError(t, err)
 	assert.Equal(t, "updated content", string(content))
-}
-
-func TestExecutor_ApplyMCPConfig_New(t *testing.T) {
-	tmpDir := t.TempDir()
-	m := newTestManifest(t, tmpDir)
-	executor := NewExecutor(tmpDir, m, false)
-
-	plan := &adapter.Plan{
-		PluginName: "test-plugin",
-		MCPEntries: map[string]any{
-			"mcpServers": map[string]any{
-				"test-server": map[string]any{
-					"command": "test-cmd",
-					"args":    []any{"--flag"},
-				},
-			},
-		},
-	}
-
-	err := executor.Execute(plan, nil)
-	require.NoError(t, err)
-
-	// Verify .mcp.json created with correct content
-	mcpPath := filepath.Join(tmpDir, ".mcp.json")
-	content, err := os.ReadFile(mcpPath)
-	require.NoError(t, err)
-
-	var result map[string]any
-	err = json.Unmarshal(content, &result)
-	require.NoError(t, err)
-
-	assert.Equal(t, map[string]any{
-		"mcpServers": map[string]any{
-			"test-server": map[string]any{
-				"command": "test-cmd",
-				"args":    []any{"--flag"},
-			},
-		},
-	}, result)
-}
-
-func TestExecutor_ApplyMCPConfig_Merge(t *testing.T) {
-	tmpDir := t.TempDir()
-	m := newTestManifest(t, tmpDir)
-
-	// Create existing .mcp.json
-	existingMCP := map[string]any{
-		"mcpServers": map[string]any{
-			"existing-server": map[string]any{
-				"command": "existing-cmd",
-			},
-		},
-	}
-	err := WriteJSONFile(filepath.Join(tmpDir, ".mcp.json"), existingMCP)
-	require.NoError(t, err)
-
-	executor := NewExecutor(tmpDir, m, false)
-
-	plan := &adapter.Plan{
-		PluginName: "test-plugin",
-		MCPEntries: map[string]any{
-			"mcpServers": map[string]any{
-				"new-server": map[string]any{
-					"command": "new-cmd",
-				},
-			},
-		},
-	}
-
-	err = executor.Execute(plan, nil)
-	require.NoError(t, err)
-
-	// Verify both servers exist
-	mcpPath := filepath.Join(tmpDir, ".mcp.json")
-	content, err := os.ReadFile(mcpPath)
-	require.NoError(t, err)
-
-	var result map[string]any
-	err = json.Unmarshal(content, &result)
-	require.NoError(t, err)
-
-	assert.Equal(t, map[string]any{
-		"mcpServers": map[string]any{
-			"existing-server": map[string]any{
-				"command": "existing-cmd",
-			},
-			"new-server": map[string]any{
-				"command": "new-cmd",
-			},
-		},
-	}, result)
-}
-
-func TestExecutor_ApplySettingsConfig_New(t *testing.T) {
-	tmpDir := t.TempDir()
-	m := newTestManifest(t, tmpDir)
-	executor := NewExecutor(tmpDir, m, false)
-
-	plan := &adapter.Plan{
-		PluginName: "test-plugin",
-		SettingsEntries: map[string]any{
-			"allow": []any{"Bash(npm:*)"},
-		},
-	}
-
-	err := executor.Execute(plan, nil)
-	require.NoError(t, err)
-
-	// Verify settings.json created
-	settingsPath := filepath.Join(tmpDir, ".claude", "settings.json")
-	content, err := os.ReadFile(settingsPath)
-	require.NoError(t, err)
-
-	var result map[string]any
-	err = json.Unmarshal(content, &result)
-	require.NoError(t, err)
-
-	assert.Equal(t, map[string]any{
-		"allow": []any{"Bash(npm:*)"},
-	}, result)
-}
-
-func TestExecutor_ApplySettingsConfig_Merge(t *testing.T) {
-	tmpDir := t.TempDir()
-	m := newTestManifest(t, tmpDir)
-
-	// Create existing settings
-	claudeDir := filepath.Join(tmpDir, ".claude")
-	err := os.MkdirAll(claudeDir, 0755)
-	require.NoError(t, err)
-
-	existingSettings := map[string]any{
-		"allow": []any{"Bash(git:*)"},
-	}
-	err = WriteJSONFile(filepath.Join(claudeDir, "settings.json"), existingSettings)
-	require.NoError(t, err)
-
-	executor := NewExecutor(tmpDir, m, false)
-
-	plan := &adapter.Plan{
-		PluginName: "test-plugin",
-		SettingsEntries: map[string]any{
-			"allow": []any{"Bash(npm:*)"},
-		},
-	}
-
-	err = executor.Execute(plan, nil)
-	require.NoError(t, err)
-
-	// Verify merged correctly
-	content, err := os.ReadFile(filepath.Join(claudeDir, "settings.json"))
-	require.NoError(t, err)
-
-	var result map[string]any
-	err = json.Unmarshal(content, &result)
-	require.NoError(t, err)
-
-	assert.Equal(t, map[string]any{
-		"allow": []any{"Bash(git:*)", "Bash(npm:*)"},
-	}, result)
-}
-
-func TestExecutor_ApplyAgentFileContent_New(t *testing.T) {
-	tmpDir := t.TempDir()
-	m := newTestManifest(t, tmpDir)
-	executor := NewExecutor(tmpDir, m, false)
-
-	plan := &adapter.Plan{
-		PluginName:       "test-plugin",
-		AgentFileContent: "Test content here",
-	}
-
-	err := executor.Execute(plan, nil)
-	require.NoError(t, err)
-
-	// Verify CLAUDE.md created with markers
-	content, err := os.ReadFile(filepath.Join(tmpDir, "CLAUDE.md"))
-	require.NoError(t, err)
-
-	expected := "<!-- dex:test-plugin -->\nTest content here\n<!-- /dex:test-plugin -->"
-	assert.Equal(t, expected, string(content))
-}
-
-func TestExecutor_ApplyAgentFileContent_Merge(t *testing.T) {
-	tmpDir := t.TempDir()
-	m := newTestManifest(t, tmpDir)
-
-	// Create existing CLAUDE.md with other content
-	existingContent := "# My Rules\n\nSome rules here."
-	err := os.WriteFile(filepath.Join(tmpDir, "CLAUDE.md"), []byte(existingContent), 0644)
-	require.NoError(t, err)
-
-	executor := NewExecutor(tmpDir, m, false)
-
-	plan := &adapter.Plan{
-		PluginName:       "test-plugin",
-		AgentFileContent: "Test content",
-	}
-
-	err = executor.Execute(plan, nil)
-	require.NoError(t, err)
-
-	// Verify content added with markers, existing content preserved
-	content, err := os.ReadFile(filepath.Join(tmpDir, "CLAUDE.md"))
-	require.NoError(t, err)
-
-	expected := "# My Rules\n\nSome rules here.\n\n<!-- dex:test-plugin -->\nTest content\n<!-- /dex:test-plugin -->"
-	assert.Equal(t, expected, string(content))
-}
-
-func TestExecutor_ApplyAgentFileContent_Update(t *testing.T) {
-	tmpDir := t.TempDir()
-	m := newTestManifest(t, tmpDir)
-
-	// Create existing CLAUDE.md with this plugin's markers
-	existingContent := "<!-- dex:test-plugin -->\nOld content\n<!-- /dex:test-plugin -->"
-	err := os.WriteFile(filepath.Join(tmpDir, "CLAUDE.md"), []byte(existingContent), 0644)
-	require.NoError(t, err)
-
-	executor := NewExecutor(tmpDir, m, false)
-
-	plan := &adapter.Plan{
-		PluginName:       "test-plugin",
-		AgentFileContent: "New content",
-	}
-
-	err = executor.Execute(plan, nil)
-	require.NoError(t, err)
-
-	// Verify content replaced
-	content, err := os.ReadFile(filepath.Join(tmpDir, "CLAUDE.md"))
-	require.NoError(t, err)
-
-	expected := "<!-- dex:test-plugin -->\nNew content\n<!-- /dex:test-plugin -->"
-	assert.Equal(t, expected, string(content))
 }
 
 func TestExecutor_EmptyPlan(t *testing.T) {
@@ -776,132 +540,6 @@ func TestRemoveMCPServers(t *testing.T) {
 	}
 }
 
-func TestMergeAgentContent(t *testing.T) {
-	tests := []struct {
-		name       string
-		existing   string
-		pluginName string
-		content    string
-		expected   string
-	}{
-		{
-			name:       "new plugin to empty file",
-			existing:   "",
-			pluginName: "test-plugin",
-			content:    "Test content",
-			expected:   "<!-- dex:test-plugin -->\nTest content\n<!-- /dex:test-plugin -->",
-		},
-		{
-			name:       "new plugin to file with content",
-			existing:   "# My Rules\n\nSome rules here.",
-			pluginName: "test-plugin",
-			content:    "Test content",
-			expected:   "# My Rules\n\nSome rules here.\n\n<!-- dex:test-plugin -->\nTest content\n<!-- /dex:test-plugin -->",
-		},
-		{
-			name:       "new plugin to file with trailing newline",
-			existing:   "# My Rules\n\nSome rules here.\n",
-			pluginName: "test-plugin",
-			content:    "Test content",
-			expected:   "# My Rules\n\nSome rules here.\n\n<!-- dex:test-plugin -->\nTest content\n<!-- /dex:test-plugin -->",
-		},
-		{
-			name:       "update existing plugin",
-			existing:   "<!-- dex:test-plugin -->\nOld content\n<!-- /dex:test-plugin -->",
-			pluginName: "test-plugin",
-			content:    "New content",
-			expected:   "<!-- dex:test-plugin -->\nNew content\n<!-- /dex:test-plugin -->",
-		},
-		{
-			name:       "update plugin preserving other content",
-			existing:   "# Rules\n\n<!-- dex:test-plugin -->\nOld content\n<!-- /dex:test-plugin -->\n\nMore rules.",
-			pluginName: "test-plugin",
-			content:    "New content",
-			expected:   "# Rules\n\n<!-- dex:test-plugin -->\nNew content\n<!-- /dex:test-plugin -->\n\nMore rules.",
-		},
-		{
-			name:       "multiple plugins",
-			existing:   "<!-- dex:other-plugin -->\nOther content\n<!-- /dex:other-plugin -->",
-			pluginName: "test-plugin",
-			content:    "Test content",
-			expected:   "<!-- dex:other-plugin -->\nOther content\n<!-- /dex:other-plugin -->\n\n<!-- dex:test-plugin -->\nTest content\n<!-- /dex:test-plugin -->",
-		},
-		{
-			name:       "multiline content",
-			existing:   "",
-			pluginName: "test-plugin",
-			content:    "Line 1\nLine 2\nLine 3",
-			expected:   "<!-- dex:test-plugin -->\nLine 1\nLine 2\nLine 3\n<!-- /dex:test-plugin -->",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := MergeAgentContent(tt.existing, tt.pluginName, tt.content)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-func TestRemoveAgentContent(t *testing.T) {
-	tests := []struct {
-		name       string
-		existing   string
-		pluginName string
-		expected   string
-	}{
-		{
-			name:       "remove only content",
-			existing:   "<!-- dex:test-plugin -->\nTest content\n<!-- /dex:test-plugin -->",
-			pluginName: "test-plugin",
-			expected:   "",
-		},
-		{
-			name:       "remove preserving other content before",
-			existing:   "# Rules\n\n<!-- dex:test-plugin -->\nTest\n<!-- /dex:test-plugin -->",
-			pluginName: "test-plugin",
-			expected:   "# Rules\n",
-		},
-		{
-			name:       "remove preserving other content after",
-			existing:   "<!-- dex:test-plugin -->\nTest\n<!-- /dex:test-plugin -->\n\nMore rules.",
-			pluginName: "test-plugin",
-			expected:   "More rules.\n",
-		},
-		{
-			name:       "remove preserving other content before and after",
-			existing:   "# Rules\n\n<!-- dex:test-plugin -->\nTest\n<!-- /dex:test-plugin -->\n\nMore rules.",
-			pluginName: "test-plugin",
-			expected:   "# Rules\nMore rules.\n", // TrimSpace collapses consecutive newlines
-		},
-		{
-			name:       "remove non-existent does nothing",
-			existing:   "# Rules\n",
-			pluginName: "test-plugin",
-			expected:   "# Rules\n",
-		},
-		{
-			name:       "remove preserves other plugin markers",
-			existing:   "<!-- dex:other-plugin -->\nOther\n<!-- /dex:other-plugin -->\n\n<!-- dex:test-plugin -->\nTest\n<!-- /dex:test-plugin -->",
-			pluginName: "test-plugin",
-			expected:   "<!-- dex:other-plugin -->\nOther\n<!-- /dex:other-plugin -->\n",
-		},
-		{
-			name:       "remove empty existing",
-			existing:   "",
-			pluginName: "test-plugin",
-			expected:   "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := RemoveAgentContent(tt.existing, tt.pluginName)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 func TestMergeSettingsArrays(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -1192,35 +830,9 @@ func TestExecutor_FullPlan(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "---\nname: test\n---\nContent", string(content))
 
-	// Verify MCP config
-	mcpContent, err := os.ReadFile(filepath.Join(tmpDir, ".mcp.json"))
-	require.NoError(t, err)
-	var mcpResult map[string]any
-	err = json.Unmarshal(mcpContent, &mcpResult)
-	require.NoError(t, err)
-	assert.Equal(t, map[string]any{
-		"mcpServers": map[string]any{
-			"test-server": map[string]any{
-				"command": "npx",
-				"args":    []any{"-y", "test-mcp"},
-			},
-		},
-	}, mcpResult)
-
-	// Verify settings config
-	settingsContent, err := os.ReadFile(filepath.Join(tmpDir, ".claude/settings.json"))
-	require.NoError(t, err)
-	var settingsResult map[string]any
-	err = json.Unmarshal(settingsContent, &settingsResult)
-	require.NoError(t, err)
-	assert.Equal(t, map[string]any{
-		"allow": []any{"Bash(npm:*)"},
-	}, settingsResult)
-
-	// Verify CLAUDE.md
-	agentContent, err := os.ReadFile(filepath.Join(tmpDir, "CLAUDE.md"))
-	require.NoError(t, err)
-	assert.Equal(t, "<!-- dex:full-test-plugin -->\n# Test Plugin Rules\n\nFollow these rules.\n<!-- /dex:full-test-plugin -->", string(agentContent))
+	plugin := m.GetPlugin("full-test-plugin")
+	require.NotNil(t, plugin)
+	assert.True(t, plugin.HasAgentContent)
 }
 
 func TestManifestTracking(t *testing.T) {
@@ -1347,8 +959,7 @@ func TestExecutor_MultiplePlugins_AllTrackedInManifest(t *testing.T) {
 }
 
 func TestSettingsDeduplicationOnUninstall(t *testing.T) {
-	// This test verifies that when two plugins share a settings value,
-	// uninstalling one plugin keeps the shared value if the other still needs it.
+	// This test verifies manifest tracking of settings values across plugins.
 	tmpDir := t.TempDir()
 
 	m := newTestManifest(t, tmpDir)
@@ -1368,28 +979,11 @@ func TestSettingsDeduplicationOnUninstall(t *testing.T) {
 	planB := &adapter.Plan{
 		PluginName: "plugin-b",
 		SettingsEntries: map[string]any{
-			"allow": []any{"bash:npm run *", "bash:yarn *"}, // "bash:npm run *" is shared
+			"allow": []any{"bash:npm run *", "bash:yarn *"},
 		},
 	}
 	err = executor.Execute(planB, nil)
 	require.NoError(t, err)
-
-	// Save manifest so we can read it properly
-	err = m.Save()
-	require.NoError(t, err)
-
-	// Verify merged settings
-	settingsPath := filepath.Join(tmpDir, ".claude", "settings.json")
-	content, err := os.ReadFile(settingsPath)
-	require.NoError(t, err)
-
-	var settings map[string]any
-	err = json.Unmarshal(content, &settings)
-	require.NoError(t, err)
-
-	assert.Equal(t, map[string]any{
-		"allow": []any{"bash:npm run *", "write:*.ts", "bash:yarn *"},
-	}, settings)
 
 	// Verify manifest tracks each plugin's contributions
 	pluginA := m.GetPlugin("plugin-a")
@@ -1598,142 +1192,6 @@ func TestPlatformFiltering_NoResourcesMatchingPlatform(t *testing.T) {
 }
 
 // Test Copilot MCP config with custom path and key
-
-func TestExecutor_ApplyMCPConfig_CopilotPath(t *testing.T) {
-	tmpDir := t.TempDir()
-	m := newTestManifest(t, tmpDir)
-	executor := NewExecutor(tmpDir, m, false)
-
-	// Copilot uses .vscode/mcp.json with "servers" key
-	plan := &adapter.Plan{
-		PluginName: "test-plugin",
-		MCPPath:    ".vscode/mcp.json",
-		MCPKey:     "servers",
-		MCPEntries: map[string]any{
-			"servers": map[string]any{
-				"context7": map[string]any{
-					"type":    "stdio",
-					"command": "npx",
-					"args":    []any{"-y", "@anthropic/mcp-server-context7"},
-				},
-			},
-		},
-	}
-
-	err := executor.Execute(plan, nil)
-	require.NoError(t, err)
-
-	// Verify .vscode/mcp.json created with exact content
-	mcpPath := filepath.Join(tmpDir, ".vscode", "mcp.json")
-	content, err := os.ReadFile(mcpPath)
-	require.NoError(t, err)
-
-	expectedJSON := `{
-  "servers": {
-    "context7": {
-      "args": [
-        "-y",
-        "@anthropic/mcp-server-context7"
-      ],
-      "command": "npx",
-      "type": "stdio"
-    }
-  }
-}
-`
-	assert.Equal(t, expectedJSON, string(content))
-
-	// Verify .mcp.json was NOT created
-	_, err = os.Stat(filepath.Join(tmpDir, ".mcp.json"))
-	assert.True(t, os.IsNotExist(err), ".mcp.json should not exist for Copilot")
-}
-
-func TestExecutor_ApplyMCPConfig_CopilotMerge(t *testing.T) {
-	tmpDir := t.TempDir()
-	m := newTestManifest(t, tmpDir)
-
-	// Create existing .vscode/mcp.json with servers key
-	vscodeDir := filepath.Join(tmpDir, ".vscode")
-	err := os.MkdirAll(vscodeDir, 0755)
-	require.NoError(t, err)
-
-	existingMCP := map[string]any{
-		"servers": map[string]any{
-			"existing-server": map[string]any{
-				"type":    "stdio",
-				"command": "existing-cmd",
-			},
-		},
-	}
-	err = WriteJSONFile(filepath.Join(vscodeDir, "mcp.json"), existingMCP)
-	require.NoError(t, err)
-
-	executor := NewExecutor(tmpDir, m, false)
-
-	plan := &adapter.Plan{
-		PluginName: "test-plugin",
-		MCPPath:    ".vscode/mcp.json",
-		MCPKey:     "servers",
-		MCPEntries: map[string]any{
-			"servers": map[string]any{
-				"new-server": map[string]any{
-					"type": "http",
-					"url":  "https://example.com/mcp",
-				},
-			},
-		},
-	}
-
-	err = executor.Execute(plan, nil)
-	require.NoError(t, err)
-
-	// Verify exact merged content
-	content, err := os.ReadFile(filepath.Join(vscodeDir, "mcp.json"))
-	require.NoError(t, err)
-
-	expectedJSON := `{
-  "servers": {
-    "existing-server": {
-      "command": "existing-cmd",
-      "type": "stdio"
-    },
-    "new-server": {
-      "type": "http",
-      "url": "https://example.com/mcp"
-    }
-  }
-}
-`
-	assert.Equal(t, expectedJSON, string(content))
-}
-
-func TestExecutor_ApplyAgentFileContent_CopilotPath(t *testing.T) {
-	tmpDir := t.TempDir()
-	m := newTestManifest(t, tmpDir)
-	executor := NewExecutor(tmpDir, m, false)
-
-	// Copilot uses .github/copilot-instructions.md
-	plan := &adapter.Plan{
-		PluginName:       "test-plugin",
-		AgentFilePath:    ".github/copilot-instructions.md",
-		AgentFileContent: "Always use TypeScript strict mode.",
-	}
-
-	err := executor.Execute(plan, nil)
-	require.NoError(t, err)
-
-	// Verify .github/copilot-instructions.md created (not CLAUDE.md)
-	agentPath := filepath.Join(tmpDir, ".github", "copilot-instructions.md")
-	content, err := os.ReadFile(agentPath)
-	require.NoError(t, err)
-
-	expected := "<!-- dex:test-plugin -->\nAlways use TypeScript strict mode.\n<!-- /dex:test-plugin -->"
-	assert.Equal(t, expected, string(content))
-
-	// Verify CLAUDE.md was NOT created
-	_, err = os.Stat(filepath.Join(tmpDir, "CLAUDE.md"))
-	assert.True(t, os.IsNotExist(err), "CLAUDE.md should not exist for Copilot")
-}
 
 // Tests for dependency management features
 
@@ -2328,7 +1786,7 @@ func TestExecutor_MultiplPlugins_SharedMergedFiles(t *testing.T) {
 	assert.True(t, m.IsMergedFileUsedByOthers("plugin2", ".mcp.json"))
 }
 
-func TestUninstall_RemovesEmptyMergedFile(t *testing.T) {
+func TestUninstall_RemovesDedicatedFiles(t *testing.T) {
 	tmpDir := t.TempDir()
 	m := newTestManifest(t, tmpDir)
 
@@ -2345,122 +1803,28 @@ func TestUninstall_RemovesEmptyMergedFile(t *testing.T) {
 	require.NoError(t, err)
 	inst.manifest = m
 
-	// Manually create an MCP config with one server
-	mcpPath := filepath.Join(tmpDir, ".mcp.json")
-	mcpConfig := map[string]any{
-		"mcpServers": map[string]any{
-			"test-server": map[string]any{"command": "test"},
-		},
-	}
-	err = WriteJSONFile(mcpPath, mcpConfig)
+	// Create a dedicated file and directory
+	testDir := filepath.Join(tmpDir, ".claude", "commands")
+	err = os.MkdirAll(testDir, 0755)
+	require.NoError(t, err)
+	testFile := filepath.Join(testDir, "test.md")
+	err = os.WriteFile(testFile, []byte("test content"), 0644)
 	require.NoError(t, err)
 
-	// Track the plugin and merged file
-	m.TrackMCPServer("test-plugin", "test-server")
-	m.TrackMergedFile("test-plugin", ".mcp.json")
+	// Track the plugin's dedicated files
+	m.Track("test-plugin", []string{".claude/commands/test.md"}, []string{".claude/commands"})
 
 	// Uninstall the plugin
 	err = inst.uninstallPlugin("test-plugin")
 	require.NoError(t, err)
 
-	// Since we removed the only server, .mcp.json should be empty and deleted
-	_, err = os.Stat(mcpPath)
-	assert.True(t, os.IsNotExist(err), ".mcp.json should be deleted when empty")
-}
+	// Dedicated file should be removed
+	_, err = os.Stat(testFile)
+	assert.True(t, os.IsNotExist(err), "dedicated file should be deleted")
 
-func TestUninstall_PreservesSharedMergedFile(t *testing.T) {
-	tmpDir := t.TempDir()
-	m := newTestManifest(t, tmpDir)
-
-	// Create minimal dex.hcl for installer
-	dexHCL := `project {
-  name = "test"
-  agentic_platform = "claude-code"
-}`
-	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(dexHCL), 0644)
-	require.NoError(t, err)
-
-	// Create installer
-	inst, err := NewInstaller(tmpDir)
-	require.NoError(t, err)
-	inst.manifest = m
-
-	// Create an MCP config with two servers
-	mcpPath := filepath.Join(tmpDir, ".mcp.json")
-	mcpConfig := map[string]any{
-		"mcpServers": map[string]any{
-			"server1": map[string]any{"command": "cmd1"},
-			"server2": map[string]any{"command": "cmd2"},
-		},
-	}
-	err = WriteJSONFile(mcpPath, mcpConfig)
-	require.NoError(t, err)
-
-	// Track both plugins using the same merged file
-	m.TrackMCPServer("plugin1", "server1")
-	m.TrackMergedFile("plugin1", ".mcp.json")
-	m.TrackMCPServer("plugin2", "server2")
-	m.TrackMergedFile("plugin2", ".mcp.json")
-
-	// Uninstall plugin1
-	err = inst.uninstallPlugin("plugin1")
-	require.NoError(t, err)
-
-	// .mcp.json should still exist (plugin2 still uses it)
-	_, err = os.Stat(mcpPath)
-	assert.NoError(t, err, ".mcp.json should still exist")
-
-	// It should only contain server2
-	content, err := os.ReadFile(mcpPath)
-	require.NoError(t, err)
-	var result map[string]any
-	err = json.Unmarshal(content, &result)
-	require.NoError(t, err)
-	assert.Equal(t, map[string]any{
-		"mcpServers": map[string]any{
-			"server2": map[string]any{"command": "cmd2"},
-		},
-	}, result)
-}
-
-// TestExecutor_ClaudeSettingsCreatesFile tests that claude_settings blocks
-// result in .claude/settings.json being created during installation.
-// This reproduces the issue where settings files were not being created.
-func TestExecutor_ClaudeSettingsCreatesFile(t *testing.T) {
-	tmpDir := t.TempDir()
-	m := newTestManifest(t, tmpDir)
-	executor := NewExecutor(tmpDir, m, false)
-
-	// Create a plan with just settings entries (like docker-compose plugin)
-	plan := &adapter.Plan{
-		PluginName: "test-settings-plugin",
-		SettingsEntries: map[string]any{
-			"allow": []any{"mcp__dev-toolkit-mcp"},
-		},
-	}
-
-	err := executor.Execute(plan, nil)
-	require.NoError(t, err)
-
-	// Verify .claude directory was created
-	_, err = os.Stat(filepath.Join(tmpDir, ".claude"))
-	assert.NoError(t, err, ".claude directory should be created")
-
-	// Verify .claude/settings.json was created
-	settingsPath := filepath.Join(tmpDir, ".claude/settings.json")
-	_, err = os.Stat(settingsPath)
-	require.NoError(t, err, ".claude/settings.json should exist")
-
-	// Verify settings content
-	settingsContent, err := os.ReadFile(settingsPath)
-	require.NoError(t, err)
-	var settingsResult map[string]any
-	err = json.Unmarshal(settingsContent, &settingsResult)
-	require.NoError(t, err)
-
-	assert.Equal(t, map[string]any{
-		"allow": []any{"mcp__dev-toolkit-mcp"},
-	}, settingsResult)
+	// Empty directory should be removed
+	_, err = os.Stat(testDir)
+	assert.True(t, os.IsNotExist(err), "empty directory should be deleted")
 }
 
 // =============================================================================
@@ -2499,7 +1863,7 @@ plugin "my-plugin" {
 	claudePath := filepath.Join(projectDir, "CLAUDE.md")
 	content1, err := os.ReadFile(claudePath)
 	require.NoError(t, err)
-	assert.Equal(t, "# Initial Instructions\n\n<!-- dex:my-plugin -->\nFollow this rule from my-plugin\n<!-- /dex:my-plugin -->", string(content1))
+	assert.Equal(t, "# Initial Instructions\n\nFollow this rule from my-plugin", string(content1))
 
 	// Update agent_instructions in dex.hcl
 	projectContent = `project {
@@ -2529,7 +1893,7 @@ plugin "my-plugin" {
 	// Verify: Agent file (CLAUDE.md) updated with new content
 	content2, err := os.ReadFile(claudePath)
 	require.NoError(t, err)
-	assert.Equal(t, "# Updated Instructions\n\nThis is the new content.\n\n<!-- dex:my-plugin -->\nFollow this rule from my-plugin\n<!-- /dex:my-plugin -->", string(content2))
+	assert.Equal(t, "# Updated Instructions\n\nThis is the new content.\n\nFollow this rule from my-plugin", string(content2))
 
 	// Verify: Manifest was saved
 	plugin := installer2.manifest.GetPlugin("__project__")
@@ -2581,7 +1945,7 @@ plugin "test-plugin" {
 	claudePath := filepath.Join(projectDir, "CLAUDE.md")
 	content1, err := os.ReadFile(claudePath)
 	require.NoError(t, err)
-	assert.Equal(t, "# V1 Instructions\n\n<!-- dex:test-plugin -->\nThis is version 1 content.\n<!-- /dex:test-plugin -->", string(content1))
+	assert.Equal(t, "# V1 Instructions\n\nThis is version 1 content.", string(content1))
 
 	// Set up plugin v2 in a different directory
 	pluginV2Dir := t.TempDir()
@@ -2628,7 +1992,7 @@ plugin "test-plugin" {
 	// Verify: Agent instructions updated and plugin v2 content present
 	content2, err := os.ReadFile(claudePath)
 	require.NoError(t, err)
-	assert.Equal(t, "# V2 Instructions\n\nUpdated for version 2.\n\n<!-- dex:test-plugin -->\nThis is version 2 content - updated!\n<!-- /dex:test-plugin -->", string(content2))
+	assert.Equal(t, "# V2 Instructions\n\nUpdated for version 2.\n\nThis is version 2 content - updated!", string(content2))
 }
 
 func TestInstaller_Update_DryRunMode(t *testing.T) {
@@ -2664,7 +2028,7 @@ plugin "my-plugin" {
 	content1, err := os.ReadFile(claudePath)
 	require.NoError(t, err)
 	initialContent := string(content1)
-	assert.Equal(t, "# Initial Instructions\n\n<!-- dex:my-plugin -->\nFollow this rule from my-plugin\n<!-- /dex:my-plugin -->", initialContent)
+	assert.Equal(t, "# Initial Instructions\n\nFollow this rule from my-plugin", initialContent)
 
 	// Update agent_instructions in dex.hcl
 	projectContent = `project {

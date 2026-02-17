@@ -2,8 +2,6 @@ package installer
 
 import (
 	"fmt"
-	"regexp"
-	"strings"
 )
 
 // MergeJSON merges two JSON objects.
@@ -202,58 +200,6 @@ func RemoveMCPServers(config map[string]any, names []string) map[string]any {
 	return config
 }
 
-// MergeAgentContent merges plugin content into CLAUDE.md using markers.
-// Uses markers: <!-- dex:{plugin} --> ... <!-- /dex:{plugin} -->
-func MergeAgentContent(existing, pluginName, content string) string {
-	startMarker := fmt.Sprintf("<!-- dex:%s -->", pluginName)
-	endMarker := fmt.Sprintf("<!-- /dex:%s -->", pluginName)
-	markedContent := fmt.Sprintf("%s\n%s\n%s", startMarker, content, endMarker)
-
-	// Check if markers already exist using regex
-	pattern := regexp.MustCompile(
-		fmt.Sprintf(`(?s)<!-- dex:%s -->.*?<!-- /dex:%s -->`,
-			regexp.QuoteMeta(pluginName),
-			regexp.QuoteMeta(pluginName)),
-	)
-
-	if pattern.MatchString(existing) {
-		// Replace existing marked section
-		return pattern.ReplaceAllString(existing, markedContent)
-	}
-
-	// Append new section
-	if existing == "" {
-		return markedContent
-	}
-
-	// Ensure proper spacing
-	if !strings.HasSuffix(existing, "\n") {
-		existing += "\n"
-	}
-
-	return existing + "\n" + markedContent
-}
-
-// RemoveAgentContent removes a plugin's content from CLAUDE.md.
-func RemoveAgentContent(existing, pluginName string) string {
-	// Match the entire section including markers
-	pattern := regexp.MustCompile(
-		fmt.Sprintf(`(?s)\n*<!-- dex:%s -->.*?<!-- /dex:%s -->\n*`,
-			regexp.QuoteMeta(pluginName),
-			regexp.QuoteMeta(pluginName)),
-	)
-
-	result := pattern.ReplaceAllString(existing, "\n")
-
-	// Clean up multiple consecutive newlines
-	result = strings.TrimSpace(result)
-	if result != "" {
-		result += "\n"
-	}
-
-	return result
-}
-
 // MergeSettingsArrays merges settings arrays (allow, ask, deny) by appending unique values.
 func MergeSettingsArrays(base, overlay []string) []string {
 	if base == nil {
@@ -302,33 +248,4 @@ func MergeEnvMaps(base, overlay map[string]string) map[string]string {
 	}
 
 	return result
-}
-
-// MergeProjectAgentContent merges project-level instructions with plugin-contributed sections.
-// Project instructions appear at the top without markers.
-// Plugin sections are marked with <!-- dex:plugin-name --> ... <!-- /dex:plugin-name -->
-// Returns the merged content with project instructions first, then all plugin sections.
-func MergeProjectAgentContent(existing, projectInstructions string) string {
-	// Extract all plugin sections (anything between <!-- dex:* --> markers)
-	// Use a simpler pattern that matches any plugin section
-	markerPattern := regexp.MustCompile(`(?s)<!-- dex:[^>]+ -->.*?<!-- /dex:[^>]+ -->`)
-	pluginSections := markerPattern.FindAllString(existing, -1)
-
-	// Build the new content: project instructions + plugin sections
-	var result strings.Builder
-
-	// Add project instructions (if any)
-	if projectInstructions != "" {
-		result.WriteString(strings.TrimSpace(projectInstructions))
-	}
-
-	// Add plugin sections
-	for _, section := range pluginSections {
-		if result.Len() > 0 {
-			result.WriteString("\n\n")
-		}
-		result.WriteString(section)
-	}
-
-	return result.String()
 }
