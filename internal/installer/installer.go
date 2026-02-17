@@ -931,6 +931,34 @@ func (i *Installer) FindOrphans(excluding []string) []string {
 	return orphans
 }
 
+// SyncAction describes what action was taken for a plugin during sync.
+type SyncAction string
+
+const (
+	// SyncInstalled means the plugin was freshly installed.
+	SyncInstalled SyncAction = "installed"
+	// SyncUpdated means the plugin was updated to a newer version.
+	SyncUpdated SyncAction = "updated"
+	// SyncUpToDate means the plugin was already at the latest compatible version.
+	SyncUpToDate SyncAction = "up_to_date"
+	// SyncPruned means the plugin was removed because it's no longer in config.
+	SyncPruned SyncAction = "pruned"
+)
+
+// SyncResult contains information about a single plugin's sync outcome.
+type SyncResult struct {
+	// Name is the plugin name
+	Name string
+	// Action is what happened during sync
+	Action SyncAction
+	// OldVersion is the previously installed version (empty if newly installed)
+	OldVersion string
+	// NewVersion is the version after sync (empty if pruned)
+	NewVersion string
+	// Reason is a human-readable explanation
+	Reason string
+}
+
 // UpdateResult contains information about an update operation.
 type UpdateResult struct {
 	// Name is the plugin name
@@ -977,6 +1005,244 @@ func (i *Installer) Update(names []string, dryRun bool) ([]UpdateResult, error) 
 
 	// Save files if not dry run
 	if !dryRun {
+		if err := i.manifest.Save(); err != nil {
+			return nil, errors.Wrap(err, "failed to save manifest")
+		}
+		if !i.noLock {
+			i.lock.Agent = i.project.Project.AgenticPlatform
+			if err := i.lock.Save(); err != nil {
+				return nil, errors.Wrap(err, "failed to save lock file")
+			}
+		}
+	}
+
+	return results, nil
+}
+
+// checkForUpdate checks if a newer version is available for a plugin.
+// Returns the best available version string, or empty if already up to date.
+// Also returns the PluginSpec built from project config for use in installation.
+func (i *Installer) checkForUpdate(name string) (bestVersion string, spec PluginSpec, err error) {
+	locked := i.lock.Get(name)
+	if locked == nil {
+		return "", PluginSpec{}, fmt.Errorf("plugin %q not in lock file", name)
+	}
+
+	// Get constraint from project config
+	var constraint string
+	for _, p := range i.project.Plugins {
+		if p.Name == name {
+			constraint = p.Version
+			spec = PluginSpec{
+				Name:     p.Name,
+				Version:  p.Version,
+				Source:   p.Source,
+				Registry: p.Registry,
+				Config:   p.Config,
+			}
+			break
+		}
+	}
+
+	if constraint == "" {
+		constraint = "latest"
+	}
+
+	// Resolve the registry
+	reg, regErr := i.resolveRegistry(&spec)
+	if regErr != nil {
+		return "", spec, errors.NewInstallError(name, "resolve", regErr)
+	}
+
+	// Get all available versions
+	pkgInfo, regErr := reg.GetPackageInfo(name)
+	if regErr != nil {
+		return "", spec, errors.NewInstallError(name, "resolve", regErr)
+	}
+
+	// Parse constraint and find best matching version
+	c, regErr := version.ParseConstraint(constraint)
+	if regErr != nil {
+		return "", spec, errors.NewInstallError(name, "resolve",
+			fmt.Errorf("invalid version constraint %q: %w", constraint, regErr))
+	}
+
+	// Parse available versions
+	var versions []*version.Version
+	for _, v := range pkgInfo.Versions {
+		if parsed, parseErr := version.Parse(v); parseErr == nil {
+			versions = append(versions, parsed)
+		}
+	}
+
+	// Find best matching version
+	best := c.FindBest(versions)
+	if best == nil {
+		return "", spec, nil // No matching version
+	}
+
+	// Compare with current version
+	current, parseErr := version.Parse(locked.Version)
+	if parseErr != nil {
+		current = nil
+	}
+
+	if current != nil && !best.GreaterThan(current) {
+		return "", spec, nil // Already up to date
+	}
+
+	return best.String(), spec, nil
+}
+
+// Sync synchronizes the project to match dex.hcl.
+// For each plugin in config: installs if missing, updates if outdated, skips if current.
+// For each plugin in lock file but not in config: prunes (uninstalls).
+// If dryRun is true, only reports what would change without making modifications.
+func (i *Installer) Sync(dryRun bool) ([]SyncResult, error) {
+	var results []SyncResult
+
+	// Build set of config plugin names
+	configPlugins := make(map[string]bool)
+	for _, p := range i.project.Plugins {
+		configPlugins[p.Name] = true
+	}
+
+	// Process each plugin in config
+	for _, plugin := range i.project.Plugins {
+		locked := i.lock.Get(plugin.Name)
+
+		if locked == nil {
+			// Not installed → install
+			if dryRun {
+				// Resolve what version would be installed
+				spec := PluginSpec{
+					Name:     plugin.Name,
+					Version:  plugin.Version,
+					Source:   plugin.Source,
+					Registry: plugin.Registry,
+					Config:   plugin.Config,
+				}
+				reg, err := i.resolveRegistry(&spec)
+				if err != nil {
+					return nil, errors.NewInstallError(plugin.Name, "resolve", err)
+				}
+				resolved, err := reg.ResolvePackage(plugin.Name, plugin.Version)
+				if err != nil {
+					return nil, errors.NewInstallError(plugin.Name, "resolve", err)
+				}
+				results = append(results, SyncResult{
+					Name:       plugin.Name,
+					Action:     SyncInstalled,
+					NewVersion: resolved.Version,
+					Reason:     "would install",
+				})
+			} else {
+				spec := PluginSpec{
+					Name:     plugin.Name,
+					Version:  plugin.Version,
+					Source:   plugin.Source,
+					Registry: plugin.Registry,
+					Config:   plugin.Config,
+				}
+				// If locked version exists for version hint, use it
+				if lockedEntry := i.lock.Get(plugin.Name); lockedEntry != nil && plugin.Version == "" {
+					spec.Version = lockedEntry.Version
+				}
+				info, err := i.installPlugin(spec)
+				if err != nil {
+					return nil, err
+				}
+				results = append(results, SyncResult{
+					Name:       plugin.Name,
+					Action:     SyncInstalled,
+					NewVersion: info.Version,
+					Reason:     "installed",
+				})
+			}
+		} else {
+			// Already installed → check for update
+			bestVersion, spec, err := i.checkForUpdate(plugin.Name)
+			if err != nil {
+				return nil, err
+			}
+
+			if bestVersion == "" {
+				// Up to date
+				results = append(results, SyncResult{
+					Name:       plugin.Name,
+					Action:     SyncUpToDate,
+					OldVersion: locked.Version,
+					NewVersion: locked.Version,
+					Reason:     "up to date",
+				})
+			} else {
+				// Update available
+				if dryRun {
+					results = append(results, SyncResult{
+						Name:       plugin.Name,
+						Action:     SyncUpdated,
+						OldVersion: locked.Version,
+						NewVersion: bestVersion,
+						Reason:     "would update",
+					})
+				} else {
+					spec.Version = bestVersion
+					_, err := i.installPlugin(spec)
+					if err != nil {
+						return nil, err
+					}
+					results = append(results, SyncResult{
+						Name:       plugin.Name,
+						Action:     SyncUpdated,
+						OldVersion: locked.Version,
+						NewVersion: bestVersion,
+						Reason:     "updated",
+					})
+				}
+			}
+		}
+	}
+
+	// Prune plugins in lock file but not in config
+	for pluginName := range i.lock.Plugins {
+		if !configPlugins[pluginName] {
+			lockedVersion := i.lock.Plugins[pluginName].Version
+			if dryRun {
+				results = append(results, SyncResult{
+					Name:       pluginName,
+					Action:     SyncPruned,
+					OldVersion: lockedVersion,
+					Reason:     "would prune",
+				})
+			} else {
+				if err := i.uninstallPlugin(pluginName); err != nil {
+					return nil, err
+				}
+				i.lock.Remove(pluginName)
+				results = append(results, SyncResult{
+					Name:       pluginName,
+					Action:     SyncPruned,
+					OldVersion: lockedVersion,
+					Reason:     "pruned",
+				})
+			}
+		}
+	}
+
+	// Sort results for consistent output: installed, updated, up_to_date, pruned
+	sort.Slice(results, func(a, b int) bool {
+		order := map[SyncAction]int{SyncInstalled: 0, SyncUpdated: 1, SyncUpToDate: 2, SyncPruned: 3}
+		if order[results[a].Action] != order[results[b].Action] {
+			return order[results[a].Action] < order[results[b].Action]
+		}
+		return results[a].Name < results[b].Name
+	})
+
+	// Apply local resources and save if not dry-run
+	if !dryRun {
+		if err := i.applyLocalResources(); err != nil {
+			return nil, err
+		}
 		if err := i.manifest.Save(); err != nil {
 			return nil, errors.Wrap(err, "failed to save manifest")
 		}

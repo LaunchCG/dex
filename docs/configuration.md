@@ -140,14 +140,13 @@ The lock file ensures deterministic installations by recording exact versions an
 To update all plugins to their latest compatible versions:
 
 ```bash
-rm dex.lock
-dex install
+dex sync
 ```
 
 To update a specific plugin:
 
 ```bash
-dex install plugin-name@latest
+dex sync plugin-name@latest
 ```
 
 ## Version Specifiers

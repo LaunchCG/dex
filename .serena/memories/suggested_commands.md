@@ -17,7 +17,7 @@ go build -o dex ./cmd/dex  # Build the CLI binary
 ```bash
 ./dex --help               # Show help
 ./dex init                 # Initialize a new project
-./dex install              # Install plugins
+./dex sync                 # Sync plugins (install/update/prune)
 ./dex uninstall <plugin>   # Uninstall a plugin
 ./dex list                 # List installed plugins
 ```

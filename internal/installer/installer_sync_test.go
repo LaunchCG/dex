@@ -1,0 +1,423 @@
+package installer
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// =============================================================================
+// Sync Tests
+// =============================================================================
+
+func TestSync_InstallsMissingPlugins(t *testing.T) {
+	projectDir := t.TempDir()
+
+	// Set up a local plugin
+	pluginDir := t.TempDir()
+	createTestPlugin(t, pluginDir, "new-plugin", "1.0.0", "A new plugin")
+
+	// Create project config referencing the plugin
+	createTestProject(t, projectDir, `
+plugin "new-plugin" {
+  source = "file:`+pluginDir+`"
+}
+`)
+
+	inst, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+
+	results, err := inst.Sync(false)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	assert.Equal(t, "new-plugin", results[0].Name)
+	assert.Equal(t, SyncInstalled, results[0].Action)
+	assert.Equal(t, "1.0.0", results[0].NewVersion)
+	assert.Empty(t, results[0].OldVersion)
+
+	// Verify it was actually installed
+	claudeContent, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
+	require.NoError(t, err)
+	expected := "<!-- dex:new-plugin -->\nFollow this rule from new-plugin\n<!-- /dex:new-plugin -->"
+	assert.Equal(t, expected, string(claudeContent))
+
+	// Verify lock file
+	lockContent, err := os.ReadFile(filepath.Join(projectDir, "dex.lock"))
+	require.NoError(t, err)
+	var lockData map[string]any
+	err = json.Unmarshal(lockContent, &lockData)
+	require.NoError(t, err)
+	plugins := lockData["plugins"].(map[string]any)
+	require.Contains(t, plugins, "new-plugin")
+}
+
+func TestSync_UpdatesOutdatedPlugins(t *testing.T) {
+	projectDir := t.TempDir()
+
+	// Set up a local registry with multiple versions
+	registryDir := t.TempDir()
+	createLocalRegistryIndex(t, registryDir, map[string][]string{
+		"updatable-plugin": {"1.0.0", "1.1.0"},
+	})
+
+	pluginDir := filepath.Join(registryDir, "updatable-plugin")
+	err := os.MkdirAll(pluginDir, 0755)
+	require.NoError(t, err)
+	createTestPlugin(t, pluginDir, "updatable-plugin", "1.1.0", "Updatable plugin")
+
+	// Create project config
+	createTestProject(t, projectDir, `
+registry "local" {
+  path = "`+registryDir+`"
+}
+
+plugin "updatable-plugin" {
+  registry = "local"
+}
+`)
+
+	// First install to get v1.1.0 locked
+	inst1, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	err = inst1.InstallAll()
+	require.NoError(t, err)
+
+	// Now add a newer version to the registry
+	createLocalRegistryIndex(t, registryDir, map[string][]string{
+		"updatable-plugin": {"1.0.0", "1.1.0", "1.2.0"},
+	})
+	// Update the package.hcl to reflect the new version
+	createTestPlugin(t, pluginDir, "updatable-plugin", "1.2.0", "Updatable plugin v1.2.0")
+
+	// Sync should detect the update
+	inst2, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+
+	results, err := inst2.Sync(false)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	assert.Equal(t, "updatable-plugin", results[0].Name)
+	assert.Equal(t, SyncUpdated, results[0].Action)
+	assert.Equal(t, "1.1.0", results[0].OldVersion)
+	assert.Equal(t, "1.2.0", results[0].NewVersion)
+}
+
+func TestSync_SkipsUpToDatePlugins(t *testing.T) {
+	projectDir := t.TempDir()
+
+	// Set up a local registry
+	registryDir := t.TempDir()
+	createLocalRegistryIndex(t, registryDir, map[string][]string{
+		"stable-plugin": {"1.0.0"},
+	})
+
+	pluginDir := filepath.Join(registryDir, "stable-plugin")
+	err := os.MkdirAll(pluginDir, 0755)
+	require.NoError(t, err)
+	createTestPlugin(t, pluginDir, "stable-plugin", "1.0.0", "Stable plugin")
+
+	// Create project config
+	createTestProject(t, projectDir, `
+registry "local" {
+  path = "`+registryDir+`"
+}
+
+plugin "stable-plugin" {
+  registry = "local"
+}
+`)
+
+	// First install
+	inst1, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	err = inst1.InstallAll()
+	require.NoError(t, err)
+
+	// Sync should show up-to-date
+	inst2, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+
+	results, err := inst2.Sync(false)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	assert.Equal(t, "stable-plugin", results[0].Name)
+	assert.Equal(t, SyncUpToDate, results[0].Action)
+	assert.Equal(t, "1.0.0", results[0].OldVersion)
+	assert.Equal(t, "1.0.0", results[0].NewVersion)
+}
+
+func TestSync_PrunesOrphanedPlugins(t *testing.T) {
+	projectDir := t.TempDir()
+
+	// Set up two local plugins
+	pluginADir := t.TempDir()
+	createTestPlugin(t, pluginADir, "keep-plugin", "1.0.0", "Keep this plugin")
+
+	pluginBDir := t.TempDir()
+	createTestPlugin(t, pluginBDir, "remove-plugin", "1.0.0", "Remove this plugin")
+
+	// Create project config with both plugins
+	createTestProject(t, projectDir, `
+plugin "keep-plugin" {
+  source = "file:`+pluginADir+`"
+}
+
+plugin "remove-plugin" {
+  source = "file:`+pluginBDir+`"
+}
+`)
+
+	// Install both
+	inst1, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	err = inst1.InstallAll()
+	require.NoError(t, err)
+
+	// Now update config to only have keep-plugin
+	createTestProject(t, projectDir, `
+plugin "keep-plugin" {
+  source = "file:`+pluginADir+`"
+}
+`)
+
+	// Sync should prune remove-plugin
+	inst2, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+
+	results, err := inst2.Sync(false)
+	require.NoError(t, err)
+	require.Len(t, results, 2)
+
+	// Results are sorted: up_to_date first, then pruned
+	var upToDate, pruned *SyncResult
+	for idx := range results {
+		switch results[idx].Action {
+		case SyncUpToDate:
+			upToDate = &results[idx]
+		case SyncPruned:
+			pruned = &results[idx]
+		}
+	}
+
+	require.NotNil(t, upToDate)
+	assert.Equal(t, "keep-plugin", upToDate.Name)
+
+	require.NotNil(t, pruned)
+	assert.Equal(t, "remove-plugin", pruned.Name)
+	assert.Equal(t, "1.0.0", pruned.OldVersion)
+
+	// Verify remove-plugin is no longer in lock file
+	lockContent, err := os.ReadFile(filepath.Join(projectDir, "dex.lock"))
+	require.NoError(t, err)
+	var lockData map[string]any
+	err = json.Unmarshal(lockContent, &lockData)
+	require.NoError(t, err)
+	plugins := lockData["plugins"].(map[string]any)
+	assert.NotContains(t, plugins, "remove-plugin")
+	assert.Contains(t, plugins, "keep-plugin")
+}
+
+func TestSync_DryRunReportsWithoutChanges(t *testing.T) {
+	projectDir := t.TempDir()
+
+	// Set up a local plugin that isn't installed yet
+	pluginDir := t.TempDir()
+	createTestPlugin(t, pluginDir, "dry-run-plugin", "1.0.0", "Dry run plugin")
+
+	// Create project config
+	createTestProject(t, projectDir, `
+plugin "dry-run-plugin" {
+  source = "file:`+pluginDir+`"
+}
+`)
+
+	inst, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+
+	results, err := inst.Sync(true)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	assert.Equal(t, "dry-run-plugin", results[0].Name)
+	assert.Equal(t, SyncInstalled, results[0].Action)
+	assert.Equal(t, "1.0.0", results[0].NewVersion)
+	assert.Equal(t, "would install", results[0].Reason)
+
+	// Verify nothing was actually installed
+	_, err = os.Stat(filepath.Join(projectDir, "CLAUDE.md"))
+	assert.True(t, os.IsNotExist(err), "CLAUDE.md should not exist after dry-run")
+
+	_, err = os.Stat(filepath.Join(projectDir, "dex.lock"))
+	assert.True(t, os.IsNotExist(err), "dex.lock should not exist after dry-run")
+}
+
+func TestSync_DryRunPrune(t *testing.T) {
+	projectDir := t.TempDir()
+
+	// Install a plugin first
+	pluginDir := t.TempDir()
+	createTestPlugin(t, pluginDir, "prune-me", "1.0.0", "Will be pruned")
+
+	createTestProject(t, projectDir, `
+plugin "prune-me" {
+  source = "file:`+pluginDir+`"
+}
+`)
+
+	inst1, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	err = inst1.InstallAll()
+	require.NoError(t, err)
+
+	// Remove plugin from config
+	createTestProject(t, projectDir, "")
+
+	// Dry-run sync
+	inst2, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+
+	results, err := inst2.Sync(true)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	assert.Equal(t, "prune-me", results[0].Name)
+	assert.Equal(t, SyncPruned, results[0].Action)
+	assert.Equal(t, "would prune", results[0].Reason)
+
+	// Verify the plugin is still installed (dry-run didn't remove it)
+	lockContent, err := os.ReadFile(filepath.Join(projectDir, "dex.lock"))
+	require.NoError(t, err)
+	var lockData map[string]any
+	err = json.Unmarshal(lockContent, &lockData)
+	require.NoError(t, err)
+	plugins := lockData["plugins"].(map[string]any)
+	assert.Contains(t, plugins, "prune-me")
+}
+
+func TestSync_MixedInstallUpdatePrune(t *testing.T) {
+	projectDir := t.TempDir()
+
+	// Set up a registry with two plugins
+	registryDir := t.TempDir()
+	createLocalRegistryIndex(t, registryDir, map[string][]string{
+		"existing-plugin": {"1.0.0"},
+		"orphan-plugin":   {"1.0.0"},
+	})
+
+	existingDir := filepath.Join(registryDir, "existing-plugin")
+	err := os.MkdirAll(existingDir, 0755)
+	require.NoError(t, err)
+	createTestPlugin(t, existingDir, "existing-plugin", "1.0.0", "Existing plugin")
+
+	orphanDir := filepath.Join(registryDir, "orphan-plugin")
+	err = os.MkdirAll(orphanDir, 0755)
+	require.NoError(t, err)
+	createTestPlugin(t, orphanDir, "orphan-plugin", "1.0.0", "Orphan plugin")
+
+	// Install both plugins
+	createTestProject(t, projectDir, `
+registry "local" {
+  path = "`+registryDir+`"
+}
+
+plugin "existing-plugin" {
+  registry = "local"
+}
+
+plugin "orphan-plugin" {
+  registry = "local"
+}
+`)
+
+	inst1, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	err = inst1.InstallAll()
+	require.NoError(t, err)
+
+	// Now: add a new version for existing-plugin, add a new plugin, remove orphan-plugin
+	createLocalRegistryIndex(t, registryDir, map[string][]string{
+		"existing-plugin": {"1.0.0", "1.1.0"},
+		"orphan-plugin":   {"1.0.0"},
+		"new-plugin":      {"2.0.0"},
+	})
+	createTestPlugin(t, existingDir, "existing-plugin", "1.1.0", "Existing plugin v1.1.0")
+
+	newDir := filepath.Join(registryDir, "new-plugin")
+	err = os.MkdirAll(newDir, 0755)
+	require.NoError(t, err)
+	createTestPlugin(t, newDir, "new-plugin", "2.0.0", "Brand new plugin")
+
+	// Update config: keep existing-plugin, add new-plugin, remove orphan-plugin
+	createTestProject(t, projectDir, `
+registry "local" {
+  path = "`+registryDir+`"
+}
+
+plugin "existing-plugin" {
+  registry = "local"
+}
+
+plugin "new-plugin" {
+  registry = "local"
+}
+`)
+
+	// Sync
+	inst2, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+
+	results, err := inst2.Sync(false)
+	require.NoError(t, err)
+	require.Len(t, results, 3)
+
+	// Build a map for easier assertion
+	resultMap := make(map[string]SyncResult)
+	for _, r := range results {
+		resultMap[r.Name] = r
+	}
+
+	// new-plugin should be installed
+	assert.Equal(t, SyncInstalled, resultMap["new-plugin"].Action)
+	assert.Equal(t, "2.0.0", resultMap["new-plugin"].NewVersion)
+
+	// existing-plugin should be updated
+	assert.Equal(t, SyncUpdated, resultMap["existing-plugin"].Action)
+	assert.Equal(t, "1.0.0", resultMap["existing-plugin"].OldVersion)
+	assert.Equal(t, "1.1.0", resultMap["existing-plugin"].NewVersion)
+
+	// orphan-plugin should be pruned
+	assert.Equal(t, SyncPruned, resultMap["orphan-plugin"].Action)
+	assert.Equal(t, "1.0.0", resultMap["orphan-plugin"].OldVersion)
+
+	// Verify lock file reflects the sync
+	lockContent, err := os.ReadFile(filepath.Join(projectDir, "dex.lock"))
+	require.NoError(t, err)
+	var lockData map[string]any
+	err = json.Unmarshal(lockContent, &lockData)
+	require.NoError(t, err)
+	plugins := lockData["plugins"].(map[string]any)
+	assert.Contains(t, plugins, "existing-plugin")
+	assert.Contains(t, plugins, "new-plugin")
+	assert.NotContains(t, plugins, "orphan-plugin")
+	assert.Equal(t, "1.1.0", plugins["existing-plugin"].(map[string]any)["version"])
+	assert.Equal(t, "2.0.0", plugins["new-plugin"].(map[string]any)["version"])
+}
+
+func TestSync_EmptyConfig(t *testing.T) {
+	projectDir := t.TempDir()
+	createTestProject(t, projectDir, "")
+
+	inst, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+
+	results, err := inst.Sync(false)
+	require.NoError(t, err)
+	assert.Empty(t, results)
+}

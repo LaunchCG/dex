@@ -66,12 +66,14 @@ dex init --path /path/to/project
 
 ---
 
-### dex install
+### dex sync
 
-Install plugins.
+Synchronize plugins to match dex.hcl configuration.
+
+Without arguments, syncs all plugins: installs missing, updates outdated, and prunes orphaned plugins. With arguments, installs or updates specific plugins.
 
 ```bash
-dex install [PLUGINS...] [OPTIONS]
+dex sync [PLUGINS...] [OPTIONS]
 ```
 
 **Arguments:**
@@ -96,10 +98,12 @@ dex install [PLUGINS...] [OPTIONS]
 |--------|-------|-------------|---------|
 | `--source` | `-s` | Direct source path (file://) | - |
 | `--registry` | `-r` | Registry to use (overrides default) | - |
-| `--save` | `-S` | Save installed plugins to dex.hcl | `false` |
+| `--no-save` | - | Don't save to config file (plugins are saved by default) | `false` |
 | `--no-lock` | - | Don't update lock file | `false` |
 | `--force` | `-f` | Overwrite existing files even if not managed by dex | `false` |
 | `--path` | `-p` | Project directory | Current directory |
+| `--namespace` | - | Namespace resources with package name | `false` |
+| `--dry-run` | `-n` | Show what would change without making changes | `false` |
 
 **File Conflict Protection:**
 
@@ -108,35 +112,38 @@ By default, Dex will refuse to overwrite files that exist but aren't tracked in 
 **Examples:**
 
 ```bash
-# Install all plugins from dex.hcl
-dex install
+# Sync all plugins (install missing, update outdated, prune orphaned)
+dex sync
 
-# Install specific plugin
-dex install my-plugin
+# Preview what sync would do
+dex sync --dry-run
+
+# Install a specific plugin
+dex sync my-plugin
 
 # Install with version specifier
-dex install my-plugin@^1.0.0
-
-# Install and save to dex.hcl
-dex install my-plugin@^1.0.0 --save
+dex sync my-plugin@^1.0.0
 
 # Install from a specific registry
-dex install my-plugin --registry file:./my-registry
+dex sync my-plugin --registry file:./my-registry
 
 # Install from local source
-dex install --source file:./local-plugin
+dex sync --source file:./local-plugin
+
+# Install without saving to dex.hcl
+dex sync my-plugin --no-save
 
 # Install without updating lock file
-dex install --no-lock
+dex sync --no-lock
 
 # Force overwrite existing files
-dex install my-plugin --force
+dex sync my-plugin --force
 ```
 
 **Exit Codes:**
 
-- `0` - All installations successful
-- `1` - One or more installations failed (including file conflicts)
+- `0` - All operations successful
+- `1` - One or more operations failed (including file conflicts)
 
 ---
 
@@ -197,7 +204,7 @@ dex uninstall PLUGINS... [OPTIONS]
 Without `--remove`:
 - Deletes installed files tracked in the manifest
 - Cleans up MCP servers
-- Keeps the plugin in dex.hcl (can reinstall with `dex install`)
+- Keeps the plugin in dex.hcl (can reinstall with `dex sync`)
 
 With `--remove`:
 - Does all of the above

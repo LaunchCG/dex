@@ -1,7 +1,7 @@
 // Package lockfile provides lock file management for reproducible installs.
 //
 // The lock file is stored at dex.lock and pins exact versions of all installed
-// plugins. This ensures that `dex install` produces identical results across
+// plugins. This ensures that `dex sync` produces identical results across
 // different machines and times.
 package lockfile
 

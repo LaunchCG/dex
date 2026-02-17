@@ -66,7 +66,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 	fmt.Println("Next steps:")
 	fmt.Println("  1. Add plugins to dex.hcl")
-	fmt.Println("  2. Run 'dex install' to install plugins")
+	fmt.Println("  2. Run 'dex sync' to install plugins")
 
 	return nil
 }

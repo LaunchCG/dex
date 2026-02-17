@@ -2613,7 +2613,7 @@ plugin "test-plugin" {
 	err = os.WriteFile(filepath.Join(projectDir, "dex.hcl"), []byte(projectContent), 0644)
 	require.NoError(t, err)
 
-	// Execute: dex update (this should reinstall the plugin since source changed)
+	// Execute: sync/update (this should reinstall the plugin since source changed)
 	installer2, err := NewInstaller(projectDir)
 	require.NoError(t, err)
 	results, err := installer2.Update(nil, false)
@@ -2680,7 +2680,7 @@ plugin "my-plugin" {
 	err = os.WriteFile(filepath.Join(projectDir, "dex.hcl"), []byte(projectContent), 0644)
 	require.NoError(t, err)
 
-	// Execute: dex update --dry-run
+	// Execute: sync --dry-run (tests Update method internally)
 	installer2, err := NewInstaller(projectDir)
 	require.NoError(t, err)
 	results, err := installer2.Update(nil, true) // dryRun = true

@@ -59,10 +59,10 @@ make install
 dex init --platform claude-code
 
 # Install a plugin from GitHub
-dex install git+https://github.com/owner/my-plugin.git
+dex sync git+https://github.com/owner/my-plugin.git
 
 # Install from a local directory (for development)
-dex install file:///path/to/my-plugin
+dex sync file:///path/to/my-plugin
 
 # List installed plugins
 dex list

@@ -361,7 +361,7 @@ git push origin v1.0.0
 Users can install directly:
 
 ```bash
-dex install git+https://github.com/owner/my-plugin.git@v1.0.0
+dex sync git+https://github.com/owner/my-plugin.git@v1.0.0
 ```
 
 ## Best Practices
