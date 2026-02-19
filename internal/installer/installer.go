@@ -416,6 +416,21 @@ func (i *Installer) installPlugin(spec PluginSpec) (*InstalledPlugin, error) {
 	// Merge all plans
 	mergedPlan := adapter.MergePlans(allPlans...)
 
+	// Always clean up stale dedicated files/dirs from a previous install, even if
+	// the new plan is empty (e.g., plugin had claude_skill resources but platform
+	// is now github-copilot — no new files, but old .claude/skills/ must go).
+	newFilePaths := make(map[string]bool, len(mergedPlan.Files))
+	for _, f := range mergedPlan.Files {
+		newFilePaths[f.Path] = true
+	}
+	newDirPaths := make(map[string]bool, len(mergedPlan.Directories))
+	for _, d := range mergedPlan.Directories {
+		newDirPaths[d.Path] = true
+	}
+	if err := executor.RemoveStaleEntries(pluginName, newFilePaths, newDirPaths); err != nil {
+		return nil, errors.NewInstallError(pluginName, "install", err)
+	}
+
 	// Execute the merged plan (creates dirs, writes dedicated files, tracks in manifest)
 	if err := executor.Execute(mergedPlan, vars); err != nil {
 		return nil, errors.NewInstallError(pluginName, "install", err)
@@ -624,22 +639,130 @@ func (i *Installer) installProjectResources() error {
 	return nil
 }
 
+// platformSharedPaths returns the default shared file paths for a given platform.
+// These are the paths used when no plugin contribution overrides them.
+func platformSharedPaths(platform string) (agentPath, mcpPath, mcpKey, settingsPath string) {
+	agentPath = "CLAUDE.md"
+	mcpPath = ".mcp.json"
+	mcpKey = "mcpServers"
+	settingsPath = filepath.Join(".claude", "settings.json")
+
+	switch platform {
+	case "cursor":
+		agentPath = "AGENTS.md"
+		mcpPath = filepath.Join(".cursor", "mcp.json")
+		mcpKey = "mcpServers"
+	case "github-copilot":
+		agentPath = filepath.Join(".github", "copilot-instructions.md")
+		mcpPath = filepath.Join(".vscode", "mcp.json")
+		mcpKey = "servers"
+		settingsPath = "" // Copilot has no settings.json equivalent
+	}
+
+	return
+}
+
+// platformInstallDirs returns the directories that a platform's adapter installs
+// plugin resources into. Used to sweep empty remnant directories after a platform
+// switch.
+func platformInstallDirs(platform string) []string {
+	switch platform {
+	case "claude-code":
+		return []string{
+			filepath.Join(".claude", "skills"),
+			filepath.Join(".claude", "commands"),
+			filepath.Join(".claude", "agents"),
+			filepath.Join(".claude", "rules"),
+		}
+	case "cursor":
+		return []string{
+			filepath.Join(".cursor", "rules"),
+		}
+	case "github-copilot":
+		// .github is a standard VCS directory — don't sweep it wholesale
+		return nil
+	}
+	return nil
+}
+
+// removeEmptyDirsUnder recursively removes empty leaf directories under root,
+// then removes root itself if it ends up empty. Safe to call when root doesn't exist.
+func removeEmptyDirsUnder(root string) {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return // doesn't exist or unreadable
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			removeEmptyDirsUnder(filepath.Join(root, e.Name()))
+		}
+	}
+	// Re-read after recursion; remove root if now empty
+	entries, err = os.ReadDir(root)
+	if err == nil && len(entries) == 0 {
+		os.Remove(root)
+	}
+}
+
+// cleanupOldPlatformFiles removes shared files that belong to a different platform.
+// Only the files are deleted — manifest data is left for the executor to replace
+// during plugin reinstallation.
+func (i *Installer) cleanupOldPlatformFiles(oldPlatform string) error {
+	oldAgentPath, oldMCPPath, _, oldSettingsPath := platformSharedPaths(oldPlatform)
+	newAgentPath, newMCPPath, _, newSettingsPath := platformSharedPaths(i.project.Project.AgenticPlatform)
+
+	// Remove old agent file if it lives at a different path than the current platform's
+	if oldAgentPath != newAgentPath {
+		path := filepath.Join(i.projectRoot, oldAgentPath)
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("removing old agent file %s: %w", oldAgentPath, err)
+		}
+	}
+
+	// Remove old MCP config if it lives at a different path than the current platform's
+	if oldMCPPath != newMCPPath {
+		path := filepath.Join(i.projectRoot, oldMCPPath)
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("removing old MCP config %s: %w", oldMCPPath, err)
+		}
+	}
+
+	// Remove old settings config if it lives at a different path than the current platform's
+	// oldSettingsPath == "" means that platform had no settings file (e.g., github-copilot)
+	if oldSettingsPath != newSettingsPath && oldSettingsPath != "" {
+		path := filepath.Join(i.projectRoot, oldSettingsPath)
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("removing old settings config %s: %w", oldSettingsPath, err)
+		}
+	}
+
+	// Sweep empty install directories left over from the old platform
+	for _, dir := range platformInstallDirs(oldPlatform) {
+		removeEmptyDirsUnder(filepath.Join(i.projectRoot, dir))
+	}
+
+	return nil
+}
+
 // generateSharedFiles regenerates all shared files (agent file, MCP config, settings)
 // from scratch using collected plugin contributions. Uses hash comparison to avoid
 // unnecessary writes. Non-dex entries in MCP and settings files are preserved.
 func (i *Installer) generateSharedFiles() error {
-	// Determine default paths from platform
-	agentPath := "CLAUDE.md"
-	mcpPath := ".mcp.json"
-	mcpKey := "mcpServers"
-	settingsPath := filepath.Join(".claude", "settings.json")
-
-	switch i.project.Project.AgenticPlatform {
-	case "cursor":
-		agentPath = "AGENTS.md"
-	case "github-copilot":
-		agentPath = filepath.Join(".github", "copilot-instructions.md")
+	// Always clean up shared files from all other platforms.
+	// This handles: platform switches (including ones that happened before this
+	// cleanup logic existed), and ensures the working tree stays clean on every sync.
+	allPlatforms := []string{"claude-code", "cursor", "github-copilot"}
+	for _, platform := range allPlatforms {
+		if platform == i.project.Project.AgenticPlatform {
+			continue
+		}
+		if err := i.cleanupOldPlatformFiles(platform); err != nil {
+			return err
+		}
 	}
+
+	// Determine default paths from platform
+	agentPath, mcpPath, mcpKey, settingsPath := platformSharedPaths(i.project.Project.AgenticPlatform)
 
 	// Override from contributions if specified
 	for _, c := range i.contributions {
@@ -678,8 +801,11 @@ func (i *Installer) generateSharedFiles() error {
 	}
 
 	// 3. Generate settings config from scratch (preserving non-dex entries)
-	if err := i.generateSettingsConfig(settingsPath); err != nil {
-		return err
+	// Skip if the platform has no settings file (e.g., github-copilot)
+	if settingsPath != "" {
+		if err := i.generateSettingsConfig(settingsPath); err != nil {
+			return err
+		}
 	}
 
 	return nil

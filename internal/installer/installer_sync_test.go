@@ -542,3 +542,232 @@ func TestSync_EmptyConfig(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, results)
 }
+
+// =============================================================================
+// Platform Switch Tests
+// =============================================================================
+
+// createClaudePlugin creates a package.hcl with claude-code-specific resources.
+func createClaudePlugin(t *testing.T, dir, name, version string) {
+	t.Helper()
+	content := `package {
+  name = "` + name + `"
+  version = "` + version + `"
+  description = "Claude-code plugin"
+}
+
+claude_rule "` + name + `-rule" {
+  description = "Rule from ` + name + `"
+  content = "Follow this rule from ` + name + `"
+}
+
+claude_skill "` + name + `-skill" {
+  description = "Skill from ` + name + `"
+  content = "This is a skill from ` + name + `"
+}
+`
+	err := os.WriteFile(filepath.Join(dir, "package.hcl"), []byte(content), 0644)
+	require.NoError(t, err)
+}
+
+// createMCPUniversalPlugin creates a package.hcl with a universal mcp_server.
+func createMCPUniversalPlugin(t *testing.T, dir, name, version string) {
+	t.Helper()
+	content := `package {
+  name = "` + name + `"
+  version = "` + version + `"
+  description = "MCP plugin"
+}
+
+mcp_server "` + name + `-server" {
+  description = "MCP server from ` + name + `"
+  command = "npx"
+  args = ["-y", "` + name + `"]
+}
+`
+	err := os.WriteFile(filepath.Join(dir, "package.hcl"), []byte(content), 0644)
+	require.NoError(t, err)
+}
+
+func TestSync_PlatformSwitch_ClaudeToGithubCopilot_SharedFiles(t *testing.T) {
+	projectDir := t.TempDir()
+	pluginDir := t.TempDir()
+	createMCPUniversalPlugin(t, pluginDir, "mcp-plugin", "1.0.0")
+
+	writeConfig := func(platform string) {
+		t.Helper()
+		content := `project {
+  name = "test-project"
+  agentic_platform = "` + platform + `"
+}
+
+plugin "mcp-plugin" {
+  source = "file:` + pluginDir + `"
+}
+`
+		err := os.WriteFile(filepath.Join(projectDir, "dex.hcl"), []byte(content), 0644)
+		require.NoError(t, err)
+	}
+
+	// Install as claude-code
+	writeConfig("claude-code")
+	inst1, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	_, err = inst1.Sync(false)
+	require.NoError(t, err)
+	assert.FileExists(t, filepath.Join(projectDir, ".mcp.json"))
+
+	// Switch to github-copilot
+	writeConfig("github-copilot")
+	inst2, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	_, err = inst2.Sync(false)
+	require.NoError(t, err)
+
+	// claude-code files must be gone
+	assert.NoFileExists(t, filepath.Join(projectDir, "CLAUDE.md"), "CLAUDE.md must be removed after platform switch")
+	assert.NoFileExists(t, filepath.Join(projectDir, ".mcp.json"), ".mcp.json must be removed after platform switch")
+	assert.NoFileExists(t, filepath.Join(projectDir, ".claude", "settings.json"), ".claude/settings.json must be removed after platform switch")
+
+	// copilot MCP must exist with correct key
+	vscodeMCP := filepath.Join(projectDir, ".vscode", "mcp.json")
+	assert.FileExists(t, vscodeMCP, ".vscode/mcp.json must be created for github-copilot")
+
+	data, err := os.ReadFile(vscodeMCP)
+	require.NoError(t, err)
+	var mcpConfig map[string]any
+	require.NoError(t, json.Unmarshal(data, &mcpConfig))
+	assert.Contains(t, mcpConfig, "servers", ".vscode/mcp.json must use 'servers' key")
+	assert.NotContains(t, mcpConfig, "mcpServers", ".vscode/mcp.json must not use 'mcpServers' key")
+}
+
+func TestSync_PlatformSwitch_ClaudeToGithubCopilot_DedicatedFiles(t *testing.T) {
+	projectDir := t.TempDir()
+	pluginDir := t.TempDir()
+	createClaudePlugin(t, pluginDir, "my-plugin", "1.0.0")
+
+	writeConfig := func(platform string) {
+		t.Helper()
+		content := `project {
+  name = "test-project"
+  agentic_platform = "` + platform + `"
+}
+
+plugin "my-plugin" {
+  source = "file:` + pluginDir + `"
+}
+`
+		err := os.WriteFile(filepath.Join(projectDir, "dex.hcl"), []byte(content), 0644)
+		require.NoError(t, err)
+	}
+
+	// Install as claude-code
+	writeConfig("claude-code")
+	inst1, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	_, err = inst1.Sync(false)
+	require.NoError(t, err)
+
+	assert.FileExists(t, filepath.Join(projectDir, "CLAUDE.md"))
+	skillDir := filepath.Join(projectDir, ".claude", "skills", "my-plugin-skill")
+	assert.DirExists(t, skillDir, ".claude/skills/ must be created by claude-code install")
+
+	// Switch to github-copilot — plugin has no copilot resources, plan will be empty
+	writeConfig("github-copilot")
+	inst2, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	_, err = inst2.Sync(false)
+	require.NoError(t, err)
+
+	// All claude-code dedicated files and dirs must be gone
+	assert.NoFileExists(t, filepath.Join(projectDir, "CLAUDE.md"), "CLAUDE.md must be removed")
+	assert.NoDirExists(t, skillDir, ".claude/skills/my-plugin-skill/ must be removed")
+	assert.NoDirExists(t, filepath.Join(projectDir, ".claude", "skills"), ".claude/skills/ must be removed when empty")
+	assert.NoDirExists(t, filepath.Join(projectDir, ".claude", "rules"), ".claude/rules/ must be removed when empty")
+}
+
+func TestSync_PlatformSwitch_ClaudeToGithubCopilot_AgentInstructions(t *testing.T) {
+	projectDir := t.TempDir()
+
+	writeConfig := func(platform string) {
+		t.Helper()
+		content := `project {
+  name = "test-project"
+  agentic_platform = "` + platform + `"
+  agent_instructions = "# Project Rules\n\nAlways follow these rules."
+}
+`
+		err := os.WriteFile(filepath.Join(projectDir, "dex.hcl"), []byte(content), 0644)
+		require.NoError(t, err)
+	}
+
+	// Install as claude-code
+	writeConfig("claude-code")
+	inst1, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	_, err = inst1.Sync(false)
+	require.NoError(t, err)
+	assert.FileExists(t, filepath.Join(projectDir, "CLAUDE.md"))
+
+	// Switch to github-copilot
+	writeConfig("github-copilot")
+	inst2, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	_, err = inst2.Sync(false)
+	require.NoError(t, err)
+
+	assert.NoFileExists(t, filepath.Join(projectDir, "CLAUDE.md"), "CLAUDE.md must be removed after platform switch")
+
+	copilotInstructions := filepath.Join(projectDir, ".github", "copilot-instructions.md")
+	assert.FileExists(t, copilotInstructions, ".github/copilot-instructions.md must be created")
+
+	content, err := os.ReadFile(copilotInstructions)
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "Always follow these rules.")
+}
+
+func TestSync_PlatformSwitch_IdempotentAfterSwitch(t *testing.T) {
+	projectDir := t.TempDir()
+	pluginDir := t.TempDir()
+	createMCPUniversalPlugin(t, pluginDir, "mcp-plugin", "1.0.0")
+
+	writeConfig := func(platform string) {
+		t.Helper()
+		content := `project {
+  name = "test-project"
+  agentic_platform = "` + platform + `"
+}
+
+plugin "mcp-plugin" {
+  source = "file:` + pluginDir + `"
+}
+`
+		err := os.WriteFile(filepath.Join(projectDir, "dex.hcl"), []byte(content), 0644)
+		require.NoError(t, err)
+	}
+
+	// Install on claude-code
+	writeConfig("claude-code")
+	inst1, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	_, err = inst1.Sync(false)
+	require.NoError(t, err)
+	assert.FileExists(t, filepath.Join(projectDir, ".mcp.json"))
+
+	// Switch to github-copilot
+	writeConfig("github-copilot")
+	inst2, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	_, err = inst2.Sync(false)
+	require.NoError(t, err)
+	assert.NoFileExists(t, filepath.Join(projectDir, ".mcp.json"))
+	assert.FileExists(t, filepath.Join(projectDir, ".vscode", "mcp.json"))
+
+	// Sync again — must be idempotent
+	inst3, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	_, err = inst3.Sync(false)
+	require.NoError(t, err)
+	assert.NoFileExists(t, filepath.Join(projectDir, ".mcp.json"), "second sync must not recreate old platform files")
+	assert.FileExists(t, filepath.Join(projectDir, ".vscode", "mcp.json"), "second sync must keep new platform files")
+}

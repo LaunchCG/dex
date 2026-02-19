@@ -32,6 +32,41 @@ func NewExecutor(projectRoot string, m *manifest.Manifest, force bool) *Executor
 	}
 }
 
+// RemoveStaleEntries deletes dedicated files and empty directories that were
+// previously tracked for a plugin but are absent from the new plan.
+// Must be called before Execute so that even plugins whose new plan is empty
+// (no resources match the current platform) have their old files cleaned up.
+func (e *Executor) RemoveStaleEntries(pluginName string, newFilePaths, newDirPaths map[string]bool) error {
+	old := e.manifest.GetPlugin(pluginName)
+	if old == nil {
+		return nil
+	}
+
+	// Remove stale files
+	for _, oldFile := range old.Files {
+		if !newFilePaths[oldFile] {
+			path := filepath.Join(e.projectRoot, oldFile)
+			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("removing stale file %s: %w", oldFile, err)
+			}
+		}
+	}
+
+	// Remove stale directories (reverse order so deepest dirs are removed first)
+	for j := len(old.Directories) - 1; j >= 0; j-- {
+		oldDir := old.Directories[j]
+		if !newDirPaths[oldDir] {
+			path := filepath.Join(e.projectRoot, oldDir)
+			entries, err := os.ReadDir(path)
+			if err == nil && len(entries) == 0 {
+				os.Remove(path)
+			}
+		}
+	}
+
+	return nil
+}
+
 // Execute executes an installation plan.
 // It creates directories, writes dedicated files, and tracks all resources in the manifest.
 // Shared files (MCP, settings, agent content) are tracked but NOT written;
@@ -57,40 +92,42 @@ func (e *Executor) Execute(plan *adapter.Plan, vars map[string]string) error {
 		mcpKey = "mcpServers"
 	}
 
-	// Track MCP entries in manifest (but don't write shared files)
+	// Build new merged files, MCP servers, and settings values from this plan.
+	var newMergedFiles []string
+	var newMCPServers []string
+	newSettingsValues := make(map[string][]string)
+
+	// Track MCP entries
 	if len(plan.MCPEntries) > 0 {
 		mcpPath := plan.MCPPath
 		if mcpPath == "" {
 			mcpPath = ".mcp.json"
 		}
-		e.manifest.TrackMergedFile(plan.PluginName, mcpPath)
+		newMergedFiles = append(newMergedFiles, mcpPath)
 
-		// Track MCP servers in manifest
 		for serverName := range plan.MCPEntries {
 			if serverName == mcpKey {
 				if servers, ok := plan.MCPEntries[serverName].(map[string]any); ok {
 					for name := range servers {
-						e.manifest.TrackMCPServer(plan.PluginName, name)
+						newMCPServers = append(newMCPServers, name)
 					}
 				}
 			}
 		}
 	}
 
-	// Track settings entries in manifest (but don't write shared files)
+	// Track settings entries
 	if len(plan.SettingsEntries) > 0 {
 		settingsPath := plan.SettingsPath
 		if settingsPath == "" {
 			settingsPath = filepath.Join(".claude", "settings.json")
 		}
-		e.manifest.TrackMergedFile(plan.PluginName, settingsPath)
+		newMergedFiles = append(newMergedFiles, settingsPath)
 
-		// Track settings values in manifest (key -> []values)
-		settingsValues := make(map[string][]string)
 		for key, val := range plan.SettingsEntries {
 			switch v := val.(type) {
 			case []string:
-				settingsValues[key] = v
+				newSettingsValues[key] = v
 			case []any:
 				var strs []string
 				for _, item := range v {
@@ -98,23 +135,23 @@ func (e *Executor) Execute(plan *adapter.Plan, vars map[string]string) error {
 						strs = append(strs, s)
 					}
 				}
-				settingsValues[key] = strs
+				newSettingsValues[key] = strs
 			}
 		}
-		e.manifest.TrackSettings(plan.PluginName, settingsValues)
 	}
 
-	// Track agent file content in manifest (but don't write shared files)
-	if plan.AgentFileContent != "" {
+	// Track agent file content
+	hasAgentContent := plan.AgentFileContent != ""
+	if hasAgentContent {
 		agentPath := plan.AgentFilePath
 		if agentPath == "" {
 			agentPath = "CLAUDE.md"
 		}
-		e.manifest.TrackMergedFile(plan.PluginName, agentPath)
-		e.manifest.TrackAgentContent(plan.PluginName)
+		newMergedFiles = append(newMergedFiles, agentPath)
 	}
 
-	// Track files and directories in manifest
+	// Replace (not append) all manifest entries for this plugin so stale
+	// entries from previous installs on a different platform are cleared.
 	filePaths := make([]string, len(plan.Files))
 	for i, f := range plan.Files {
 		filePaths[i] = f.Path
@@ -123,7 +160,18 @@ func (e *Executor) Execute(plan *adapter.Plan, vars map[string]string) error {
 	for i, d := range plan.Directories {
 		dirPaths[i] = d.Path
 	}
-	e.manifest.Track(plan.PluginName, filePaths, dirPaths)
+	e.manifest.ReplaceTracked(plan.PluginName, filePaths, dirPaths)
+	e.manifest.ReplaceMergedFiles(plan.PluginName, newMergedFiles)
+	e.manifest.ReplaceMCPServers(plan.PluginName, newMCPServers)
+	e.manifest.ReplaceSettings(plan.PluginName, newSettingsValues)
+	if hasAgentContent {
+		e.manifest.TrackAgentContent(plan.PluginName)
+	} else {
+		// Clear agent content flag if this plugin no longer contributes
+		if pm := e.manifest.GetPlugin(plan.PluginName); pm != nil {
+			pm.HasAgentContent = false
+		}
+	}
 
 	return nil
 }

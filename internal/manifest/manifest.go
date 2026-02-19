@@ -105,6 +105,32 @@ func (m *Manifest) Track(pluginName string, files, directories []string) {
 	pm.Directories = uniqueStrings(append(pm.Directories, directories...))
 }
 
+// ReplaceTracked replaces (not appends) the files and directories for a plugin.
+// Used during reinstall to remove stale entries from previous installations.
+func (m *Manifest) ReplaceTracked(pluginName string, files, directories []string) {
+	pm := m.getOrCreate(pluginName)
+	pm.Files = uniqueStrings(files)
+	pm.Directories = uniqueStrings(directories)
+}
+
+// ReplaceMergedFiles replaces the merged files list for a plugin.
+func (m *Manifest) ReplaceMergedFiles(pluginName string, mergedFiles []string) {
+	pm := m.getOrCreate(pluginName)
+	pm.MergedFiles = uniqueStrings(mergedFiles)
+}
+
+// ReplaceMCPServers replaces the MCP servers list for a plugin.
+func (m *Manifest) ReplaceMCPServers(pluginName string, servers []string) {
+	pm := m.getOrCreate(pluginName)
+	pm.MCPServers = uniqueStrings(servers)
+}
+
+// ReplaceSettings replaces (not merges) the settings values for a plugin.
+func (m *Manifest) ReplaceSettings(pluginName string, values map[string][]string) {
+	pm := m.getOrCreate(pluginName)
+	pm.SettingsValues = values
+}
+
 // TrackMCPServer records an MCP server for a plugin.
 func (m *Manifest) TrackMCPServer(pluginName, serverName string) {
 	pm := m.getOrCreate(pluginName)
