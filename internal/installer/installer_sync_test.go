@@ -771,3 +771,146 @@ plugin "mcp-plugin" {
 	assert.NoFileExists(t, filepath.Join(projectDir, ".mcp.json"), "second sync must not recreate old platform files")
 	assert.FileExists(t, filepath.Join(projectDir, ".vscode", "mcp.json"), "second sync must keep new platform files")
 }
+
+// createPluginWithFile creates a package.hcl with a universal file resource.
+func createPluginWithFile(t *testing.T, dir, name, version, dest, content string) {
+	t.Helper()
+	hcl := `package {
+  name = "` + name + `"
+  version = "` + version + `"
+  description = "Plugin with file resource"
+}
+
+file "my-file" {
+  dest    = "` + dest + `"
+  content = "` + content + `"
+}
+`
+	err := os.WriteFile(filepath.Join(dir, "package.hcl"), []byte(hcl), 0644)
+	require.NoError(t, err)
+}
+
+func TestSync_ClearsManifestWhenFileResourceRemoved(t *testing.T) {
+	projectDir := t.TempDir()
+	pluginDir := t.TempDir()
+
+	// v1: plugin has a file resource
+	createPluginWithFile(t, pluginDir, "file-plugin", "1.0.0", "config/my-file.txt", "hello world")
+
+	createTestProject(t, projectDir, `
+plugin "file-plugin" {
+  source = "file:`+pluginDir+`"
+}
+`)
+
+	// Install v1
+	inst1, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	err = inst1.InstallAll()
+	require.NoError(t, err)
+
+	// Verify file exists and is in manifest
+	filePath := filepath.Join(projectDir, "config", "my-file.txt")
+	require.FileExists(t, filePath)
+
+	mf1, err := loadManifestForTest(projectDir)
+	require.NoError(t, err)
+	require.NotNil(t, mf1["file-plugin"])
+	assert.Contains(t, mf1["file-plugin"], "config/my-file.txt", "file must be tracked in manifest after install")
+
+	// Update plugin: remove the file resource entirely
+	noResourcePlugin := `package {
+  name = "file-plugin"
+  version = "1.0.0"
+  description = "Plugin with no resources"
+}
+`
+	err = os.WriteFile(filepath.Join(pluginDir, "package.hcl"), []byte(noResourcePlugin), 0644)
+	require.NoError(t, err)
+
+	// Sync
+	inst2, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	_, err = inst2.Sync(false)
+	require.NoError(t, err)
+
+	// File must be gone from disk
+	assert.NoFileExists(t, filePath, "old file must be deleted when resource is removed")
+
+	// Manifest must NOT contain the old path
+	mf2, err := loadManifestForTest(projectDir)
+	require.NoError(t, err)
+	plugin2 := mf2["file-plugin"]
+	assert.NotContains(t, plugin2, "config/my-file.txt", "stale file path must be cleared from manifest")
+}
+
+func TestSync_ClearsManifestWhenFileDestinationChanges(t *testing.T) {
+	projectDir := t.TempDir()
+	pluginDir := t.TempDir()
+
+	// v1: dest = "config/v1.txt"
+	createPluginWithFile(t, pluginDir, "dest-plugin", "1.0.0", "config/v1.txt", "version one")
+
+	createTestProject(t, projectDir, `
+plugin "dest-plugin" {
+  source = "file:`+pluginDir+`"
+}
+`)
+
+	// Install v1
+	inst1, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	err = inst1.InstallAll()
+	require.NoError(t, err)
+
+	v1Path := filepath.Join(projectDir, "config", "v1.txt")
+	require.FileExists(t, v1Path)
+
+	mf1, err := loadManifestForTest(projectDir)
+	require.NoError(t, err)
+	assert.Contains(t, mf1["dest-plugin"], "config/v1.txt")
+
+	// Update plugin: change dest to "config/v2.txt"
+	createPluginWithFile(t, pluginDir, "dest-plugin", "1.0.0", "config/v2.txt", "version two")
+
+	// Sync
+	inst2, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+	_, err = inst2.Sync(false)
+	require.NoError(t, err)
+
+	v2Path := filepath.Join(projectDir, "config", "v2.txt")
+
+	// Old file must be gone
+	assert.NoFileExists(t, v1Path, "old destination file must be deleted after dest change")
+	// New file must exist
+	assert.FileExists(t, v2Path, "new destination file must exist after dest change")
+
+	// Manifest must have v2.txt and NOT v1.txt
+	mf2, err := loadManifestForTest(projectDir)
+	require.NoError(t, err)
+	plugin2 := mf2["dest-plugin"]
+	assert.Contains(t, plugin2, "config/v2.txt", "new file path must be in manifest")
+	assert.NotContains(t, plugin2, "config/v1.txt", "old file path must be cleared from manifest")
+}
+
+// loadManifestForTest reads the manifest and returns a map of plugin -> []files.
+func loadManifestForTest(projectDir string) (map[string][]string, error) {
+	data, err := os.ReadFile(filepath.Join(projectDir, ".dex", "manifest.json"))
+	if err != nil {
+		return nil, err
+	}
+	var raw struct {
+		Plugins map[string]struct {
+			Files []string `json:"files"`
+		} `json:"plugins"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil, err
+	}
+	result := make(map[string][]string, len(raw.Plugins))
+	for name, pm := range raw.Plugins {
+		result[name] = pm.Files
+	}
+	return result, nil
+}

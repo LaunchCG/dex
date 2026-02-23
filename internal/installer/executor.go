@@ -72,18 +72,21 @@ func (e *Executor) RemoveStaleEntries(pluginName string, newFilePaths, newDirPat
 // Shared files (MCP, settings, agent content) are tracked but NOT written;
 // use generateSharedFiles() to write them after all plugins are processed.
 func (e *Executor) Execute(plan *adapter.Plan, vars map[string]string) error {
-	if plan == nil || plan.IsEmpty() {
+	if plan == nil {
 		return nil
 	}
 
-	// Create directories first
-	if err := e.createDirectories(plan.Directories); err != nil {
-		return fmt.Errorf("creating directories: %w", err)
-	}
+	// Only create dirs/write files if there's content to install
+	if !plan.IsEmpty() {
+		// Create directories first
+		if err := e.createDirectories(plan.Directories); err != nil {
+			return fmt.Errorf("creating directories: %w", err)
+		}
 
-	// Write dedicated files
-	if err := e.writeFiles(plan.Files, vars); err != nil {
-		return fmt.Errorf("writing files: %w", err)
+		// Write dedicated files
+		if err := e.writeFiles(plan.Files, vars); err != nil {
+			return fmt.Errorf("writing files: %w", err)
+		}
 	}
 
 	// Determine the MCP key to use (default to "mcpServers" for backward compatibility)

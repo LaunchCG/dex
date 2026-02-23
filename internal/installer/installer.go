@@ -415,6 +415,8 @@ func (i *Installer) installPlugin(spec PluginSpec) (*InstalledPlugin, error) {
 
 	// Merge all plans
 	mergedPlan := adapter.MergePlans(allPlans...)
+	// Always ensure PluginName is set, even when plan is empty (no resources matched platform)
+	mergedPlan.PluginName = pluginName
 
 	// Always clean up stale dedicated files/dirs from a previous install, even if
 	// the new plan is empty (e.g., plugin had claude_skill resources but platform
