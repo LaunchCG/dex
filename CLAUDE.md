@@ -37,21 +37,28 @@ version: 1.0.0
 
 ## Development Tools
 
-**CRITICAL: Use MCP dev-toolkit tools for ALL development tasks. DO NOT use shell commands or Makefiles.**
+**CRITICAL: Use MCP runbook tools for ALL development tasks. DO NOT use shell commands or Makefiles.**
 
-This project provides MCP (Model Context Protocol) tools for all development operations. You MUST use these tools instead of running shell commands directly.
+This project provides MCP (Model Context Protocol) tools via [Runbook](https://github.com/jarosser06/runbook) for all development operations. You MUST use these tools instead of running shell commands directly. Tasks are defined in `.runbook/tasks.yaml`.
 
 ### Available Dev Tools
 
-- `mcp__dev-toolkit-mcp__run_build` - Build the CLI binary to bin/dex
-- `mcp__dev-toolkit-mcp__run_clean` - Remove built binary and coverage files
-- `mcp__dev-toolkit-mcp__run_fmt` - Format code with go fmt
-- `mcp__dev-toolkit-mcp__run_install` - Install binary to GOPATH/bin
-- `mcp__dev-toolkit-mcp__run_install-user` - Install binary to ~/.bin
-- `mcp__dev-toolkit-mcp__run_lint` - Run linter (fmt + vet)
-- `mcp__dev-toolkit-mcp__run_test` - Run all tests
-- `mcp__dev-toolkit-mcp__run_test-cover` - Run tests with coverage report
-- `mcp__dev-toolkit-mcp__run_vet` - Run go vet
+- `mcp__runbook__run_build` - Build the CLI binary to bin/dex
+- `mcp__runbook__run_clean` - Remove built binary and coverage files
+- `mcp__runbook__run_fmt` - Format code with go fmt
+- `mcp__runbook__run_install` - Install binary to GOPATH/bin
+- `mcp__runbook__run_install-user` - Install binary to ~/.bin
+- `mcp__runbook__run_lint` - Run linter (fmt + vet)
+- `mcp__runbook__run_test` - Run all tests
+- `mcp__runbook__run_test-cover` - Run tests with coverage report
+- `mcp__runbook__run_vet` - Run go vet
+
+### Available Prompts
+
+Prompts are defined in `.runbook/prompts.yaml`:
+
+- `ci` - Run the full CI pipeline (lint → test → build) and fix failures
+- `fix-test-failures` - Run tests and fix any failures
 
 ### Examples
 
@@ -65,10 +72,10 @@ go fmt ./...
 
 **GOOD:**
 ```python
-# Use MCP dev-toolkit tools
-mcp__dev-toolkit-mcp__run_build()
-mcp__dev-toolkit-mcp__run_test()
-mcp__dev-toolkit-mcp__run_fmt()
+# Use MCP runbook tools
+mcp__runbook__run_build()
+mcp__runbook__run_test()
+mcp__runbook__run_fmt()
 ```
 
 ### Why MCP Tools?

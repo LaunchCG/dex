@@ -4,14 +4,14 @@
     "serena",
     "context7",
     "github",
-    "dev-toolkit-mcp"
+    "runbook"
   ],
   "permissions": {
     "allow": [
       "mcp__serena",
       "mcp__context7",
       "mcp__github",
-      "mcp__dev-toolkit-mcp"
+      "mcp__runbook"
     ]
   }
 }

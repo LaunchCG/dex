@@ -1,6 +1,5 @@
 version: "1.0"
 
-# Dex project tasks mapped to Makefile targets
 tasks:
   build:
     description: "Build the CLI binary to bin/dex"
@@ -62,11 +61,7 @@ tasks:
     command: "./deploy.sh --infra"
     type: oneshot
 
-# Task groups organize related tasks
 task_groups:
   ci:
     description: "CI pipeline tasks"
-    tasks:
-      - lint
-      - test
-      - build
+    tasks: [lint, test, build]

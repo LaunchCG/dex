@@ -30,12 +30,8 @@
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
       }
     },
-    "dev-toolkit-mcp": {
-      "command": "dev-toolkit-mcp",
-      "args": [
-        "-config",
-        ".mcp-tasks.yaml"
-      ]
+    "runbook": {
+      "command": "runbook"
     }
   }
 }

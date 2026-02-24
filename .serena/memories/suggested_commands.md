@@ -1,29 +1,23 @@
 # Suggested Commands
 
-## Testing
-```bash
-go test ./...           # Run all tests
-go test ./internal/...  # Run internal package tests
-go test -v ./...        # Run with verbose output
-go test -cover ./...    # Run with coverage
-```
+## MCP Runbook Tools (use these, NOT shell commands)
+- `mcp__runbook__run_test` - Run all tests
+- `mcp__runbook__run_test-cover` - Run tests with coverage
+- `mcp__runbook__run_build` - Build the CLI binary
+- `mcp__runbook__run_lint` - Run linter (fmt + vet)
+- `mcp__runbook__run_fmt` - Format code
+- `mcp__runbook__run_vet` - Run go vet
+- `mcp__runbook__run_clean` - Clean build artifacts
+- `mcp__runbook__run_install` - Install to GOPATH/bin
+- `mcp__runbook__run_install-user` - Install to ~/.bin
 
-## Building
-```bash
-go build -o dex ./cmd/dex  # Build the CLI binary
-```
+Tasks config: `.runbook/tasks.yaml`
+Prompts: `ci`, `fix-test-failures` (in `.runbook/prompts.yaml`)
 
 ## Running the CLI
 ```bash
 ./dex --help               # Show help
-./dex init                 # Initialize a new project
 ./dex sync                 # Sync plugins (install/update/prune)
 ./dex uninstall <plugin>   # Uninstall a plugin
 ./dex list                 # List installed plugins
-```
-
-## Linting
-```bash
-go fmt ./...              # Format code
-go vet ./...              # Run vet
 ```
