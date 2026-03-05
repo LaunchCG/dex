@@ -104,6 +104,7 @@ dex sync [PLUGINS...] [OPTIONS]
 | `--path` | `-p` | Project directory | Current directory |
 | `--namespace` | - | Namespace resources with package name | `false` |
 | `--dry-run` | `-n` | Show what would change without making changes | `false` |
+| `--git-exclude` | - | Update `.git/info/exclude` to locally hide dex-managed files from git | `false` |
 
 **File Conflict Protection:**
 
@@ -326,46 +327,6 @@ dex manifest my-plugin
 - `0` - Success
 
 ---
-
-### dex update-ignore
-
-Update .gitignore with Dex-managed files.
-
-```bash
-dex update-ignore [OPTIONS]
-```
-
-Adds or updates a managed section in .gitignore that excludes all directories and files tracked by Dex. The section is marked with header and footer comments so it can be automatically updated.
-
-**Options:**
-
-| Option | Short | Description | Default |
-|--------|-------|-------------|---------|
-| `--print` | - | Print what would be written without modifying files | `false` |
-| `--path` | `-p` | Project directory | Current directory |
-
-**Examples:**
-
-```bash
-# Update .gitignore
-dex update-ignore
-
-# Preview changes without modifying
-dex update-ignore --print
-```
-
-**Managed Section Format:**
-
-```gitignore
-# === Dex managed files (do not edit this section) ===
-.dex/
-.claude/
-# === End Dex managed files ===
-```
-
-**Exit Codes:**
-
-- `0` - Success
 
 ---
 

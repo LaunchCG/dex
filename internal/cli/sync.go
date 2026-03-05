@@ -37,7 +37,7 @@ func init() {
 	syncCmd.Flags().StringP("path", "p", ".", "Project directory")
 	syncCmd.Flags().Bool("namespace", false, "Namespace resources with package name (e.g., pkg-name-resource)")
 	syncCmd.Flags().BoolP("dry-run", "n", false, "Show what would change without making changes")
-	syncCmd.Flags().Bool("update-ignore", false, "Update .gitignore with dex-managed files")
+	syncCmd.Flags().Bool("git-exclude", false, "Update .git/info/exclude to locally hide dex-managed files from git")
 }
 
 // parsePluginSpec parses a plugin specification in name@version format.
@@ -70,7 +70,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 	// Configure installer options
 	inst.WithForce(force).WithNoLock(noLock).WithNamespace(namespace)
 
-	updateIgnore, _ := cmd.Flags().GetBool("update-ignore")
+	gitExclude, _ := cmd.Flags().GetBool("git-exclude")
 
 	// If args or --source provided, explicit install mode
 	var syncErr error
@@ -85,21 +85,21 @@ func runSync(cmd *cobra.Command, args []string) error {
 		return syncErr
 	}
 
-	// After a successful non-dry-run sync, optionally update .gitignore
+	// After a successful non-dry-run sync, optionally update .git/info/exclude
 	if !dryRun {
-		shouldUpdateIgnore := updateIgnore
-		if !shouldUpdateIgnore {
+		shouldGitExclude := gitExclude
+		if !shouldGitExclude {
 			// Check config setting
 			if cfg, err := config.LoadProject(projectPath); err == nil {
-				shouldUpdateIgnore = cfg.Project.UpdateGitignore
+				shouldGitExclude = cfg.Project.GitExclude
 			}
 		}
-		if shouldUpdateIgnore {
+		if shouldGitExclude {
 			absPath, err := filepath.Abs(projectPath)
-			if err == nil {
-				if err := updateIgnoreForProject(absPath); err != nil {
-					fmt.Printf("%s Failed to update .gitignore: %v\n", color.YellowString("⚠"), err)
-				}
+			if err != nil {
+				fmt.Printf("%s Failed to resolve path for .git/info/exclude update: %v\n", color.YellowString("⚠"), err)
+			} else if err := updateIgnoreForProject(absPath); err != nil {
+				fmt.Printf("%s Failed to update .git/info/exclude: %v\n", color.YellowString("⚠"), err)
 			}
 		}
 	}

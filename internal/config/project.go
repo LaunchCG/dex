@@ -76,9 +76,9 @@ type ProjectBlock struct {
 	// plugin-contributed content. This content is owned by the project, not plugins.
 	AgentInstructions string `hcl:"agent_instructions,optional"`
 
-	// UpdateGitignore controls whether dex sync automatically updates .gitignore
-	// with dex-managed files
-	UpdateGitignore bool `hcl:"update_gitignore,optional"`
+	// GitExclude controls whether dex sync automatically updates .git/info/exclude
+	// to locally hide dex-managed files from git without modifying .gitignore
+	GitExclude bool `hcl:"git_exclude,optional"`
 }
 
 // RegistryBlock defines a plugin registry source.
@@ -234,6 +234,91 @@ func (p *ProjectConfig) buildResources() {
 	for i := range p.CursorCommands {
 		p.Resources = append(p.Resources, &p.CursorCommands[i])
 	}
+}
+
+// toLocalConfig extracts the resource slices from this ProjectConfig into a LocalConfig
+// so that MergeLocal can delegate to LocalConfig.merge (the single merge source of truth).
+// ResolvedVars is intentionally omitted: MergeLocal handles var precedence separately.
+func (p *ProjectConfig) toLocalConfig() *LocalConfig {
+	return &LocalConfig{
+		Registries:          p.Registries,
+		Plugins:             p.Plugins,
+		Skills:              p.Skills,
+		Commands:            p.Commands,
+		Subagents:           p.Subagents,
+		Rules:               p.Rules,
+		RulesFiles:          p.RulesFiles,
+		Settings:            p.Settings,
+		MCPServers:          p.MCPServers,
+		UniversalMCPServers: p.UniversalMCPServers,
+		CopilotInstruction:  p.CopilotInstruction,
+		CopilotMCPServers:   p.CopilotMCPServers,
+		CopilotInstructions: p.CopilotInstructions,
+		CopilotPrompts:      p.CopilotPrompts,
+		CopilotAgents:       p.CopilotAgents,
+		CopilotSkills:       p.CopilotSkills,
+		CursorRules_:        p.CursorRules_,
+		CursorMCPServers:    p.CursorMCPServers,
+		CursorRules:         p.CursorRules,
+		CursorCommands:      p.CursorCommands,
+		Variables:           p.Variables,
+	}
+}
+
+// applyLocalConfig writes the merged resource slices from l back into this ProjectConfig.
+// Used by MergeLocal after delegating to LocalConfig.merge.
+// ResolvedVars is intentionally omitted: MergeLocal handles var precedence separately.
+// IMPORTANT: this leaves p.Resources stale. Callers must call p.buildResources() afterward.
+// applyLocalConfig is unexported to enforce this — MergeLocal is the only call site.
+func (p *ProjectConfig) applyLocalConfig(l *LocalConfig) {
+	p.Registries = l.Registries
+	p.Plugins = l.Plugins
+	p.Skills = l.Skills
+	p.Commands = l.Commands
+	p.Subagents = l.Subagents
+	p.Rules = l.Rules
+	p.RulesFiles = l.RulesFiles
+	p.Settings = l.Settings
+	p.MCPServers = l.MCPServers
+	p.UniversalMCPServers = l.UniversalMCPServers
+	p.CopilotInstruction = l.CopilotInstruction
+	p.CopilotMCPServers = l.CopilotMCPServers
+	p.CopilotInstructions = l.CopilotInstructions
+	p.CopilotPrompts = l.CopilotPrompts
+	p.CopilotAgents = l.CopilotAgents
+	p.CopilotSkills = l.CopilotSkills
+	p.CursorRules_ = l.CursorRules_
+	p.CursorMCPServers = l.CursorMCPServers
+	p.CursorRules = l.CursorRules
+	p.CursorCommands = l.CursorCommands
+	p.Variables = l.Variables
+}
+
+// MergeLocal appends all resources from a LocalConfig into this ProjectConfig and
+// rebuilds the unified Resources slice. Resource slice merging is delegated to
+// LocalConfig.merge so the merge logic lives in one place. Project-defined resolved
+// vars take precedence over local config vars.
+func (p *ProjectConfig) MergeLocal(local *LocalConfig) {
+	base := p.toLocalConfig()
+	base.merge(local)
+	p.applyLocalConfig(base)
+
+	// Var precedence at the project level: skip-if-exists (project wins).
+	// This is asymmetric with LocalConfig.merge, which uses last-writer-wins within
+	// local configs. The full chain is intentional:
+	//   project vars > per-project local vars > global local vars
+	// merge() above has already collapsed global+per-project into local using
+	// last-writer-wins, so here we only copy vars not already set by the project.
+	if p.ResolvedVars == nil {
+		p.ResolvedVars = make(map[string]string)
+	}
+	for k, v := range local.ResolvedVars {
+		if _, exists := p.ResolvedVars[k]; !exists {
+			p.ResolvedVars[k] = v
+		}
+	}
+
+	p.buildResources()
 }
 
 // Validate checks the project config for errors.
