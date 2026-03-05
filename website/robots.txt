@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://dexartifactsproduction.z13.web.core.windows.net/sitemap.xml
