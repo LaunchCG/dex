@@ -914,3 +914,84 @@ func loadManifestForTest(projectDir string) (map[string][]string, error) {
 	}
 	return result, nil
 }
+
+// TestSync_TransitiveDependenciesNotPruned reproduces the bug where transitive
+// dependencies installed during Sync are immediately pruned in the same run.
+//
+// Repro: plugin "parent" declares dependency "child". Sync installs parent,
+// which pulls in child as a transitive dep and writes it to the lock file.
+// The prune pass then sees child in the lock but not in configPlugins (which
+// only contains direct project plugins) and prunes it.
+func TestSync_TransitiveDependenciesNotPruned(t *testing.T) {
+	projectDir := t.TempDir()
+	registryDir := t.TempDir()
+
+	// Set up registry index with both plugins
+	createLocalRegistryIndex(t, registryDir, map[string][]string{
+		"parent-plugin": {"1.0.0"},
+		"child-plugin":  {"1.0.0"},
+	})
+
+	// child-plugin: a simple plugin with no dependencies
+	childDir := filepath.Join(registryDir, "child-plugin")
+	require.NoError(t, os.MkdirAll(childDir, 0755))
+	createTestPlugin(t, childDir, "child-plugin", "1.0.0", "Child plugin (transitive dep)")
+
+	// parent-plugin: declares child-plugin as a dependency
+	parentDir := filepath.Join(registryDir, "parent-plugin")
+	require.NoError(t, os.MkdirAll(parentDir, 0755))
+	err := os.WriteFile(filepath.Join(parentDir, "package.hcl"), []byte(`
+package {
+  name        = "parent-plugin"
+  version     = "1.0.0"
+  description = "Parent plugin"
+}
+
+dependency "child-plugin" {
+  version = ">=1.0.0"
+}
+
+claude_rule "parent-rule" {
+  description = "Rule from parent"
+  content     = "Follow this rule from parent-plugin"
+}
+`), 0644)
+	require.NoError(t, err)
+
+	// Project only references parent-plugin directly
+	createTestProject(t, projectDir, `
+registry "local" {
+  path = "`+registryDir+`"
+}
+
+plugin "parent-plugin" {
+  registry = "local"
+}
+`)
+
+	inst, err := NewInstaller(projectDir)
+	require.NoError(t, err)
+
+	results, err := inst.Sync(false)
+	require.NoError(t, err)
+
+	// Collect pruned plugin names for a readable failure message
+	var pruned []string
+	for _, r := range results {
+		if r.Action == SyncPruned {
+			pruned = append(pruned, r.Name)
+		}
+	}
+
+	assert.Empty(t, pruned,
+		"transitive dependencies should not be pruned in the same sync that installs them; got pruned: %v", pruned)
+
+	// Also verify child-plugin is still in the lock file after sync
+	lockContent, err := os.ReadFile(filepath.Join(projectDir, "dex.lock"))
+	require.NoError(t, err)
+	var lockData map[string]any
+	require.NoError(t, json.Unmarshal(lockContent, &lockData))
+	plugins := lockData["plugins"].(map[string]any)
+	assert.Contains(t, plugins, "child-plugin",
+		"child-plugin (transitive dep) must remain in lock file after sync")
+}

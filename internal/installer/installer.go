@@ -113,7 +113,7 @@ func NewInstaller(projectRoot string) (*Installer, error) {
 		)
 	}
 
-	// Validate project config
+	// Validate project config before using the project name to access the filesystem.
 	if err := project.Validate(); err != nil {
 		return nil, errors.NewConfigError(
 			filepath.Join(projectRoot, "dex.hcl"),
@@ -121,6 +121,15 @@ func NewInstaller(projectRoot string) (*Installer, error) {
 			"invalid project config",
 			err,
 		)
+	}
+
+	// Load and merge user-level local configs (~/.dex/local.hcl and ~/.dex/projects/<name>/project.hcl)
+	localCfg, err := config.LoadLocalConfigs(project.Project.Name)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to load local config")
+	}
+	if localCfg != nil {
+		project.MergeLocal(localCfg)
 	}
 
 	// Get adapter for the platform
@@ -1605,9 +1614,19 @@ func (i *Installer) Sync(dryRun bool) ([]SyncResult, error) {
 		}
 	}
 
-	// Prune plugins in lock file but not in config
+	// Build set of transitive dependencies needed by config plugins.
+	// A dep of any locked plugin must not be pruned even if it isn't directly
+	// listed in dex.hcl (e.g. sdlc-stories pulled in by github-workflows).
+	neededDeps := make(map[string]bool)
+	for _, locked := range i.lock.Plugins {
+		for dep := range locked.Dependencies {
+			neededDeps[dep] = true
+		}
+	}
+
+	// Prune plugins in lock file but not in config and not needed as a dependency
 	for pluginName := range i.lock.Plugins {
-		if !configPlugins[pluginName] {
+		if !configPlugins[pluginName] && !neededDeps[pluginName] {
 			lockedVersion := i.lock.Plugins[pluginName].Version
 			if dryRun {
 				results = append(results, SyncResult{
