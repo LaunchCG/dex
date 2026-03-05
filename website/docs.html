@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>dex Documentation</title>
+  <meta name="description" content="Complete reference documentation for dex, the universal package manager for AI coding agents. Commands, config, resources, and publishing guide.">
+  <link rel="canonical" href="https://dexartifactsproduction.z13.web.core.windows.net/docs.html">
+
+  <!-- Launch brand fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --launch-blue:    #013760;
+      --launch-violet:  #5C2275;
+      --launch-magenta: #DE1B83;
+      --launch-purple:  #80379B;
+      --launch-orange:  #F64D05;
+      --launch-cool-blue:#CDEEFE;
+
+      --bg:          #ffffff;
+      --bg-surface:  #f5f8fc;
+      --bg-code:     #eef4fa;
+      --bg-nav:      rgba(255,255,255,0.96);
+      --border:      #d0dde9;
+      --border-soft: #e4ecf4;
+      --text:        #0d2137;
+      --text-muted:  #3d6278;
+      --text-faint:  #8aadca;
+      --accent:      #DE1B83;
+      --accent-glow: rgba(222,27,131,0.08);
+      --accent-hover:#c21672;
+      --violet:      #80379B;
+      --violet-light:#7b30a5;
+      --orange:      #F64D05;
+      --success:     #0d8f6e;
+      --mono: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+      --sans: "Open Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+      --heading: "Poppins", -apple-system, BlinkMacSystemFont, sans-serif;
+      --radius: 8px;
+      --sidebar-w: 220px;
+      --max-w: 1200px;
+    }
+
+    html { font-size: 16px; scroll-behavior: smooth; scroll-padding-top: 72px; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      line-height: 1.65;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: var(--accent-hover); text-decoration: underline; }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--bg-nav);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-inner {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 0 1.5rem;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .nav-brand {
+      font-family: var(--heading);
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--text);
+      margin-right: 1rem;
+      letter-spacing: -0.01em;
+      flex-shrink: 0;
+    }
+    .nav-brand:hover { color: var(--accent-hover); text-decoration: none; }
+
+    .nav-breadcrumb {
+      font-size: 0.85rem;
+      color: var(--text-faint);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .nav-breadcrumb span { color: var(--text-muted); }
+
+    .nav-gh {
+      margin-left: auto;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--text-muted) !important;
+      font-size: 0.875rem;
+      padding: 0.35rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .nav-gh:hover { color: var(--text) !important; border-color: var(--accent); text-decoration: none; }
+
+    /* ── TWO-COLUMN LAYOUT ── */
+    .docs-layout {
+      flex: 1;
+      max-width: var(--max-w);
+      margin: 0 auto;
+      width: 100%;
+      display: grid;
+      grid-template-columns: var(--sidebar-w) 1fr;
+      align-items: start;
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      position: sticky;
+      top: 56px;
+      height: calc(100vh - 56px);
+      overflow-y: auto;
+      padding: 1.5rem 0 2rem;
+      border-right: 1px solid var(--border-soft);
+      scrollbar-width: thin;
+      scrollbar-color: var(--border-soft) transparent;
+    }
+    .sidebar::-webkit-scrollbar { width: 4px; }
+    .sidebar::-webkit-scrollbar-track { background: transparent; }
+    .sidebar::-webkit-scrollbar-thumb { background: var(--border-soft); border-radius: 2px; }
+
+    .sidebar-group {
+      margin-bottom: 1.5rem;
+      padding: 0 1rem;
+    }
+
+    .sidebar-group-label {
+      font-family: var(--heading);
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--text-faint);
+      padding: 0 0.5rem;
+      margin-bottom: 0.35rem;
+      display: block;
+    }
+
+    .sidebar-group a {
+      display: block;
+      font-size: 0.83rem;
+      color: var(--text-muted);
+      padding: 0.25rem 0.5rem;
+      border-radius: 5px;
+      transition: color 0.12s, background 0.12s;
+      text-decoration: none;
+      line-height: 1.4;
+    }
+    .sidebar-group a:hover { color: var(--text); background: var(--bg-surface); }
+    .sidebar-group a.active {
+      color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    /* ── CONTENT ── */
+    .docs-content {
+      padding: 2.5rem 2rem 4rem 2.5rem;
+      min-width: 0;
+    }
+
+    .doc-section {
+      padding-bottom: 3rem;
+      margin-bottom: 3rem;
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .doc-section:last-child { border-bottom: none; margin-bottom: 0; }
+
+    h1 {
+      font-family: var(--heading);
+      font-size: 1.9rem;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.03em;
+      margin-bottom: 0.75rem;
+      line-height: 1.2;
+    }
+
+    h2 {
+      font-family: var(--heading);
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.01em;
+      margin-bottom: 1rem;
+      margin-top: 2.5rem;
+      padding-top: 1rem;
+    }
+    h2:first-child { margin-top: 0; padding-top: 0; }
+
+    h3 {
+      font-family: var(--heading);
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 0.6rem;
+      margin-top: 1.75rem;
+    }
+    h3:first-child { margin-top: 0; }
+
+    h4 {
+      font-family: var(--heading);
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 0.5rem;
+      margin-top: 1.25rem;
+    }
+
+    p { color: var(--text-muted); margin-bottom: 0.75rem; line-height: 1.7; }
+    p:last-child { margin-bottom: 0; }
+
+    ul, ol { color: var(--text-muted); padding-left: 1.5rem; margin-bottom: 0.75rem; }
+    li { margin-bottom: 0.25rem; line-height: 1.6; }
+
+    /* ── CODE ── */
+    pre {
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.1rem 1.25rem;
+      overflow-x: auto;
+      margin: 0.75rem 0;
+    }
+
+    pre code {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      line-height: 1.65;
+      color: var(--text);
+      background: none;
+      border: none;
+      padding: 0;
+    }
+
+    code {
+      font-family: var(--mono);
+      font-size: 0.82em;
+      background: var(--bg-code);
+      border: 1px solid var(--border-soft);
+      border-radius: 4px;
+      padding: 0.15em 0.45em;
+      color: var(--text);
+    }
+
+    /* HCL syntax tints */
+    .hk { color: #0b6fb5; }
+    .hs { color: #1a5f8a; }
+    .hb { color: var(--success); }
+    .hc { color: var(--text-faint); font-style: italic; }
+    .hf { color: #7b30a5; }
+    .fi { color: var(--text-muted); font-size: 0.78rem; margin-bottom: 0.35rem; display: block; }
+
+    /* ── TABLES ── */
+    .attr-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin: 1rem 0;
+    }
+
+    .attr-table th {
+      text-align: left;
+      padding: 0.5rem 0.85rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      font-family: var(--heading);
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+    }
+
+    .attr-table td {
+      padding: 0.55rem 0.85rem;
+      border: 1px solid var(--border-soft);
+      vertical-align: top;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .attr-table td:first-child {
+      white-space: nowrap;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: var(--text);
+    }
+
+    .attr-table td.type-col {
+      white-space: nowrap;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: #8a6a00;
+    }
+
+    .attr-table tr:nth-child(even) td { background: var(--bg-surface); }
+
+    .required-badge {
+      display: inline-block;
+      font-size: 0.62rem;
+      font-family: var(--heading);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 0.1em 0.4em;
+      border-radius: 3px;
+      background: rgba(222,27,131,0.12);
+      color: var(--accent);
+      border: 1px solid rgba(222,27,131,0.3);
+    }
+
+    /* ── PLATFORM BADGES ── */
+    .badge {
+      display: inline-block;
+      font-family: var(--heading);
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.2em 0.65em;
+      border-radius: 100px;
+      margin-right: 0.3rem;
+    }
+    .badge-claude  { background: rgba(222,27,131,0.12); color: var(--accent); border: 1px solid rgba(222,27,131,0.25); }
+    .badge-cursor  { background: rgba(128,55,155,0.12); color: var(--violet-light); border: 1px solid rgba(128,55,155,0.25); }
+    .badge-copilot { background: rgba(27,123,181,0.08); color: #1b7bb5; border: 1px solid rgba(27,123,181,0.2); }
+
+    /* ── CALLOUT ── */
+    .callout {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 0.9rem 1.1rem;
+      margin: 1rem 0;
+    }
+    .callout.warning { border-left-color: var(--orange); }
+    .callout p { color: var(--text-muted); margin: 0; font-size: 0.875rem; }
+    .callout-icon { font-size: 0.9rem; margin-right: 0.35rem; }
+
+    /* ── COMMAND HEADER ── */
+    .cmd-header {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--violet);
+      border-radius: var(--radius);
+      padding: 0.85rem 1.25rem;
+      margin-bottom: 1rem;
+      font-family: var(--mono);
+      font-size: 0.875rem;
+      color: var(--text);
+    }
+
+    /* ── OPTIONS TABLE ── */
+    .options-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin: 0.75rem 0 1.25rem;
+    }
+    .options-table th {
+      text-align: left;
+      padding: 0.45rem 0.85rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      font-family: var(--heading);
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+    }
+    .options-table td {
+      padding: 0.5rem 0.85rem;
+      border: 1px solid var(--border-soft);
+      vertical-align: top;
+      color: var(--text-muted);
+    }
+    .options-table td:first-child {
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: var(--text);
+      white-space: nowrap;
+    }
+    .options-table tr:nth-child(even) td { background: var(--bg-surface); }
+
+    /* ── SECTION DIVIDER with gradient accent ── */
+    .doc-section > h2:first-child {
+      border-bottom: 2px solid transparent;
+      border-image: linear-gradient(90deg, var(--launch-magenta), var(--launch-purple), transparent) 1;
+      padding-bottom: 0.5rem;
+      margin-bottom: 1.25rem;
+      margin-top: 0;
+      padding-top: 0;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 1.5rem 1.5rem;
+      text-align: center;
+    }
+    .footer-main { font-size: 0.82rem; color: var(--text-faint); margin-bottom: 0.6rem; }
+    .footer-main a { color: var(--text-muted); }
+    .footer-main a:hover { color: var(--accent-hover); }
+
+    .footer-launch {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.78rem;
+      color: var(--text-faint);
+    }
+
+    .launch-logo-link {
+      display: inline-flex;
+      align-items: center;
+      opacity: 0.85;
+      transition: opacity 0.15s;
+      text-decoration: none;
+    }
+    .launch-logo-link:hover { opacity: 1; text-decoration: none; }
+    .launch-logo-link img { height: 36px; width: auto; display: block; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      .docs-layout { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .docs-content { padding: 1.5rem 1rem 3rem; }
+      .nav-breadcrumb { display: none; }
+    }
+    @media (max-width: 480px) {
+      pre { max-width: calc(100vw - 2rem); }
+      .attr-table, .options-table { font-size: 0.78rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <div class="nav-inner">
+      <a href="index.html" class="nav-brand">dex</a>
+      <div class="nav-breadcrumb">
+        <span>/</span>
+        <span>Documentation</span>
+      </div>
+      <a href="https://github.com/LaunchCG/dex" target="_blank" rel="noopener" class="nav-gh">
+        <svg height="16" width="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub
+      </a>
+    </div>
+  </nav>
+
+  <div class="docs-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+
+      <div class="sidebar-group">
+        <span class="sidebar-group-label">Getting Started</span>
+        <a href="#installation">Installation</a>
+        <a href="#quick-start">Quick Start</a>
+      </div>
+
+      <div class="sidebar-group">
+        <span class="sidebar-group-label">Commands</span>
+        <a href="#cmd-init">dex init</a>
+        <a href="#cmd-sync">dex sync</a>
+        <a href="#cmd-list">dex list</a>
+        <a href="#cmd-uninstall">dex uninstall</a>
+        <a href="#cmd-info">dex info</a>
+        <a href="#cmd-manifest">dex manifest</a>
+        <a href="#cmd-version">dex version</a>
+      </div>
+
+      <div class="sidebar-group">
+        <span class="sidebar-group-label">Project Config</span>
+        <a href="#project-block">project block</a>
+        <a href="#registry-block">registry block</a>
+        <a href="#plugin-block">plugin block</a>
+        <a href="#version-constraints">version constraints</a>
+        <a href="#lock-file">lock file</a>
+      </div>
+
+      <div class="sidebar-group">
+        <span class="sidebar-group-label">Package Config</span>
+        <a href="#package-block">package block</a>
+        <a href="#variables">variables</a>
+        <a href="#hcl-functions">HCL functions</a>
+        <a href="#template-variables">template variables</a>
+      </div>
+
+      <div class="sidebar-group">
+        <span class="sidebar-group-label">Resources / Claude Code</span>
+        <a href="#claude-skill">claude_skill</a>
+        <a href="#claude-command">claude_command</a>
+        <a href="#claude-subagent">claude_subagent</a>
+        <a href="#claude-rule">claude_rule</a>
+        <a href="#claude-rules">claude_rules</a>
+        <a href="#claude-settings">claude_settings</a>
+        <a href="#claude-mcp-server">claude_mcp_server</a>
+      </div>
+
+      <div class="sidebar-group">
+        <span class="sidebar-group-label">Resources / Cursor</span>
+        <a href="#cursor-rule">cursor_rule</a>
+        <a href="#cursor-rules">cursor_rules</a>
+        <a href="#cursor-command">cursor_command</a>
+        <a href="#cursor-mcp-server">cursor_mcp_server</a>
+      </div>
+
+      <div class="sidebar-group">
+        <span class="sidebar-group-label">Resources / GitHub Copilot</span>
+        <a href="#copilot-instruction">copilot_instruction</a>
+        <a href="#copilot-instructions">copilot_instructions</a>
+        <a href="#copilot-prompt">copilot_prompt</a>
+        <a href="#copilot-agent">copilot_agent</a>
+        <a href="#copilot-skill">copilot_skill</a>
+        <a href="#copilot-mcp-server">copilot_mcp_server</a>
+      </div>
+
+      <div class="sidebar-group">
+        <span class="sidebar-group-label">Personal Config</span>
+        <a href="#local-hcl">local.hcl</a>
+        <a href="#per-project-config">per-project config</a>
+        <a href="#git-exclude">git exclude</a>
+        <a href="#variable-precedence">variable precedence</a>
+      </div>
+
+      <div class="sidebar-group">
+        <span class="sidebar-group-label">Publishing</span>
+        <a href="#plugin-structure">plugin structure</a>
+        <a href="#file-blocks">file blocks</a>
+        <a href="#cross-platform">cross-platform plugins</a>
+        <a href="#publishing-guide">publishing guide</a>
+      </div>
+
+    </aside>
+
+    <!-- CONTENT -->
+    <main class="docs-content">
+
+      <!-- ── GETTING STARTED ── -->
+      <div class="doc-section" id="installation">
+        <h1>dex Documentation</h1>
+        <p>dex is a universal package manager for AI coding agents. It installs skills, commands, rules, and MCP servers into Claude Code, Cursor, and GitHub Copilot projects from a single HCL config.</p>
+
+        <h2>Installation</h2>
+
+        <h3>macOS &amp; Linux</h3>
+<pre><code>curl -fsSL https://dexartifactsproduction.z13.web.core.windows.net/install.sh | bash</code></pre>
+
+        <h3>Windows (PowerShell)</h3>
+<pre><code>irm https://dexartifactsproduction.z13.web.core.windows.net/install.ps1 | iex</code></pre>
+
+        <p>Installs to <code>~/.bin/dex</code>. Add <code>~/.bin</code> to your PATH if needed.</p>
+
+        <h3>Global options</h3>
+        <table class="options-table">
+          <thead><tr><th>Flag</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>--help, -h</td><td>Show help message</td></tr>
+            <tr><td>--verbose, -v</td><td>Increase verbosity (-v info, -vv debug, -vvv trace)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="quick-start">
+        <h2>Quick Start</h2>
+        <p><strong>1. Initialize a project:</strong></p>
+<pre><code>dex init                        <span class="hc"># Claude Code (default)</span>
+dex init --agent cursor         <span class="hc"># Cursor</span>
+dex init --agent github-copilot <span class="hc"># GitHub Copilot</span></code></pre>
+
+        <p><strong>2. Edit <code>dex.hcl</code> to add plugins:</strong></p>
+<pre><code><span class="hk">project</span> {
+  <span class="hk">agentic_platform</span> = <span class="hs">"claude-code"</span>
+}
+
+<span class="hk">plugin</span> <span class="hs">"my-tools"</span> {
+  <span class="hk">source</span>  = <span class="hs">"git+https://github.com/example/my-tools.git"</span>
+  <span class="hk">version</span> = <span class="hs">"^1.0.0"</span>
+}</code></pre>
+
+        <p><strong>3. Sync:</strong></p>
+<pre><code>dex sync</code></pre>
+
+        <p><strong>4. Use in your AI assistant.</strong> Skills, commands, and rules are now installed in your project.</p>
+      </div>
+
+      <!-- ── COMMANDS ── -->
+      <div class="doc-section" id="cmd-init">
+        <h2>Commands</h2>
+        <h3>dex init</h3>
+        <p>Initialize a new dex project in the current directory. Creates a <code>dex.hcl</code> file.</p>
+        <div class="cmd-header">dex init [OPTIONS]</div>
+        <table class="options-table">
+          <thead><tr><th>Option</th><th>Short</th><th>Description</th><th>Default</th></tr></thead>
+          <tbody>
+            <tr><td>--agent</td><td>-a</td><td>Target AI agent platform</td><td>claude-code</td></tr>
+            <tr><td>--name</td><td>-n</td><td>Project name</td><td>Directory name</td></tr>
+            <tr><td>--path</td><td>-p</td><td>Project directory</td><td>Current directory</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="cmd-sync">
+        <h3>dex sync</h3>
+        <p>Synchronize plugins to match <code>dex.hcl</code>. Without arguments, installs missing, updates outdated, and prunes orphaned plugins.</p>
+        <div class="cmd-header">dex sync [PLUGINS...] [OPTIONS]</div>
+        <table class="options-table">
+          <thead><tr><th>Option</th><th>Short</th><th>Description</th><th>Default</th></tr></thead>
+          <tbody>
+            <tr><td>--source</td><td>-s</td><td>Direct source path (file://)</td><td></td></tr>
+            <tr><td>--registry</td><td>-r</td><td>Registry to use</td><td></td></tr>
+            <tr><td>--no-save</td><td></td><td>Don't save to config file</td><td>false</td></tr>
+            <tr><td>--no-lock</td><td></td><td>Don't update lock file</td><td>false</td></tr>
+            <tr><td>--force</td><td>-f</td><td>Overwrite files not managed by dex</td><td>false</td></tr>
+            <tr><td>--path</td><td>-p</td><td>Project directory</td><td>Current directory</td></tr>
+            <tr><td>--namespace</td><td></td><td>Namespace resources with package name</td><td>false</td></tr>
+            <tr><td>--dry-run</td><td>-n</td><td>Show what would change without making changes</td><td>false</td></tr>
+            <tr><td>--git-exclude</td><td></td><td>Update .git/info/exclude to hide dex-managed files</td><td>false</td></tr>
+          </tbody>
+        </table>
+        <h4>Version specifiers</h4>
+        <table class="options-table">
+          <thead><tr><th>Format</th><th>Example</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>Exact</td><td>plugin@1.2.0</td><td>Exact version</td></tr>
+            <tr><td>Caret</td><td>plugin@^1.0.0</td><td>Compatible with 1.x.x</td></tr>
+            <tr><td>Tilde</td><td>plugin@~1.2.0</td><td>Compatible with 1.2.x</td></tr>
+            <tr><td>Range</td><td>plugin@&gt;=1.0.0</td><td>1.0.0 or higher</td></tr>
+            <tr><td>Latest</td><td>plugin</td><td>Latest version</td></tr>
+          </tbody>
+        </table>
+        <div class="callout">
+          <p><span class="callout-icon">ℹ</span> By default, dex refuses to overwrite files that exist but aren't tracked in the manifest. Use <code>--force</code> to override.</p>
+        </div>
+<pre><code><span class="hc"># Sync all plugins</span>
+dex sync
+
+<span class="hc"># Preview changes without applying</span>
+dex sync --dry-run
+
+<span class="hc"># Install a specific plugin with version</span>
+dex sync my-plugin@^1.0.0
+
+<span class="hc"># Install from local source</span>
+dex sync --source file:./local-plugin
+
+<span class="hc"># Hide managed files from git status</span>
+dex sync --git-exclude</code></pre>
+      </div>
+
+      <div class="doc-section" id="cmd-list">
+        <h3>dex list</h3>
+        <p>List installed plugins.</p>
+        <div class="cmd-header">dex list [OPTIONS]</div>
+        <table class="options-table">
+          <thead><tr><th>Option</th><th>Short</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>--tree</td><td>-t</td><td>Show dependency tree</td></tr>
+            <tr><td>--path</td><td>-p</td><td>Project directory</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="cmd-uninstall">
+        <h3>dex uninstall</h3>
+        <p>Uninstall plugins from the project.</p>
+        <div class="cmd-header">dex uninstall PLUGINS... [OPTIONS]</div>
+        <table class="options-table">
+          <thead><tr><th>Option</th><th>Short</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>--remove</td><td>-r</td><td>Also remove from dex.hcl (drop the dependency)</td></tr>
+            <tr><td>--path</td><td>-p</td><td>Project directory</td></tr>
+          </tbody>
+        </table>
+        <p>Without <code>--remove</code>: deletes installed files but keeps the plugin in <code>dex.hcl</code>. With <code>--remove</code>: also drops the plugin from <code>dex.hcl</code>.</p>
+      </div>
+
+      <div class="doc-section" id="cmd-info">
+        <h3>dex info</h3>
+        <p>Show information about an installed plugin: version, source, lock file entry, and dependencies.</p>
+        <div class="cmd-header">dex info PLUGIN [OPTIONS]</div>
+        <table class="options-table">
+          <thead><tr><th>Option</th><th>Short</th><th>Description</th></tr></thead>
+          <tbody><tr><td>--path</td><td>-p</td><td>Project directory</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="cmd-manifest">
+        <h3>dex manifest</h3>
+        <p>Show files managed by dex. Optionally filter by plugin name.</p>
+        <div class="cmd-header">dex manifest [PLUGIN] [OPTIONS]</div>
+        <table class="options-table">
+          <thead><tr><th>Option</th><th>Short</th><th>Description</th></tr></thead>
+          <tbody><tr><td>--path</td><td>-p</td><td>Project directory</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="cmd-version">
+        <h3>dex version</h3>
+        <p>Show the dex version.</p>
+        <div class="cmd-header">dex version</div>
+<pre><code>$ dex version
+dex 0.1.0</code></pre>
+      </div>
+
+      <!-- ── PROJECT CONFIG ── -->
+      <div class="doc-section" id="project-block">
+        <h2>Project Configuration</h2>
+        <p>The <code>dex.hcl</code> file configures a dex-managed project.</p>
+
+        <h3>project block</h3>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>name</td><td class="type-col">string</td><td></td><td>Project name (defaults to directory name)</td></tr>
+            <tr><td>agentic_platform</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Target AI platform: claude-code, cursor, or github-copilot</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="registry-block">
+        <h3>registry block</h3>
+        <p>Registries define where to fetch plugins from.</p>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Registry identifier (block label)</td></tr>
+            <tr><td>path</td><td class="type-col">string</td><td>conditional</td><td>Local filesystem path</td></tr>
+            <tr><td>url</td><td class="type-col">string</td><td>conditional</td><td>Remote URL (https://, s3://, az://)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="plugin-block">
+        <h3>plugin block</h3>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Plugin identifier (block label)</td></tr>
+            <tr><td>source</td><td class="type-col">string</td><td>conditional</td><td>Direct source URL (git+https://, file://)</td></tr>
+            <tr><td>registry</td><td class="type-col">string</td><td>conditional</td><td>Registry name to fetch from</td></tr>
+            <tr><td>version</td><td class="type-col">string</td><td></td><td>Version constraint</td></tr>
+            <tr><td>config</td><td class="type-col">map(string)</td><td></td><td>Plugin-specific configuration values</td></tr>
+          </tbody>
+        </table>
+<pre><code><span class="hk">project</span> {
+  <span class="hk">agentic_platform</span> = <span class="hs">"claude-code"</span>
+}
+
+<span class="hk">registry</span> <span class="hs">"community"</span> {
+  <span class="hk">url</span> = <span class="hs">"https://plugins.example.com"</span>
+}
+
+<span class="hk">plugin</span> <span class="hs">"python-tools"</span> {
+  <span class="hk">registry</span> = <span class="hs">"community"</span>
+  <span class="hk">version</span>  = <span class="hs">"^1.0.0"</span>
+  <span class="hk">config</span> = { <span class="hk">python_version</span> = <span class="hs">"3.12"</span> }
+}
+
+<span class="hk">plugin</span> <span class="hs">"custom-plugin"</span> {
+  <span class="hk">source</span>  = <span class="hs">"git+https://github.com/user/custom-plugin.git"</span>
+  <span class="hk">version</span> = <span class="hs">"v2.0.0"</span>
+}</code></pre>
+      </div>
+
+      <div class="doc-section" id="version-constraints">
+        <h3>Version Constraints</h3>
+        <table class="attr-table">
+          <thead><tr><th>Specifier</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td>1.0.0</td><td>Exact version</td></tr>
+            <tr><td>^1.0.0</td><td>Compatible with 1.x.x (≥1.0.0 &lt;2.0.0)</td></tr>
+            <tr><td>~1.0.0</td><td>Patch-level changes (~1.0.x)</td></tr>
+            <tr><td>≥1.0.0</td><td>Greater than or equal</td></tr>
+            <tr><td>latest</td><td>Latest available version</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="lock-file">
+        <h3>Lock File (dex.lock)</h3>
+        <p>Records exact versions and checksums for deterministic installs. Commit it for team projects and production deployments.</p>
+<pre><code>{
+  "version": "1.0",
+  "platform": "claude-code",
+  "plugins": {
+    "python-tools": {
+      "version": "1.2.0",
+      "resolved": "https://registry.example.com/python-tools-1.2.0.tar.gz",
+      "integrity": "sha512-abc123..."
+    }
+  }
+}</code></pre>
+      </div>
+
+      <!-- ── PACKAGE CONFIG ── -->
+      <div class="doc-section" id="package-block">
+        <h2>Package Configuration</h2>
+        <p>A <code>package.hcl</code> file defines a plugin's metadata and resources.</p>
+        <h3>package block</h3>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Package name (lowercase, hyphens allowed)</td></tr>
+            <tr><td>version</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Semantic version (e.g., "1.0.0")</td></tr>
+            <tr><td>description</td><td class="type-col">string</td><td></td><td>Human-readable description</td></tr>
+            <tr><td>author</td><td class="type-col">string</td><td></td><td>Package author</td></tr>
+            <tr><td>license</td><td class="type-col">string</td><td></td><td>License identifier (e.g., "MIT")</td></tr>
+            <tr><td>repository</td><td class="type-col">string</td><td></td><td>Source repository URL</td></tr>
+            <tr><td>platforms</td><td class="type-col">list(string)</td><td></td><td>Supported platforms (empty = all)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="variables">
+        <h3>Variables</h3>
+        <p>Variables allow users to customize plugin behavior at installation time via the <code>config</code> map in the plugin block.</p>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Variable identifier (block label)</td></tr>
+            <tr><td>description</td><td class="type-col">string</td><td></td><td>Variable description</td></tr>
+            <tr><td>default</td><td class="type-col">string</td><td></td><td>Default value</td></tr>
+            <tr><td>required</td><td class="type-col">bool</td><td></td><td>Whether user must provide a value</td></tr>
+            <tr><td>env</td><td class="type-col">string</td><td></td><td>Environment variable to read from</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="hcl-functions">
+        <h3>HCL Functions</h3>
+        <h4>file(path)</h4>
+        <p>Reads the contents of a file relative to the package directory.</p>
+<pre><code><span class="hk">content</span> = <span class="hf">file</span>(<span class="hs">"skills/my-skill.md"</span>)</code></pre>
+
+        <h4>templatefile(path, vars)</h4>
+        <p>Renders a template file with Go <code>text/template</code> syntax.</p>
+<pre><code><span class="hk">content</span> = <span class="hf">templatefile</span>(<span class="hs">"skills/my-skill.md.tmpl"</span>, {
+  <span class="hk">project_name</span> = <span class="hs">"MyProject"</span>
+  <span class="hk">api_version</span>  = <span class="hs">"v2"</span>
+})</code></pre>
+
+        <h4>env(name [, default])</h4>
+        <p>Reads an environment variable with an optional default value.</p>
+<pre><code><span class="hk">env</span> = {
+  <span class="hk">API_KEY</span> = <span class="hf">env</span>(<span class="hs">"MY_API_KEY"</span>)
+  <span class="hk">DEBUG</span>   = <span class="hf">env</span>(<span class="hs">"DEBUG"</span>, <span class="hs">"false"</span>)
+}</code></pre>
+      </div>
+
+      <div class="doc-section" id="template-variables">
+        <h3>Template Variables</h3>
+        <p>Available when rendering templates via <code>templatefile()</code>:</p>
+        <table class="attr-table">
+          <thead><tr><th>Variable</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>{{ .ComponentDir }}</td><td>Absolute path to the installed component directory</td></tr>
+            <tr><td>{{ .PluginName }}</td><td>Name of the plugin being installed</td></tr>
+            <tr><td>{{ .PluginVersion }}</td><td>Version of the plugin</td></tr>
+            <tr><td>{{ .ProjectRoot }}</td><td>Absolute path to the project root</td></tr>
+            <tr><td>{{ .Platform }}</td><td>Target platform (e.g., claude-code)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ── CLAUDE CODE RESOURCES ── -->
+      <div class="doc-section" id="claude-skill">
+        <h2>Resources: Claude Code</h2>
+        <span class="badge badge-claude">Claude Code</span>
+
+        <h3>claude_skill</h3>
+        <p>Skills provide specialized knowledge or capabilities to Claude. Installed to <code>.claude/skills/{plugin}-{name}/SKILL.md</code>.</p>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Block label identifying this skill</td></tr>
+            <tr><td>description</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Explains when and how to use this skill</td></tr>
+            <tr><td>content</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>The skill's instructions/knowledge</td></tr>
+            <tr><td>argument_hint</td><td class="type-col">string</td><td></td><td>Hint shown during autocomplete (e.g., "[filename]")</td></tr>
+            <tr><td>disable_model_invocation</td><td class="type-col">bool</td><td></td><td>Prevent Claude from auto-loading; user must invoke manually</td></tr>
+            <tr><td>user_invocable</td><td class="type-col">bool</td><td></td><td>Set to false to hide from / menu (default: true)</td></tr>
+            <tr><td>allowed_tools</td><td class="type-col">list(string)</td><td></td><td>Tools Claude can use without asking</td></tr>
+            <tr><td>model</td><td class="type-col">string</td><td></td><td>Model to use: sonnet, haiku, or opus</td></tr>
+            <tr><td>context</td><td class="type-col">string</td><td></td><td>Set to "fork" to run in isolated subagent</td></tr>
+            <tr><td>agent</td><td class="type-col">string</td><td></td><td>Subagent type when context = "fork"</td></tr>
+            <tr><td>metadata</td><td class="type-col">map(string)</td><td></td><td>Additional frontmatter fields</td></tr>
+          </tbody>
+        </table>
+<pre><code><span class="hk">claude_skill</span> <span class="hs">"code-review"</span> {
+  <span class="hk">description</span>   = <span class="hs">"Performs thorough code reviews"</span>
+  <span class="hk">content</span>       = <span class="hf">file</span>(<span class="hs">"skills/code-review.md"</span>)
+  <span class="hk">allowed_tools</span> = [<span class="hs">"Read"</span>, <span class="hs">"Grep"</span>, <span class="hs">"Glob"</span>]
+  <span class="hk">model</span>         = <span class="hs">"sonnet"</span>
+}</code></pre>
+      </div>
+
+      <div class="doc-section" id="claude-command">
+        <h3>claude_command</h3>
+        <p>User-invokable actions accessible via <code>/{name}</code>. Installed to <code>.claude/commands/{plugin}-{name}.md</code>.</p>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Command name (invoked as /{name})</td></tr>
+            <tr><td>description</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Brief description shown to user</td></tr>
+            <tr><td>content</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Command instructions</td></tr>
+            <tr><td>argument_hint</td><td class="type-col">string</td><td></td><td>Hint for arguments (e.g., "[environment]")</td></tr>
+            <tr><td>allowed_tools</td><td class="type-col">list(string)</td><td></td><td>Tools this command can use</td></tr>
+            <tr><td>model</td><td class="type-col">string</td><td></td><td>Model: sonnet, haiku, or opus</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="claude-subagent">
+        <h3>claude_subagent</h3>
+        <p>Specialized agents spawnable by Claude. Installed to <code>.claude/agents/{plugin}-{name}.md</code>.</p>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Agent identifier</td></tr>
+            <tr><td>description</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>When to use this agent</td></tr>
+            <tr><td>content</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Agent instructions</td></tr>
+            <tr><td>model</td><td class="type-col">string</td><td></td><td>Model: inherit, sonnet, haiku, or opus</td></tr>
+            <tr><td>color</td><td class="type-col">string</td><td></td><td>Display color: blue, green, yellow, red, purple</td></tr>
+            <tr><td>tools</td><td class="type-col">list(string)</td><td></td><td>Allowed tools for this agent</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="claude-rule">
+        <h3>claude_rule</h3>
+        <p>Rules merged into <code>CLAUDE.md</code>. Multiple plugins can contribute rules which are combined together.</p>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Rule identifier</td></tr>
+            <tr><td>description</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Rule description</td></tr>
+            <tr><td>content</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Rule content</td></tr>
+            <tr><td>paths</td><td class="type-col">list(string)</td><td></td><td>File patterns to scope when this rule applies</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="claude-rules">
+        <h3>claude_rules</h3>
+        <p>Standalone rules file installed to <code>.claude/rules/{plugin}-{name}.md</code>.</p>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Rules file identifier</td></tr>
+            <tr><td>description</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Rules description</td></tr>
+            <tr><td>content</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Rules content</td></tr>
+            <tr><td>paths</td><td class="type-col">list(string)</td><td></td><td>File patterns to scope when these rules apply</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="claude-settings">
+        <h3>claude_settings</h3>
+        <p>Settings merged into <code>.claude/settings.json</code>. Multiple plugins can contribute permissions and environment variables.</p>
+        <h4>Permissions (mergeable)</h4>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>allow</td><td class="type-col">list(string)</td><td>Tool patterns to automatically allow</td></tr>
+            <tr><td>ask</td><td class="type-col">list(string)</td><td>Tool patterns requiring confirmation</td></tr>
+            <tr><td>deny</td><td class="type-col">list(string)</td><td>Tool patterns to block</td></tr>
+            <tr><td>env</td><td class="type-col">map(string)</td><td>Environment variables to set</td></tr>
+          </tbody>
+        </table>
+        <h4>Global settings (project-level only)</h4>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>enable_all_project_mcp_servers</td><td class="type-col">bool</td><td>Auto-approve project MCP servers</td></tr>
+            <tr><td>enabled_mcp_servers</td><td class="type-col">list(string)</td><td>Specific approved MCP servers</td></tr>
+            <tr><td>disabled_mcp_servers</td><td class="type-col">list(string)</td><td>Rejected MCP servers</td></tr>
+            <tr><td>respect_gitignore</td><td class="type-col">bool</td><td>Filter suggestions by gitignore</td></tr>
+            <tr><td>include_co_authored_by</td><td class="type-col">bool</td><td>Include co-author in commits</td></tr>
+            <tr><td>model</td><td class="type-col">string</td><td>Override default model</td></tr>
+            <tr><td>always_thinking_enabled</td><td class="type-col">bool</td><td>Enable extended thinking</td></tr>
+            <tr><td>plans_directory</td><td class="type-col">string</td><td>Custom plan files location</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="claude-mcp-server">
+        <h3>claude_mcp_server</h3>
+        <p>MCP server configurations merged into <code>.mcp.json</code>.</p>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Server identifier</td></tr>
+            <tr><td>description</td><td class="type-col">string</td><td></td><td>Server description</td></tr>
+            <tr><td>type</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Server type: command or http</td></tr>
+            <tr><td>command</td><td class="type-col">string</td><td>conditional</td><td>Command to run (required for type = "command")</td></tr>
+            <tr><td>args</td><td class="type-col">list(string)</td><td></td><td>Command-line arguments</td></tr>
+            <tr><td>env</td><td class="type-col">map(string)</td><td></td><td>Environment variables</td></tr>
+            <tr><td>source</td><td class="type-col">string</td><td>conditional</td><td>Package manager shortcut: npm:, uvx:, pip:</td></tr>
+            <tr><td>url</td><td class="type-col">string</td><td>conditional</td><td>HTTP endpoint (required for type = "http")</td></tr>
+          </tbody>
+        </table>
+<pre><code><span class="hk">claude_mcp_server</span> <span class="hs">"postgres"</span> {
+  <span class="hk">type</span>   = <span class="hs">"command"</span>
+  <span class="hk">source</span> = <span class="hs">"uvx:mcp-postgres"</span>
+  <span class="hk">env</span>    = { <span class="hk">DATABASE_URL</span> = <span class="hf">env</span>(<span class="hs">"DATABASE_URL"</span>) }
+}
+
+<span class="hk">claude_mcp_server</span> <span class="hs">"remote-api"</span> {
+  <span class="hk">type</span> = <span class="hs">"http"</span>
+  <span class="hk">url</span>  = <span class="hs">"https://mcp.example.com/api"</span>
+}</code></pre>
+      </div>
+
+      <!-- ── CURSOR RESOURCES ── -->
+      <div class="doc-section" id="cursor-rule">
+        <h2>Resources: Cursor</h2>
+        <span class="badge badge-cursor">Cursor</span>
+
+        <h3>cursor_rule</h3>
+        <p>Rules merged into <code>AGENTS.md</code> using marker comments.</p>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Rule identifier</td></tr>
+            <tr><td>description</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Explains what this rule provides</td></tr>
+            <tr><td>content</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>The rule content</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="cursor-rules">
+        <h3>cursor_rules</h3>
+        <p>Standalone rules file installed to <code>.cursor/rules/{plugin}-{name}.mdc</code>.</p>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Rules file identifier</td></tr>
+            <tr><td>description</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Rules description</td></tr>
+            <tr><td>content</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Rules content</td></tr>
+            <tr><td>globs</td><td class="type-col">list(string)</td><td></td><td>File patterns for selective application</td></tr>
+            <tr><td>always_apply</td><td class="type-col">bool</td><td></td><td>Whether the rule should always be applied</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="cursor-command">
+        <h3>cursor_command</h3>
+        <p>User-invokable commands installed to <code>.cursor/commands/{plugin}-{name}.md</code>.</p>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Command name</td></tr>
+            <tr><td>description</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Brief description</td></tr>
+            <tr><td>content</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Command instructions</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="cursor-mcp-server">
+        <h3>cursor_mcp_server</h3>
+        <p>MCP server configurations merged into <code>.cursor/mcp.json</code>.</p>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Server identifier</td></tr>
+            <tr><td>type</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Server type: stdio, http, or sse</td></tr>
+            <tr><td>command</td><td class="type-col">string</td><td>conditional</td><td>Command to run (required for type = "stdio")</td></tr>
+            <tr><td>args</td><td class="type-col">list(string)</td><td></td><td>Command-line arguments</td></tr>
+            <tr><td>env</td><td class="type-col">map(string)</td><td></td><td>Environment variables</td></tr>
+            <tr><td>env_file</td><td class="type-col">string</td><td></td><td>Path to an env file to load</td></tr>
+            <tr><td>url</td><td class="type-col">string</td><td>conditional</td><td>HTTP/SSE endpoint</td></tr>
+            <tr><td>headers</td><td class="type-col">map(string)</td><td></td><td>HTTP headers for http/sse servers</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ── COPILOT RESOURCES ── -->
+      <div class="doc-section" id="copilot-instruction">
+        <h2>Resources: GitHub Copilot</h2>
+        <span class="badge badge-copilot">GitHub Copilot</span>
+
+        <h3>copilot_instruction</h3>
+        <p>Instructions merged into <code>.github/copilot-instructions.md</code> using marker comments.</p>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Instruction identifier</td></tr>
+            <tr><td>description</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Explains what this instruction provides</td></tr>
+            <tr><td>content</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>The instruction content</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="copilot-instructions">
+        <h3>copilot_instructions</h3>
+        <p>Standalone instruction files installed to <code>.github/instructions/{plugin}-{name}.instructions.md</code>.</p>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Instructions file identifier</td></tr>
+            <tr><td>description</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Instructions description</td></tr>
+            <tr><td>content</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Instructions content</td></tr>
+            <tr><td>apply_to</td><td class="type-col">string</td><td></td><td>Glob pattern for selective application</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="copilot-prompt">
+        <h3>copilot_prompt</h3>
+        <p>User-invokable prompts installed to <code>.github/prompts/{plugin}-{name}.prompt.md</code>.</p>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Prompt name</td></tr>
+            <tr><td>description</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Brief description</td></tr>
+            <tr><td>content</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Prompt instructions</td></tr>
+            <tr><td>argument_hint</td><td class="type-col">string</td><td></td><td>Hint for arguments</td></tr>
+            <tr><td>agent</td><td class="type-col">string</td><td></td><td>Agent mode: ask, edit, agent, or custom</td></tr>
+            <tr><td>model</td><td class="type-col">string</td><td></td><td>Model selection</td></tr>
+            <tr><td>tools</td><td class="type-col">list(string)</td><td></td><td>Tools to enable</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="copilot-agent">
+        <h3>copilot_agent</h3>
+        <p>Specialized agents installed to <code>.github/agents/{plugin}-{name}.agent.md</code>.</p>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Agent identifier</td></tr>
+            <tr><td>description</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>When to use this agent</td></tr>
+            <tr><td>content</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Agent instructions</td></tr>
+            <tr><td>model</td><td class="type-col">string</td><td></td><td>Model selection</td></tr>
+            <tr><td>tools</td><td class="type-col">list(string)</td><td></td><td>Available tools</td></tr>
+            <tr><td>handoffs</td><td class="type-col">list(string)</td><td></td><td>Sequential workflow transitions to other agents</td></tr>
+            <tr><td>infer</td><td class="type-col">bool</td><td></td><td>Enable subagent usage (default: true)</td></tr>
+            <tr><td>target</td><td class="type-col">string</td><td></td><td>Target environment: vscode or github-copilot</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="copilot-skill">
+        <h3>copilot_skill</h3>
+        <p>Skills installed to <code>.github/skills/{plugin}-{name}/SKILL.md</code>.</p>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Skill name (max 64 characters)</td></tr>
+            <tr><td>description</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>When and how to use this skill (max 1024 characters)</td></tr>
+            <tr><td>content</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>The skill's instructions/knowledge</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="copilot-mcp-server">
+        <h3>copilot_mcp_server</h3>
+        <p>MCP server configurations merged into <code>.vscode/mcp.json</code>.</p>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Server identifier</td></tr>
+            <tr><td>type</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Server type: stdio, http, or sse</td></tr>
+            <tr><td>command</td><td class="type-col">string</td><td>conditional</td><td>Command to run (required for type = "stdio")</td></tr>
+            <tr><td>args</td><td class="type-col">list(string)</td><td></td><td>Command-line arguments</td></tr>
+            <tr><td>env</td><td class="type-col">map(string)</td><td></td><td>Environment variables</td></tr>
+            <tr><td>url</td><td class="type-col">string</td><td>conditional</td><td>HTTP/SSE endpoint</td></tr>
+            <tr><td>headers</td><td class="type-col">map(string)</td><td></td><td>HTTP headers for http/sse servers</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ── PERSONAL CONFIG ── -->
+      <div class="doc-section" id="local-hcl">
+        <h2>Personal Config</h2>
+        <p>Personal config lets you add resources locally without touching the shared project config. Your additions are invisible to teammates and never land in git.</p>
+
+        <h3>local.hcl</h3>
+        <p>Place a <code>local.hcl</code> at <code>~/.dex/local.hcl</code> to define global personal resources. Supports the same resource types as <code>dex.hcl</code> without the required <code>project</code> block.</p>
+<pre><code><span class="hc"># ~/.dex/local.hcl - applied to every dex project on this machine</span>
+
+<span class="hk">plugin</span> <span class="hs">"my-personal-tools"</span> {
+  <span class="hk">source</span>  = <span class="hs">"git+https://github.com/me/my-tools.git"</span>
+  <span class="hk">version</span> = <span class="hs">"latest"</span>
+}
+
+<span class="hk">claude_settings</span> <span class="hs">"personal"</span> {
+  <span class="hk">allow</span> = [<span class="hs">"Bash(gh:*)"</span>]
+}</code></pre>
+      </div>
+
+      <div class="doc-section" id="per-project-config">
+        <h3>Per-project config</h3>
+        <p>For project-specific personal config, create <code>~/.dex/projects/&lt;project-name&gt;/project.hcl</code>. The project name matches the <code>name</code> field in <code>dex.hcl</code>.</p>
+<pre><code><span class="hc"># ~/.dex/projects/my-webapp/project.hcl</span>
+
+<span class="hk">claude_settings</span> <span class="hs">"local-dev"</span> {
+  <span class="hk">env</span> = {
+    <span class="hk">DATABASE_URL</span> = <span class="hs">"postgres://localhost/myapp_dev"</span>
+  }
+}</code></pre>
+      </div>
+
+      <div class="doc-section" id="git-exclude">
+        <h3>Git exclude</h3>
+        <p>Hide dex-managed files from <code>git status</code> without modifying <code>.gitignore</code>:</p>
+<pre><code>dex sync --git-exclude</code></pre>
+        <p>Writes patterns to <code>.git/info/exclude</code>, a local gitignore that only affects your checkout. Files remain on disk and fully functional.</p>
+        <div class="callout">
+          <p><span class="callout-icon">ℹ</span> <code>--git-exclude</code> is local only. Teammates see the files normally unless they also use this flag.</p>
+        </div>
+      </div>
+
+      <div class="doc-section" id="variable-precedence">
+        <h3>Variable Precedence</h3>
+        <p>When multiple sources define the same variable, dex resolves them in this order (highest wins):</p>
+        <ol>
+          <li><strong>Project variables</strong> in <code>dex.hcl</code></li>
+          <li><strong>Per-project local variables</strong> in <code>~/.dex/projects/&lt;name&gt;/project.hcl</code></li>
+          <li><strong>Global local variables</strong> in <code>~/.dex/local.hcl</code></li>
+          <li><strong>Package defaults</strong> in <code>package.hcl</code></li>
+        </ol>
+      </div>
+
+      <!-- ── PUBLISHING ── -->
+      <div class="doc-section" id="plugin-structure">
+        <h2>Publishing Plugins</h2>
+        <h3>Plugin Structure</h3>
+<pre><code>my-plugin/
+├── package.hcl           <span class="hc"># Plugin manifest (required)</span>
+├── content/              <span class="hc"># Shared content files</span>
+│   └── code-review.md
+├── skills/               <span class="hc"># Skill content</span>
+│   └── testing.md
+├── commands/             <span class="hc"># Command content</span>
+│   └── deploy.md.tmpl
+├── rules/                <span class="hc"># Rule content</span>
+│   └── security.md
+└── scripts/              <span class="hc"># Helper scripts</span>
+    └── setup.sh</code></pre>
+      </div>
+
+      <div class="doc-section" id="file-blocks">
+        <h3>File Blocks</h3>
+        <p>Resources can include additional files using <code>file</code> and <code>template_file</code> blocks.</p>
+        <h4>file block</h4>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>src</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Source path relative to plugin root</td></tr>
+            <tr><td>dest</td><td class="type-col">string</td><td></td><td>Destination filename (defaults to basename of src)</td></tr>
+            <tr><td>chmod</td><td class="type-col">string</td><td></td><td>File permissions (e.g., "755")</td></tr>
+          </tbody>
+        </table>
+        <h4>template_file block</h4>
+        <table class="attr-table">
+          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>src</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Source template path relative to plugin root</td></tr>
+            <tr><td>dest</td><td class="type-col">string</td><td></td><td>Destination filename (defaults to basename without .tmpl)</td></tr>
+            <tr><td>chmod</td><td class="type-col">string</td><td></td><td>File permissions</td></tr>
+            <tr><td>vars</td><td class="type-col">map</td><td></td><td>Additional variables for this template</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section" id="cross-platform">
+        <h3>Cross-Platform Plugins</h3>
+        <p>Share content files across platforms. Write once, deploy to all:</p>
+<pre><code><span class="hk">package</span> {
+  <span class="hk">name</span>      = <span class="hs">"code-review-tools"</span>
+  <span class="hk">version</span>   = <span class="hs">"1.0.0"</span>
+  <span class="hk">platforms</span> = [<span class="hs">"claude-code"</span>, <span class="hs">"github-copilot"</span>, <span class="hs">"cursor"</span>]
+}
+
+<span class="hk">claude_skill</span> <span class="hs">"code-review"</span> {
+  <span class="hk">description</span> = <span class="hs">"Thorough code review capability"</span>
+  <span class="hk">content</span>     = <span class="hf">file</span>(<span class="hs">"content/code-review.md"</span>)
+}
+
+<span class="hk">copilot_skill</span> <span class="hs">"code-review"</span> {
+  <span class="hk">description</span> = <span class="hs">"Thorough code review capability"</span>
+  <span class="hk">content</span>     = <span class="hf">file</span>(<span class="hs">"content/code-review.md"</span>)  <span class="hc"># Same file!</span>
+}</code></pre>
+      </div>
+
+      <div class="doc-section" id="publishing-guide">
+        <h3>Publishing Guide</h3>
+        <h4>Publish to Git</h4>
+<pre><code>git tag v1.0.0
+git push origin v1.0.0</code></pre>
+<pre><code><span class="hk">plugin</span> <span class="hs">"my-plugin"</span> {
+  <span class="hk">source</span>  = <span class="hs">"git+https://github.com/owner/my-plugin.git"</span>
+  <span class="hk">version</span> = <span class="hs">"v1.0.0"</span>
+}</code></pre>
+
+        <h4>Best practices</h4>
+        <ul>
+          <li>Use descriptive, meaningful names for skills and commands</li>
+          <li>Document thoroughly. Include usage examples in content files.</li>
+          <li>Share content. Use <code>file()</code> to share content across platforms.</li>
+          <li>Use templates. Use <code>templatefile()</code> for platform-specific variations.</li>
+          <li>Pin dependencies. Use specific version ranges for stability.</li>
+          <li>Test on all platforms. Verify your plugin works on each target platform.</li>
+        </ul>
+      </div>
+
+    </main>
+  </div>
+
+  <footer>
+    <p class="footer-main">
+      © 2026 dex &nbsp;·&nbsp; MIT License &nbsp;·&nbsp;
+      <a href="https://github.com/LaunchCG/dex" target="_blank" rel="noopener">GitHub</a> &nbsp;·&nbsp;
+      <a href="index.html">Home</a>
+    </p>
+    <div class="footer-launch">
+      Built by&nbsp;
+      <a href="https://www.launchconsulting.com" target="_blank" rel="noopener" class="launch-logo-link">
+        <img src="https://cdn.prod.website-files.com/60c924f1b871a7316a4a5bb3/639ce8afc018dd4593394e21_TheWordmark1.svg" alt="Launch Consulting">
+      </a>
+    </div>
+  </footer>
+
+  <script>
+    // IntersectionObserver: highlight active sidebar section on scroll
+    const sections = document.querySelectorAll('.doc-section[id]');
+    const sidebarLinks = document.querySelectorAll('.sidebar-group a[href^="#"]');
+
+    function setActive(id) {
+      sidebarLinks.forEach(a => {
+        a.classList.toggle('active', a.getAttribute('href') === '#' + id);
+      });
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) setActive(entry.target.id);
+      });
+    }, { rootMargin: '-56px 0px -60% 0px', threshold: 0 });
+
+    sections.forEach(s => observer.observe(s));
+  </script>
+</body>
+</html>
