@@ -150,7 +150,7 @@ Configure which plugins are installed in your project:
 ```hcl
 project {
   name             = "my-webapp"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 plugin "code-review-tools" {

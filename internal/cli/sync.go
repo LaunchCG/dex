@@ -38,6 +38,7 @@ func init() {
 	syncCmd.Flags().Bool("namespace", false, "Namespace resources with package name (e.g., pkg-name-resource)")
 	syncCmd.Flags().BoolP("dry-run", "n", false, "Show what would change without making changes")
 	syncCmd.Flags().Bool("git-exclude", false, "Update .git/info/exclude to locally hide dex-managed files from git")
+	syncCmd.Flags().StringP("platform", "P", "", "Override the target AI agent platform")
 }
 
 // parsePluginSpec parses a plugin specification in name@version format.
@@ -69,6 +70,14 @@ func runSync(cmd *cobra.Command, args []string) error {
 
 	// Configure installer options
 	inst.WithForce(force).WithNoLock(noLock).WithNamespace(namespace)
+
+	// Apply platform override if provided
+	platform, _ := cmd.Flags().GetString("platform")
+	if platform != "" {
+		if err := inst.WithPlatform(platform); err != nil {
+			return fmt.Errorf("unsupported platform %q: %w", platform, err)
+		}
+	}
 
 	gitExclude, _ := cmd.Flags().GetBool("git-exclude")
 

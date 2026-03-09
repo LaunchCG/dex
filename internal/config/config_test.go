@@ -16,7 +16,7 @@ func TestLoadProject_Valid(t *testing.T) {
 	hclContent := `
 project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 registry "local" {
@@ -79,21 +79,21 @@ func TestLoadProject_MissingRequired(t *testing.T) {
 	hclContent := `
 project {
   name = ""
-  agentic_platform = ""
+  default_platform = ""
 }
 `
 	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(hclContent), 0644)
 	require.NoError(t, err)
 
-	// This should parse successfully but fail validation (missing agentic_platform)
+	// This should parse successfully but fail validation (missing default_platform)
 	config, err := LoadProject(tmpDir)
 	require.NoError(t, err)
 	assert.NotNil(t, config)
 
-	// Validation should fail due to missing agentic_platform
+	// Validation should fail due to missing default_platform
 	err = config.Validate()
 	require.Error(t, err)
-	assert.EqualError(t, err, "project.agentic_platform is required")
+	assert.EqualError(t, err, "project.default_platform is required")
 }
 
 func TestProjectConfig_Validate(t *testing.T) {
@@ -135,7 +135,7 @@ func TestProjectConfig_Validate_MissingAgenticPlatform(t *testing.T) {
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.EqualError(t, err, "project.agentic_platform is required")
+	assert.EqualError(t, err, "project.default_platform is required")
 }
 
 func TestProjectConfig_Validate_DuplicateRegistry(t *testing.T) {
@@ -667,7 +667,7 @@ func TestProjectConfig_WithPluginConfig(t *testing.T) {
 	hclContent := `
 project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 plugin "my-plugin" {
@@ -872,7 +872,7 @@ variable "API_KEY" {
 
 project {
   name             = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 plugin "test-plugin" {
@@ -921,7 +921,7 @@ variable "MY_VAR" {
 
 project {
   name             = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 plugin "test-plugin" {
@@ -957,7 +957,7 @@ variable "REQUIRED_VAR" {
 
 project {
   name             = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 `
 	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(hclContent), 0644)
@@ -982,7 +982,7 @@ variable "MISSING_VAR" {
 
 project {
   name             = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 `
 	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(hclContent), 0644)
@@ -1058,7 +1058,7 @@ variable "OPTIONAL_VAR" {
 
 project {
   name             = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 plugin "test-plugin" {
@@ -1130,7 +1130,7 @@ variable "EMPTY_VAR" {
 
 project {
   name             = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 plugin "azure-devops" {
@@ -1199,7 +1199,7 @@ variable "MCP_ARG" {
 
 project {
   name             = "resource-test"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 claude_mcp_server "test-server" {
@@ -1230,7 +1230,7 @@ func TestAddRegistry_WithURL(t *testing.T) {
 	tmpDir := t.TempDir()
 	initialContent := `project {
   name             = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 `
 	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(initialContent), 0644)
@@ -1244,7 +1244,7 @@ func TestAddRegistry_WithURL(t *testing.T) {
 	require.NoError(t, err)
 	expected := `project {
   name             = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 registry "my-registry" {
@@ -1258,7 +1258,7 @@ func TestAddRegistry_WithPath(t *testing.T) {
 	tmpDir := t.TempDir()
 	initialContent := `project {
   name             = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 `
 	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(initialContent), 0644)
@@ -1271,7 +1271,7 @@ func TestAddRegistry_WithPath(t *testing.T) {
 	require.NoError(t, err)
 	expected := `project {
   name             = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 registry "local-registry" {
@@ -1285,7 +1285,7 @@ func TestAddRegistry_DuplicateSkipped(t *testing.T) {
 	tmpDir := t.TempDir()
 	initialContent := `project {
   name             = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 registry "existing" {
@@ -1308,7 +1308,7 @@ func TestAddRegistry_ErrorBothURLAndPath(t *testing.T) {
 	tmpDir := t.TempDir()
 	initialContent := `project {
   name             = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 `
 	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(initialContent), 0644)
@@ -1323,7 +1323,7 @@ func TestAddRegistry_ErrorNeitherURLNorPath(t *testing.T) {
 	tmpDir := t.TempDir()
 	initialContent := `project {
   name             = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 `
 	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(initialContent), 0644)
@@ -1358,7 +1358,7 @@ variable "SERVER_ARG" {
 
 project {
   name             = "env-resource-test"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 claude_mcp_server "env-server" {
@@ -1495,7 +1495,7 @@ func TestAddPluginToConfig_WithRegistry(t *testing.T) {
 	tmpDir := t.TempDir()
 	initialContent := `project {
   name             = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 registry "my-registry" {
@@ -1512,7 +1512,7 @@ registry "my-registry" {
 	require.NoError(t, err)
 	expected := `project {
   name             = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 registry "my-registry" {
@@ -1531,7 +1531,7 @@ func TestAddPluginToConfig_WithRegistryNoVersion(t *testing.T) {
 	tmpDir := t.TempDir()
 	initialContent := `project {
   name             = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 registry "my-registry" {
@@ -1548,7 +1548,7 @@ registry "my-registry" {
 	require.NoError(t, err)
 	expected := `project {
   name             = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 registry "my-registry" {
@@ -1566,7 +1566,7 @@ func TestAddPluginToConfig_WithSource(t *testing.T) {
 	tmpDir := t.TempDir()
 	initialContent := `project {
   name             = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 `
 	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(initialContent), 0644)
@@ -1579,7 +1579,7 @@ func TestAddPluginToConfig_WithSource(t *testing.T) {
 	require.NoError(t, err)
 	expected := `project {
   name             = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 plugin "my-plugin" {
@@ -1594,7 +1594,7 @@ func TestAddPluginToConfig_ErrorNoSourceOrRegistry(t *testing.T) {
 	tmpDir := t.TempDir()
 	initialContent := `project {
   name             = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 `
 	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(initialContent), 0644)

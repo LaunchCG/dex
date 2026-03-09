@@ -1202,7 +1202,7 @@ func TestInstaller_FindDependents(t *testing.T) {
 	dexHCL := `
 project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 `
 	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(dexHCL), 0644)
@@ -1268,7 +1268,7 @@ func TestInstaller_FindOrphans(t *testing.T) {
 	dexHCL := `
 project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 plugin "app" {
@@ -1345,7 +1345,7 @@ func TestInstaller_FindDependents_TransitiveChain(t *testing.T) {
 	dexHCL := `
 project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 plugin "app" {
@@ -1425,7 +1425,7 @@ func TestInstaller_FindDependents_DiamondDependency(t *testing.T) {
 	dexHCL := `
 project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 plugin "app" {
@@ -1504,7 +1504,7 @@ func TestInstaller_FindDependents_ComplexGraph(t *testing.T) {
 	dexHCL := `
 project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 plugin "app-a" {
@@ -1793,7 +1793,7 @@ func TestUninstall_RemovesDedicatedFiles(t *testing.T) {
 	// Create minimal dex.hcl for installer
 	dexHCL := `project {
   name = "test"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }`
 	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(dexHCL), 0644)
 	require.NoError(t, err)
@@ -1842,7 +1842,7 @@ func TestInstaller_Update_LocalResourcesOnly(t *testing.T) {
 	// Create project config with initial agent instructions
 	projectContent := `project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
   agent_instructions = "# Initial Instructions"
 }
 
@@ -1868,7 +1868,7 @@ plugin "my-plugin" {
 	// Update agent_instructions in dex.hcl
 	projectContent = `project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
   agent_instructions = "# Updated Instructions\n\nThis is the new content."
 }
 
@@ -1924,7 +1924,7 @@ claude_rule "test-rule" {
 	// Create project config with v1 and initial agent instructions
 	projectContent := `project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
   agent_instructions = "# V1 Instructions"
 }
 
@@ -1966,7 +1966,7 @@ claude_rule "test-rule" {
 	// Update project config to point to v2 and modify agent instructions
 	projectContent = `project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
   agent_instructions = "# V2 Instructions\n\nUpdated for version 2."
 }
 
@@ -2006,7 +2006,7 @@ func TestInstaller_Update_DryRunMode(t *testing.T) {
 	// Create project config with initial agent instructions
 	projectContent := `project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
   agent_instructions = "# Initial Instructions"
 }
 
@@ -2033,7 +2033,7 @@ plugin "my-plugin" {
 	// Update agent_instructions in dex.hcl
 	projectContent = `project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
   agent_instructions = "# Updated Instructions\n\nThis should not be applied in dry-run."
 }
 

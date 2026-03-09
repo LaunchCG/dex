@@ -20,7 +20,7 @@ func TestInstaller_ProjectAgentInstructions_ClaudeCodeOnly(t *testing.T) {
 	// Create project config with agent instructions but no plugins
 	projectContent := `project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
   agent_instructions = <<EOF
 # My Project Guidelines
 
@@ -83,7 +83,7 @@ claude_rule "eslint" {
 	// Create project config with agent instructions AND a plugin
 	projectContent := `project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
   agent_instructions = <<EOF
 # My Project
 
@@ -125,7 +125,7 @@ func TestInstaller_ProjectAgentInstructions_UpdateInstructions(t *testing.T) {
 	// Create project config v1
 	projectContent := `project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
   agent_instructions = "# V1 Instructions"
 }
 
@@ -151,7 +151,7 @@ plugin "my-plugin" {
 	// Update project config to v2
 	projectContent = `project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
   agent_instructions = "# V2 Updated Instructions\n\nThis is the new version."
 }
 
@@ -186,7 +186,7 @@ func TestInstaller_ProjectAgentInstructions_RemoveInstructions(t *testing.T) {
 	// Create project config WITH instructions
 	projectContent := `project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
   agent_instructions = "# Project Instructions"
 }
 
@@ -212,7 +212,7 @@ plugin "my-plugin" {
 	// Remove agent_instructions from config
 	projectContent = `project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 plugin "my-plugin" {
@@ -242,7 +242,7 @@ func TestInstaller_ProjectAgentInstructions_Cursor(t *testing.T) {
 	// Create project config for Cursor
 	projectContent := `project {
   name = "test-project"
-  agentic_platform = "cursor"
+  default_platform = "cursor"
   agent_instructions = "# Cursor Project Guidelines\n\nUse Cursor-specific instructions."
 }
 `
@@ -274,7 +274,7 @@ func TestInstaller_ProjectAgentInstructions_Copilot(t *testing.T) {
 	// Create project config for GitHub Copilot
 	projectContent := `project {
   name = "test-project"
-  agentic_platform = "github-copilot"
+  default_platform = "github-copilot"
   agent_instructions = "# Copilot Project Guidelines\n\nUse GitHub Copilot best practices."
 }
 `
@@ -316,7 +316,7 @@ func TestInstaller_ProjectAgentInstructions_MultiplePlugins(t *testing.T) {
 	// Create project config
 	projectContent := `project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
   agent_instructions = <<EOF
 # Main Project Guidelines
 
@@ -366,7 +366,7 @@ func TestInstaller_ProjectAgentInstructions_NoInstructionsNoPlugins(t *testing.T
 	// Create minimal project config
 	projectContent := `project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 `
 	err := os.WriteFile(filepath.Join(projectDir, "dex.hcl"), []byte(projectContent), 0644)
@@ -395,7 +395,7 @@ func TestInstall_SpecificPlugins_TracksProjectResources(t *testing.T) {
 	// Create project config with agent instructions AND a plugin
 	projectContent := `project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
   agent_instructions = "# Project Rules\n\nAlways follow these rules."
 }
 

@@ -19,14 +19,14 @@ var initCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(initCmd)
-	initCmd.Flags().StringP("agent", "a", "claude-code", "Target AI agent platform")
+	initCmd.Flags().StringP("platform", "P", "claude-code", "Target AI agent platform")
 	initCmd.Flags().StringP("name", "n", "", "Project name (defaults to directory name)")
 	initCmd.Flags().StringP("path", "p", ".", "Project directory")
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
 	// Get flags
-	agent, _ := cmd.Flags().GetString("agent")
+	platform, _ := cmd.Flags().GetString("platform")
 	name, _ := cmd.Flags().GetString("name")
 	projectPath, _ := cmd.Flags().GetString("path")
 
@@ -49,10 +49,10 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	// Create dex.hcl with project block
 	content := fmt.Sprintf(`project {
-  name            = %q
-  agentic_platform = %q
+  name             = %q
+  default_platform = %q
 }
-`, name, agent)
+`, name, platform)
 
 	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 		return fmt.Errorf("failed to create dex.hcl: %w", err)
@@ -62,7 +62,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	green := color.New(color.FgGreen).SprintFunc()
 	fmt.Printf("%s Created dex.hcl in %s\n", green("✓"), absPath)
 	fmt.Printf("  Project: %s\n", name)
-	fmt.Printf("  Platform: %s\n", agent)
+	fmt.Printf("  Platform: %s\n", platform)
 	fmt.Println()
 	fmt.Println("Next steps:")
 	fmt.Println("  1. Add plugins to dex.hcl")

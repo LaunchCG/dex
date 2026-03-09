@@ -20,7 +20,7 @@ func createTestProject(t *testing.T, dir string, plugins string) {
 	t.Helper()
 	content := `project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 ` + plugins
