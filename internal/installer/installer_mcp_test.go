@@ -101,7 +101,7 @@ mcp_server "filesystem" {
 	// Create project config with namespace_all enabled
 	projectContent := `project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
   namespace_all = true
 }
 
@@ -169,7 +169,7 @@ mcp_server "context7" {
 	// Create project config for Cursor
 	projectContent := `project {
   name = "test-project"
-  agentic_platform = "cursor"
+  default_platform = "cursor"
 }
 
 plugin "mcp-test" {
@@ -238,7 +238,7 @@ mcp_server "database" {
 	// Create project config for GitHub Copilot
 	projectContent := `project {
   name = "test-project"
-  agentic_platform = "github-copilot"
+  default_platform = "github-copilot"
 }
 
 plugin "mcp-test" {
@@ -315,7 +315,7 @@ mcp_server "multi-platform" {
 	t.Run("claude-code uses override", func(t *testing.T) {
 		projectContent := `project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 plugin "mcp-test" {
@@ -354,7 +354,7 @@ plugin "mcp-test" {
 		cursorProjectDir := t.TempDir()
 		projectContent := `project {
   name = "test-project"
-  agentic_platform = "cursor"
+  default_platform = "cursor"
 }
 
 plugin "mcp-test" {
@@ -487,7 +487,7 @@ copilot_mcp_server "ado" {
 	// Create project config for GitHub Copilot
 	projectContent := `project {
   name = "test-project"
-  agentic_platform = "github-copilot"
+  default_platform = "github-copilot"
 }
 
 plugin "ado-plugin" {
@@ -566,7 +566,7 @@ mcp_server "ado" {
 	// Create project config for GitHub Copilot
 	projectContent := `project {
   name = "test-project"
-  agentic_platform = "github-copilot"
+  default_platform = "github-copilot"
 }
 
 plugin "ado-plugin" {

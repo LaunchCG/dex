@@ -182,6 +182,17 @@ func (i *Installer) WithNamespace(namespace bool) *Installer {
 	return i
 }
 
+// WithPlatform overrides the target AI agent platform for this sync run.
+func (i *Installer) WithPlatform(platform string) error {
+	adpt, err := adapter.Get(platform)
+	if err != nil {
+		return err
+	}
+	i.project.Project.AgenticPlatform = platform
+	i.adapter = adpt
+	return nil
+}
+
 // shouldNamespacePackage determines if a package should be namespaced
 // based on the install flag, global config, or package-specific config.
 func (i *Installer) shouldNamespacePackage(packageName string) bool {

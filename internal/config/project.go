@@ -63,7 +63,7 @@ type ProjectBlock struct {
 	Name string `hcl:"name,attr"`
 
 	// AgenticPlatform specifies the target AI agent platform (e.g., "claude-code", "cursor")
-	AgenticPlatform string `hcl:"agentic_platform,attr"`
+	AgenticPlatform string `hcl:"default_platform,attr"`
 
 	// NamespaceAll enables namespacing for all installed packages
 	NamespaceAll bool `hcl:"namespace_all,optional"`
@@ -327,7 +327,7 @@ func (p *ProjectConfig) Validate() error {
 	// Validate project block
 	// Name is optional - will default to directory name if not specified
 	if p.Project.AgenticPlatform == "" {
-		return fmt.Errorf("project.agentic_platform is required")
+		return fmt.Errorf("project.default_platform is required")
 	}
 
 	// Validate variables

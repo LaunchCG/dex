@@ -598,7 +598,7 @@ func TestSync_PlatformSwitch_ClaudeToGithubCopilot_SharedFiles(t *testing.T) {
 		t.Helper()
 		content := `project {
   name = "test-project"
-  agentic_platform = "` + platform + `"
+  default_platform = "` + platform + `"
 }
 
 plugin "mcp-plugin" {
@@ -650,7 +650,7 @@ func TestSync_PlatformSwitch_ClaudeToGithubCopilot_DedicatedFiles(t *testing.T) 
 		t.Helper()
 		content := `project {
   name = "test-project"
-  agentic_platform = "` + platform + `"
+  default_platform = "` + platform + `"
 }
 
 plugin "my-plugin" {
@@ -693,7 +693,7 @@ func TestSync_PlatformSwitch_ClaudeToGithubCopilot_AgentInstructions(t *testing.
 		t.Helper()
 		content := `project {
   name = "test-project"
-  agentic_platform = "` + platform + `"
+  default_platform = "` + platform + `"
   agent_instructions = "# Project Rules\n\nAlways follow these rules."
 }
 `
@@ -735,7 +735,7 @@ func TestSync_PlatformSwitch_IdempotentAfterSwitch(t *testing.T) {
 		t.Helper()
 		content := `project {
   name = "test-project"
-  agentic_platform = "` + platform + `"
+  default_platform = "` + platform + `"
 }
 
 plugin "mcp-plugin" {

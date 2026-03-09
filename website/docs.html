@@ -595,12 +595,12 @@
         <h2>Quick Start</h2>
         <p><strong>1. Initialize a project:</strong></p>
 <pre><code>dex init                        <span class="hc"># Claude Code (default)</span>
-dex init --agent cursor         <span class="hc"># Cursor</span>
-dex init --agent github-copilot <span class="hc"># GitHub Copilot</span></code></pre>
+dex init --platform cursor         <span class="hc"># Cursor</span>
+dex init --platform github-copilot <span class="hc"># GitHub Copilot</span></code></pre>
 
         <p><strong>2. Edit <code>dex.hcl</code> to add plugins:</strong></p>
 <pre><code><span class="hk">project</span> {
-  <span class="hk">agentic_platform</span> = <span class="hs">"claude-code"</span>
+  <span class="hk">default_platform</span> = <span class="hs">"claude-code"</span>
 }
 
 <span class="hk">plugin</span> <span class="hs">"my-tools"</span> {
@@ -623,7 +623,7 @@ dex init --agent github-copilot <span class="hc"># GitHub Copilot</span></code><
         <table class="options-table">
           <thead><tr><th>Option</th><th>Short</th><th>Description</th><th>Default</th></tr></thead>
           <tbody>
-            <tr><td>--agent</td><td>-a</td><td>Target AI agent platform</td><td>claude-code</td></tr>
+            <tr><td>--platform</td><td>-P</td><td>Target AI agent platform</td><td>claude-code</td></tr>
             <tr><td>--name</td><td>-n</td><td>Project name</td><td>Directory name</td></tr>
             <tr><td>--path</td><td>-p</td><td>Project directory</td><td>Current directory</td></tr>
           </tbody>
@@ -743,7 +743,7 @@ dex 0.1.0</code></pre>
           <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
           <tbody>
             <tr><td>name</td><td class="type-col">string</td><td></td><td>Project name (defaults to directory name)</td></tr>
-            <tr><td>agentic_platform</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Target AI platform: claude-code, cursor, or github-copilot</td></tr>
+            <tr><td>default_platform</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Target AI platform: claude-code, cursor, or github-copilot</td></tr>
           </tbody>
         </table>
       </div>
@@ -774,7 +774,7 @@ dex 0.1.0</code></pre>
           </tbody>
         </table>
 <pre><code><span class="hk">project</span> {
-  <span class="hk">agentic_platform</span> = <span class="hs">"claude-code"</span>
+  <span class="hk">default_platform</span> = <span class="hs">"claude-code"</span>
 }
 
 <span class="hk">registry</span> <span class="hs">"community"</span> {

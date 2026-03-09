@@ -47,7 +47,7 @@ claude_settings "mcp-permissions" {
 	// Write dex.hcl for the project
 	projectHCL := `project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 plugin "test-settings-plugin" {
@@ -134,7 +134,7 @@ claude_settings "permissions" {
 	// Write dex.hcl
 	projectHCL := `project {
   name = "test-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 plugin "multi-resource-plugin" {

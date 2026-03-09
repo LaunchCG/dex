@@ -918,8 +918,8 @@
 dex init
 
 <span class="hc"># Initialize for a specific platform</span>
-dex init --agent cursor
-dex init --agent github-copilot</code></pre>
+dex init --platform cursor
+dex init --platform github-copilot</code></pre>
           </div>
         </div>
 
@@ -934,7 +934,7 @@ dex init --agent github-copilot</code></pre>
             <p>Edit <code>dex.hcl</code> to add plugins from a registry, a git repository, or a local path.</p>
             <span class="fi">dex.hcl</span>
 <pre><code><span class="hk">project</span> {
-  <span class="hk">agentic_platform</span> = <span class="hs">"claude-code"</span>
+  <span class="hk">default_platform</span> = <span class="hs">"claude-code"</span>
 }
 
 <span class="hk">plugin</span> <span class="hs">"python-tools"</span> {
@@ -990,7 +990,7 @@ dex sync my-plugin@^1.0.0</code></pre>
 
         <div class="platform-card">
           <h3 class="c-claude">Claude Code</h3>
-          <p class="platform-value">agentic_platform = "claude-code"</p>
+          <p class="platform-value">default_platform = "claude-code"</p>
           <ul class="platform-resources">
             <li><span class="res-type">claude_skill</span><span class="res-dest">.claude/skills/</span></li>
             <li><span class="res-type">claude_command</span><span class="res-dest">.claude/commands/</span></li>
@@ -1004,7 +1004,7 @@ dex sync my-plugin@^1.0.0</code></pre>
 
         <div class="platform-card">
           <h3 class="c-cursor">Cursor</h3>
-          <p class="platform-value">agentic_platform = "cursor"</p>
+          <p class="platform-value">default_platform = "cursor"</p>
           <ul class="platform-resources">
             <li><span class="res-type">cursor_rule</span><span class="res-dest">AGENTS.md (merged)</span></li>
             <li><span class="res-type">cursor_rules</span><span class="res-dest">.cursor/rules/</span></li>
@@ -1015,7 +1015,7 @@ dex sync my-plugin@^1.0.0</code></pre>
 
         <div class="platform-card">
           <h3 class="c-copilot">GitHub Copilot</h3>
-          <p class="platform-value">agentic_platform = "github-copilot"</p>
+          <p class="platform-value">default_platform = "github-copilot"</p>
           <ul class="platform-resources">
             <li><span class="res-type">copilot_instruction</span><span class="res-dest">copilot-instructions.md</span></li>
             <li><span class="res-type">copilot_instructions</span><span class="res-dest">.github/instructions/</span></li>
