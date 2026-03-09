@@ -1,6 +1,6 @@
 project {
   name            = "dex"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 
   git_exclude = true
 }
