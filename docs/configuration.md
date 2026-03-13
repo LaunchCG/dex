@@ -12,7 +12,7 @@ The `dex.hcl` file defines your project settings, registries, and plugins.
 ```hcl
 project {
   name             = "my-project"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 registry "internal" {
@@ -44,7 +44,7 @@ plugin "custom-plugin" {
 | Attribute | Required | Description |
 |-----------|----------|-------------|
 | `name` | no | Project name (defaults to directory name) |
-| `agentic_platform` | yes | Target AI platform |
+| `default_platform` | yes | Target AI platform |
 
 ### Supported Platforms
 
