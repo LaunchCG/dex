@@ -144,7 +144,7 @@ template_file {
 
 ## Claude Code Resources
 
-The following resources are available for Claude Code projects (`agentic_platform = "claude-code"`).
+The following resources are available for Claude Code projects (`default_platform = "claude-code"`).
 
 ### claude_skill
 
@@ -661,7 +661,7 @@ claude_mcp_server "serena" {
 
 ## Cursor Resources
 
-The following resources are available for Cursor projects (`agentic_platform = "cursor"`).
+The following resources are available for Cursor projects (`default_platform = "cursor"`).
 
 ### cursor_rule
 
@@ -854,7 +854,7 @@ cursor_mcp_server "realtime" {
 
 ## GitHub Copilot Resources
 
-The following resources are available for GitHub Copilot projects (`agentic_platform = "github-copilot"`).
+The following resources are available for GitHub Copilot projects (`default_platform = "github-copilot"`).
 
 ### copilot_instruction
 
@@ -1240,7 +1240,7 @@ A `dex.hcl` file configures a dex-managed project.
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `name` | string | no | Project name (defaults to directory name) |
-| `agentic_platform` | string | yes | Target AI platform (e.g., `claude-code`) |
+| `default_platform` | string | yes | Target AI platform (e.g., `claude-code`) |
 
 ### Registry Block
 
@@ -1265,7 +1265,7 @@ A `dex.hcl` file configures a dex-managed project.
 ```hcl
 project {
   name             = "my-webapp"
-  agentic_platform = "claude-code"
+  default_platform = "claude-code"
 }
 
 registry "internal" {
