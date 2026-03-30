@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+
+	"github.com/launchcg/dex/internal/jsonutil"
 )
 
 // Manifest tracks all files managed by dex.
@@ -89,7 +91,7 @@ func (m *Manifest) Save() error {
 		return err
 	}
 
-	data, err := json.MarshalIndent(m, "", "  ")
+	data, err := jsonutil.MarshalIndent(m, "", "  ")
 	if err != nil {
 		return err
 	}

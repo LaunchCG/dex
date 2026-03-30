@@ -31,6 +31,7 @@ func init() {
 	registryAddCmd.Flags().StringP("url", "u", "", "Remote registry URL")
 	registryAddCmd.Flags().StringP("local", "l", "", "Local filesystem path for the registry")
 	registryAddCmd.Flags().StringP("path", "p", ".", "Project directory")
+	registryAddCmd.Flags().BoolP("force", "f", false, "Overwrite registry if it already exists")
 }
 
 func runRegistryAdd(cmd *cobra.Command, args []string) error {
@@ -38,6 +39,7 @@ func runRegistryAdd(cmd *cobra.Command, args []string) error {
 	url, _ := cmd.Flags().GetString("url")
 	local, _ := cmd.Flags().GetString("local")
 	projectPath, _ := cmd.Flags().GetString("path")
+	force, _ := cmd.Flags().GetBool("force")
 
 	// Validate exactly one of url or local is set
 	if url == "" && local == "" {
@@ -70,7 +72,7 @@ func runRegistryAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Add registry to config
-	if err := config.AddRegistry(projectPath, name, url, local); err != nil {
+	if err := config.AddRegistry(projectPath, name, url, local, force); err != nil {
 		return err
 	}
 

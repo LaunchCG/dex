@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/launchcg/dex/internal/adapter"
+	"github.com/launchcg/dex/internal/jsonutil"
 	"github.com/launchcg/dex/internal/manifest"
 )
 
@@ -303,7 +304,7 @@ func WriteJSONFile(path string, data map[string]any) error {
 		return err
 	}
 
-	content, err := json.MarshalIndent(data, "", "  ")
+	content, err := jsonutil.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return err
 	}

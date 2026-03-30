@@ -14,7 +14,6 @@
 package installer
 
 import (
-	"encoding/json"
 	stderrors "errors"
 	"fmt"
 	"os"
@@ -25,6 +24,7 @@ import (
 	"github.com/launchcg/dex/internal/adapter"
 	"github.com/launchcg/dex/internal/config"
 	"github.com/launchcg/dex/internal/errors"
+	"github.com/launchcg/dex/internal/jsonutil"
 	"github.com/launchcg/dex/internal/lockfile"
 	"github.com/launchcg/dex/internal/manifest"
 	"github.com/launchcg/dex/internal/registry"
@@ -950,7 +950,7 @@ func (i *Installer) generateMCPConfig(mcpPath, mcpKey string) error {
 	}
 
 	if hasContent {
-		content, marshalErr := json.MarshalIndent(existing, "", "  ")
+		content, marshalErr := jsonutil.MarshalIndent(existing, "", "  ")
 		if marshalErr != nil {
 			return fmt.Errorf("marshaling MCP config: %w", marshalErr)
 		}
@@ -1036,7 +1036,7 @@ func (i *Installer) generateSettingsConfig(settingsPath string) error {
 
 	// Write if there's content, delete if empty
 	if len(existing) > 0 {
-		content, marshalErr := json.MarshalIndent(existing, "", "  ")
+		content, marshalErr := jsonutil.MarshalIndent(existing, "", "  ")
 		if marshalErr != nil {
 			return fmt.Errorf("marshaling settings config: %w", marshalErr)
 		}

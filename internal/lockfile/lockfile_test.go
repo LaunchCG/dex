@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -294,6 +295,58 @@ func TestLockFileFormat(t *testing.T) {
 }`
 	if string(data) != expected {
 		t.Errorf("Lock file format mismatch.\nGot:\n%s\n\nWant:\n%s", string(data), expected)
+	}
+}
+
+func TestSave_VersionConstraintsNotHTMLEscaped(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	l, err := Load(tmpDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	l.Agent = "claude-code"
+	l.Set("my-plugin", &LockedPlugin{
+		Version:   "2.0.0",
+		Resolved:  "https://example.com/my-plugin/2.0.0.tar.gz",
+		Integrity: "sha256-abc",
+		Dependencies: map[string]string{
+			"dep-a": ">=1.0.0",
+			"dep-b": "<2.0.0",
+			"dep-c": ">=1.0.0 & <3.0.0",
+		},
+	})
+
+	if err := l.Save(); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	lockPath := filepath.Join(tmpDir, LockFileName)
+	data, err := os.ReadFile(lockPath)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+
+	raw := string(data)
+
+	// Must contain literal >= and <, not unicode escapes
+	if !strings.Contains(raw, ">=1.0.0") {
+		t.Errorf("lock file should contain literal >=1.0.0, got:\n%s", raw)
+	}
+	if !strings.Contains(raw, "<2.0.0") {
+		t.Errorf("lock file should contain literal <2.0.0, got:\n%s", raw)
+	}
+
+	// Must NOT contain Go's HTML-escaped versions
+	if strings.Contains(raw, `\u003e`) {
+		t.Errorf("lock file contains escaped \\u003e (>), should use literal >:\n%s", raw)
+	}
+	if strings.Contains(raw, `\u003c`) {
+		t.Errorf("lock file contains escaped \\u003c (<), should use literal <:\n%s", raw)
+	}
+	if strings.Contains(raw, `\u0026`) {
+		t.Errorf("lock file contains escaped \\u0026 (&), should use literal &:\n%s", raw)
 	}
 }
 

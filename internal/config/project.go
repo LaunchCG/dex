@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/launchcg/dex/internal/resource"
 )
@@ -453,7 +454,7 @@ func AddPluginToConfig(dir, name, source, registryName, version string) error {
 // AddRegistry adds a registry block to the dex.hcl file.
 // It appends the registry block to the end of the file.
 // Exactly one of url or path must be provided.
-func AddRegistry(dir string, name string, url string, path string) error {
+func AddRegistry(dir string, name string, url string, path string, force bool) error {
 	// Validate exactly one of url or path is provided
 	if url == "" && path == "" {
 		return fmt.Errorf("exactly one of --url or --local must be provided")
@@ -475,8 +476,13 @@ func AddRegistry(dir string, name string, url string, path string) error {
 	if err == nil {
 		for _, r := range existingConfig.Registries {
 			if r.Name == name {
-				// Registry already exists, skip
-				return nil
+				if !force {
+					return fmt.Errorf("registry %q already exists; use --force to overwrite", name)
+				}
+				// Remove the existing registry block using regex
+				re := regexp.MustCompile(`(?m)\n?registry\s+"` + regexp.QuoteMeta(name) + `"\s*\{[^}]*\}\n?`)
+				content = re.ReplaceAll(content, []byte(""))
+				break
 			}
 		}
 	}
