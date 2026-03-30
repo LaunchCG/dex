@@ -14,6 +14,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 
 	"github.com/launchcg/dex/internal/errors"
+	"github.com/launchcg/dex/internal/jsonutil"
 	"github.com/launchcg/dex/internal/registry"
 )
 
@@ -131,7 +132,7 @@ func (p *AzurePublisher) updateIndex(name, version string) error {
 	index = UpdateRegistryIndex(index, name, version)
 
 	// Marshal index
-	data, err := json.MarshalIndent(index, "", "  ")
+	data, err := jsonutil.MarshalIndent(index, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal registry.json: %w", err)
 	}

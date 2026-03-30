@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/launchcg/dex/internal/jsonutil"
 
 	"github.com/launchcg/dex/internal/errors"
 	"github.com/launchcg/dex/internal/registry"
@@ -127,7 +128,7 @@ func (p *S3Publisher) updateIndex(name, version string) error {
 	index = UpdateRegistryIndex(index, name, version)
 
 	// Marshal index
-	data, err := json.MarshalIndent(index, "", "  ")
+	data, err := jsonutil.MarshalIndent(index, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal registry.json: %w", err)
 	}

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/launchcg/dex/internal/errors"
+	"github.com/launchcg/dex/internal/jsonutil"
 	"github.com/launchcg/dex/internal/registry"
 )
 
@@ -97,7 +98,7 @@ func (p *LocalPublisher) updateIndex(name, version string) error {
 	index = UpdateRegistryIndex(index, name, version)
 
 	// Write back
-	data, err = json.MarshalIndent(index, "", "  ")
+	data, err = jsonutil.MarshalIndent(index, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal registry.json: %w", err)
 	}

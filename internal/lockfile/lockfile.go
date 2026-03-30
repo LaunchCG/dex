@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+
+	"github.com/launchcg/dex/internal/jsonutil"
 )
 
 const (
@@ -88,7 +90,7 @@ func Load(projectRoot string) (*LockFile, error) {
 // Save writes the lock file to disk.
 func (l *LockFile) Save() error {
 	// Sort plugin entries for consistent output
-	data, err := json.MarshalIndent(l, "", "  ")
+	data, err := jsonutil.MarshalIndent(l, "", "  ")
 	if err != nil {
 		return err
 	}
