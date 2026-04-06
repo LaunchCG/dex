@@ -46,7 +46,7 @@ plugin "mcp-test" {
 `)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -113,7 +113,7 @@ plugin "mcp-test" {
 	require.NoError(t, err)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -180,7 +180,7 @@ plugin "mcp-test" {
 	require.NoError(t, err)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -249,7 +249,7 @@ plugin "mcp-test" {
 	require.NoError(t, err)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -325,7 +325,7 @@ plugin "mcp-test" {
 		err = os.WriteFile(filepath.Join(projectDir, "dex.hcl"), []byte(projectContent), 0644)
 		require.NoError(t, err)
 
-		installer, err := NewInstaller(projectDir)
+		installer, err := NewInstaller(projectDir, "")
 		require.NoError(t, err)
 
 		err = installer.InstallAll()
@@ -364,7 +364,7 @@ plugin "mcp-test" {
 		err = os.WriteFile(filepath.Join(cursorProjectDir, "dex.hcl"), []byte(projectContent), 0644)
 		require.NoError(t, err)
 
-		installer, err := NewInstaller(cursorProjectDir)
+		installer, err := NewInstaller(cursorProjectDir, "")
 		require.NoError(t, err)
 
 		err = installer.InstallAll()
@@ -420,7 +420,7 @@ plugin "multi-mcp" {
 `)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -498,7 +498,7 @@ plugin "ado-plugin" {
 	require.NoError(t, err)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -577,7 +577,7 @@ plugin "ado-plugin" {
 	require.NoError(t, err)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -643,7 +643,7 @@ plugin "mcp-test" {
 `)
 
 	// Create installer and install
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	err = installer.InstallAll()

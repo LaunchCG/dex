@@ -101,9 +101,10 @@ type InstalledPlugin struct {
 
 // NewInstaller creates a new installer for the given project root.
 // It loads the project configuration, manifest, and lock file.
-func NewInstaller(projectRoot string) (*Installer, error) {
-	// Load project config
-	project, err := config.LoadProject(projectRoot)
+// If profile is non-empty, the named profile is applied to the config before use.
+func NewInstaller(projectRoot string, profile string) (*Installer, error) {
+	// Load project config (with optional profile application)
+	project, err := config.LoadProjectWithProfile(projectRoot, profile)
 	if err != nil {
 		return nil, errors.NewConfigError(
 			filepath.Join(projectRoot, "dex.hcl"),
@@ -162,6 +163,11 @@ func NewInstaller(projectRoot string) (*Installer, error) {
 		manifest:    mf,
 		lock:        lf,
 	}, nil
+}
+
+// ProjectConfig returns the loaded project configuration.
+func (i *Installer) ProjectConfig() *config.ProjectConfig {
+	return i.project
 }
 
 // WithForce sets the force flag to overwrite non-managed files.

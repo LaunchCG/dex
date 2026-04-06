@@ -88,7 +88,7 @@ plugin "my-test-plugin" {
 `)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install all plugins
@@ -160,7 +160,7 @@ plugin "plugin-b" {
 `)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install all plugins
@@ -217,7 +217,7 @@ plugin "versioned-plugin" {
 `)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install with version constraint
@@ -251,7 +251,7 @@ plugin "reinstall-plugin" {
 `)
 
 	// First install
-	installer1, err := NewInstaller(projectDir)
+	installer1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = installer1.InstallAll()
 	require.NoError(t, err)
@@ -278,7 +278,7 @@ claude_rule "reinstall-plugin-rule" {
 	require.NoError(t, err)
 
 	// Reinstall
-	installer2, err := NewInstaller(projectDir)
+	installer2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = installer2.InstallAll()
 	require.NoError(t, err)
@@ -326,7 +326,7 @@ plugin "var-plugin" {
 `)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -369,7 +369,7 @@ plugin "mcp-plugin" {
 `)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -418,7 +418,7 @@ plugin "settings-plugin" {
 `)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -473,7 +473,7 @@ plugin "skill-plugin" {
 `)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -524,7 +524,7 @@ plugin "command-plugin" {
 `)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -564,7 +564,7 @@ plugin "plugin-two" {
 `)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install all
@@ -606,7 +606,7 @@ plugin "invalid-plugin" {
 `)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install should fail
@@ -629,7 +629,7 @@ plugin "empty-plugin" {
 `)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install should fail
@@ -666,7 +666,7 @@ plugin "strict-plugin" {
 `)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install should fail due to version constraint
@@ -706,7 +706,7 @@ plugin "lock-test-plugin" {
 `)
 
 	// First install - should get 1.2.0 (latest)
-	installer1, err := NewInstaller(projectDir)
+	installer1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = installer1.InstallAll()
 	require.NoError(t, err)
@@ -726,7 +726,7 @@ plugin "lock-test-plugin" {
 	})
 
 	// Second install should use locked version, not latest
-	installer2, err := NewInstaller(projectDir)
+	installer2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = installer2.InstallAll()
 	require.NoError(t, err)
@@ -757,7 +757,7 @@ plugin "no-lock-plugin" {
 `)
 
 	// Create installer with --no-lock
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	installer = installer.WithNoLock(true)
 
@@ -815,7 +815,7 @@ plugin "save-test-plugin" {
 `)
 
 	// Create installer and install
-	inst, err := NewInstaller(projectDir)
+	inst, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	installed, err := inst.Install([]PluginSpec{{
@@ -847,7 +847,7 @@ plugin "source-save-plugin" {
 `)
 
 	// Create installer and install
-	inst, err := NewInstaller(projectDir)
+	inst, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	installed, err := inst.Install([]PluginSpec{{
@@ -901,7 +901,7 @@ registry "second" {
 `)
 
 	// Create installer and install WITHOUT specifying --registry
-	inst, err := NewInstaller(projectDir)
+	inst, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	installed, err := inst.Install([]PluginSpec{{
@@ -933,7 +933,7 @@ registry "local" {
 `)
 
 	// Create installer and try to install a plugin that doesn't exist
-	inst, err := NewInstaller(projectDir)
+	inst, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	_, err = inst.Install([]PluginSpec{{
@@ -978,7 +978,7 @@ registry "second" {
 `)
 
 	// Create installer and try to install the ambiguous plugin
-	inst, err := NewInstaller(projectDir)
+	inst, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	_, err = inst.Install([]PluginSpec{{
@@ -996,7 +996,7 @@ func TestInstaller_AutoSearchRegistries_NoRegistries(t *testing.T) {
 	createTestProject(t, projectDir, "")
 
 	// Create installer and try to install without any registry
-	inst, err := NewInstaller(projectDir)
+	inst, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	_, err = inst.Install([]PluginSpec{{
@@ -1028,7 +1028,7 @@ registry "my-reg" {
 `)
 
 	// Create installer and install WITHOUT --registry (auto-search should find it)
-	inst, err := NewInstaller(projectDir)
+	inst, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	installed, err := inst.Install([]PluginSpec{{

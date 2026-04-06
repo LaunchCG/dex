@@ -49,7 +49,7 @@ plugin "file-test" {
 `)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -120,7 +120,7 @@ plugin "file-inline" {
 `)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -187,7 +187,7 @@ plugin "docker-compose" {
 `)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -292,7 +292,7 @@ plugin "multi-files" {
 `)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -369,7 +369,7 @@ plugin "file-chmod" {
 `)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install

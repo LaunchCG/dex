@@ -1241,7 +1241,7 @@ project {
 	err = os.WriteFile(filepath.Join(tmpDir, "dex.lock"), []byte(lockContent), 0644)
 	require.NoError(t, err)
 
-	inst, err := NewInstaller(tmpDir)
+	inst, err := NewInstaller(tmpDir, "")
 	require.NoError(t, err)
 
 	// core is depended on by both app and utils
@@ -1308,7 +1308,7 @@ plugin "app" {
 	err = os.WriteFile(filepath.Join(tmpDir, "dex.lock"), []byte(lockContent), 0644)
 	require.NoError(t, err)
 
-	inst, err := NewInstaller(tmpDir)
+	inst, err := NewInstaller(tmpDir, "")
 	require.NoError(t, err)
 
 	// orphan-pkg is not in dex.hcl and not a dependency of anything
@@ -1395,7 +1395,7 @@ plugin "app" {
 	err = os.WriteFile(filepath.Join(tmpDir, "dex.lock"), []byte(lockContent), 0644)
 	require.NoError(t, err)
 
-	inst, err := NewInstaller(tmpDir)
+	inst, err := NewInstaller(tmpDir, "")
 	require.NoError(t, err)
 
 	// Direct dependents of core is just utils
@@ -1477,7 +1477,7 @@ plugin "app" {
 	err = os.WriteFile(filepath.Join(tmpDir, "dex.lock"), []byte(lockContent), 0644)
 	require.NoError(t, err)
 
-	inst, err := NewInstaller(tmpDir)
+	inst, err := NewInstaller(tmpDir, "")
 	require.NoError(t, err)
 
 	// shared-lib is depended on by both frontend and backend
@@ -1573,7 +1573,7 @@ plugin "app-b" {
 	err = os.WriteFile(filepath.Join(tmpDir, "dex.lock"), []byte(lockContent), 0644)
 	require.NoError(t, err)
 
-	inst, err := NewInstaller(tmpDir)
+	inst, err := NewInstaller(tmpDir, "")
 	require.NoError(t, err)
 
 	// Direct dependents of core: lib-x, lib-y
@@ -1799,7 +1799,7 @@ func TestUninstall_RemovesDedicatedFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create installer
-	inst, err := NewInstaller(tmpDir)
+	inst, err := NewInstaller(tmpDir, "")
 	require.NoError(t, err)
 	inst.manifest = m
 
@@ -1854,7 +1854,7 @@ plugin "my-plugin" {
 	require.NoError(t, err)
 
 	// Install initial version
-	installer1, err := NewInstaller(projectDir)
+	installer1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = installer1.InstallAll()
 	require.NoError(t, err)
@@ -1880,7 +1880,7 @@ plugin "my-plugin" {
 	require.NoError(t, err)
 
 	// Execute: dex update
-	installer2, err := NewInstaller(projectDir)
+	installer2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	results, err := installer2.Update(nil, false)
 	require.NoError(t, err)
@@ -1936,7 +1936,7 @@ plugin "test-plugin" {
 	require.NoError(t, err)
 
 	// Install initial version (v1)
-	installer1, err := NewInstaller(projectDir)
+	installer1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = installer1.InstallAll()
 	require.NoError(t, err)
@@ -1978,7 +1978,7 @@ plugin "test-plugin" {
 	require.NoError(t, err)
 
 	// Execute: sync/update (this should reinstall the plugin since source changed)
-	installer2, err := NewInstaller(projectDir)
+	installer2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	results, err := installer2.Update(nil, false)
 	require.NoError(t, err)
@@ -2018,7 +2018,7 @@ plugin "my-plugin" {
 	require.NoError(t, err)
 
 	// Install initial version
-	installer1, err := NewInstaller(projectDir)
+	installer1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = installer1.InstallAll()
 	require.NoError(t, err)
@@ -2045,7 +2045,7 @@ plugin "my-plugin" {
 	require.NoError(t, err)
 
 	// Execute: sync --dry-run (tests Update method internally)
-	installer2, err := NewInstaller(projectDir)
+	installer2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	results, err := installer2.Update(nil, true) // dryRun = true
 	require.NoError(t, err)

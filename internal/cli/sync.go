@@ -39,6 +39,7 @@ func init() {
 	syncCmd.Flags().BoolP("dry-run", "n", false, "Show what would change without making changes")
 	syncCmd.Flags().Bool("git-exclude", false, "Update .git/info/exclude to locally hide dex-managed files from git")
 	syncCmd.Flags().StringP("platform", "P", "", "Override the target AI agent platform")
+	syncCmd.Flags().String("profile", "", "Use a named configuration profile")
 }
 
 // parsePluginSpec parses a plugin specification in name@version format.
@@ -61,9 +62,10 @@ func runSync(cmd *cobra.Command, args []string) error {
 	namespace, _ := cmd.Flags().GetBool("namespace")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	projectPath, _ := cmd.Flags().GetString("path")
+	profile, _ := cmd.Flags().GetString("profile")
 
 	// Create installer
-	inst, err := installer.NewInstaller(projectPath)
+	inst, err := installer.NewInstaller(projectPath, profile)
 	if err != nil {
 		return fmt.Errorf("failed to initialize installer: %w", err)
 	}
@@ -98,10 +100,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 	if !dryRun {
 		shouldGitExclude := gitExclude
 		if !shouldGitExclude {
-			// Check config setting
-			if cfg, err := config.LoadProject(projectPath); err == nil {
-				shouldGitExclude = cfg.Project.GitExclude
-			}
+			shouldGitExclude = inst.ProjectConfig().Project.GitExclude
 		}
 		if shouldGitExclude {
 			absPath, err := filepath.Abs(projectPath)

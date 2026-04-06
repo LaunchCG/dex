@@ -28,7 +28,7 @@ plugin "new-plugin" {
 }
 `)
 
-	inst, err := NewInstaller(projectDir)
+	inst, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	results, err := inst.Sync(false)
@@ -82,7 +82,7 @@ plugin "updatable-plugin" {
 `)
 
 	// First install to get v1.1.0 locked
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = inst1.InstallAll()
 	require.NoError(t, err)
@@ -95,7 +95,7 @@ plugin "updatable-plugin" {
 	createTestPlugin(t, pluginDir, "updatable-plugin", "1.2.0", "Updatable plugin v1.2.0")
 
 	// Sync should detect the update
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	results, err := inst2.Sync(false)
@@ -134,13 +134,13 @@ plugin "stable-plugin" {
 `)
 
 	// First install
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = inst1.InstallAll()
 	require.NoError(t, err)
 
 	// Sync should show up-to-date
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	results, err := inst2.Sync(false)
@@ -175,7 +175,7 @@ plugin "remove-plugin" {
 `)
 
 	// Install both
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = inst1.InstallAll()
 	require.NoError(t, err)
@@ -188,7 +188,7 @@ plugin "keep-plugin" {
 `)
 
 	// Sync should prune remove-plugin
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	results, err := inst2.Sync(false)
@@ -238,7 +238,7 @@ plugin "dry-run-plugin" {
 }
 `)
 
-	inst, err := NewInstaller(projectDir)
+	inst, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	results, err := inst.Sync(true)
@@ -271,7 +271,7 @@ plugin "prune-me" {
 }
 `)
 
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = inst1.InstallAll()
 	require.NoError(t, err)
@@ -280,7 +280,7 @@ plugin "prune-me" {
 	createTestProject(t, projectDir, "")
 
 	// Dry-run sync
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	results, err := inst2.Sync(true)
@@ -336,7 +336,7 @@ plugin "orphan-plugin" {
 }
 `)
 
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = inst1.InstallAll()
 	require.NoError(t, err)
@@ -370,7 +370,7 @@ plugin "new-plugin" {
 `)
 
 	// Sync
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	results, err := inst2.Sync(false)
@@ -443,7 +443,7 @@ plugin "mcp-plugin" {
 `)
 
 	// First install
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = inst1.InstallAll()
 	require.NoError(t, err)
@@ -465,7 +465,7 @@ plugin "mcp-plugin" {
 	require.NoError(t, err)
 
 	// Sync should reinstall the plugin and recreate .mcp.json
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	results, err := inst2.Sync(false)
@@ -501,7 +501,7 @@ plugin "file-plugin" {
 `)
 
 	// First install
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = inst1.InstallAll()
 	require.NoError(t, err)
@@ -517,7 +517,7 @@ plugin "file-plugin" {
 	require.NoError(t, err)
 
 	// Sync should reinstall and recreate CLAUDE.md
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	_, err = inst2.Sync(false)
@@ -535,7 +535,7 @@ func TestSync_EmptyConfig(t *testing.T) {
 	projectDir := t.TempDir()
 	createTestProject(t, projectDir, "")
 
-	inst, err := NewInstaller(projectDir)
+	inst, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	results, err := inst.Sync(false)
@@ -611,7 +611,7 @@ plugin "mcp-plugin" {
 
 	// Install as claude-code
 	writeConfig("claude-code")
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = inst1.Sync(false)
 	require.NoError(t, err)
@@ -619,7 +619,7 @@ plugin "mcp-plugin" {
 
 	// Switch to github-copilot
 	writeConfig("github-copilot")
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = inst2.Sync(false)
 	require.NoError(t, err)
@@ -663,7 +663,7 @@ plugin "my-plugin" {
 
 	// Install as claude-code
 	writeConfig("claude-code")
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = inst1.Sync(false)
 	require.NoError(t, err)
@@ -674,7 +674,7 @@ plugin "my-plugin" {
 
 	// Switch to github-copilot — plugin has no copilot resources, plan will be empty
 	writeConfig("github-copilot")
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = inst2.Sync(false)
 	require.NoError(t, err)
@@ -703,7 +703,7 @@ func TestSync_PlatformSwitch_ClaudeToGithubCopilot_AgentInstructions(t *testing.
 
 	// Install as claude-code
 	writeConfig("claude-code")
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = inst1.Sync(false)
 	require.NoError(t, err)
@@ -711,7 +711,7 @@ func TestSync_PlatformSwitch_ClaudeToGithubCopilot_AgentInstructions(t *testing.
 
 	// Switch to github-copilot
 	writeConfig("github-copilot")
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = inst2.Sync(false)
 	require.NoError(t, err)
@@ -748,7 +748,7 @@ plugin "mcp-plugin" {
 
 	// Install on claude-code
 	writeConfig("claude-code")
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = inst1.Sync(false)
 	require.NoError(t, err)
@@ -756,7 +756,7 @@ plugin "mcp-plugin" {
 
 	// Switch to github-copilot
 	writeConfig("github-copilot")
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = inst2.Sync(false)
 	require.NoError(t, err)
@@ -764,7 +764,7 @@ plugin "mcp-plugin" {
 	assert.FileExists(t, filepath.Join(projectDir, ".vscode", "mcp.json"))
 
 	// Sync again — must be idempotent
-	inst3, err := NewInstaller(projectDir)
+	inst3, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = inst3.Sync(false)
 	require.NoError(t, err)
@@ -804,7 +804,7 @@ plugin "file-plugin" {
 `)
 
 	// Install v1
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = inst1.InstallAll()
 	require.NoError(t, err)
@@ -829,7 +829,7 @@ plugin "file-plugin" {
 	require.NoError(t, err)
 
 	// Sync
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = inst2.Sync(false)
 	require.NoError(t, err)
@@ -858,7 +858,7 @@ plugin "dest-plugin" {
 `)
 
 	// Install v1
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = inst1.InstallAll()
 	require.NoError(t, err)
@@ -874,7 +874,7 @@ plugin "dest-plugin" {
 	createPluginWithFile(t, pluginDir, "dest-plugin", "1.0.0", "config/v2.txt", "version two")
 
 	// Sync
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = inst2.Sync(false)
 	require.NoError(t, err)
@@ -969,7 +969,7 @@ plugin "parent-plugin" {
 }
 `)
 
-	inst, err := NewInstaller(projectDir)
+	inst, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	results, err := inst.Sync(false)
@@ -994,4 +994,249 @@ plugin "parent-plugin" {
 	plugins := lockData["plugins"].(map[string]any)
 	assert.Contains(t, plugins, "child-plugin",
 		"child-plugin (transitive dep) must remain in lock file after sync")
+}
+
+// =============================================================================
+// Profile Sync Tests
+// =============================================================================
+
+func TestSync_ProfileAddsPlugins(t *testing.T) {
+	projectDir := t.TempDir()
+
+	// Create two test plugins
+	defaultPluginDir := t.TempDir()
+	createTestPlugin(t, defaultPluginDir, "default-plugin", "1.0.0", "Default plugin")
+
+	profilePluginDir := t.TempDir()
+	createTestPlugin(t, profilePluginDir, "profile-plugin", "1.0.0", "Profile plugin")
+
+	// Project config with a default plugin and a profile that adds another
+	hcl := `
+plugin "default-plugin" {
+  source = "file:` + defaultPluginDir + `"
+}
+
+profile "qa" {
+  plugin "profile-plugin" {
+    source = "file:` + profilePluginDir + `"
+  }
+}
+`
+	createTestProject(t, projectDir, hcl)
+
+	// Sync with profile — should install both default + profile plugin
+	inst, err := NewInstaller(projectDir, "qa")
+	require.NoError(t, err)
+
+	results, err := inst.Sync(false)
+	require.NoError(t, err)
+	require.Len(t, results, 2)
+
+	names := make(map[string]bool)
+	for _, r := range results {
+		names[r.Name] = true
+		assert.Equal(t, SyncInstalled, r.Action)
+	}
+	assert.True(t, names["default-plugin"], "default plugin should be installed")
+	assert.True(t, names["profile-plugin"], "profile plugin should be installed")
+
+	// Verify CLAUDE.md has content from both plugins
+	claudeContent, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(claudeContent), "Follow this rule from default-plugin")
+	assert.Contains(t, string(claudeContent), "Follow this rule from profile-plugin")
+}
+
+func TestSync_DefaultIgnoresProfiles(t *testing.T) {
+	projectDir := t.TempDir()
+
+	defaultPluginDir := t.TempDir()
+	createTestPlugin(t, defaultPluginDir, "default-plugin", "1.0.0", "Default plugin")
+
+	profilePluginDir := t.TempDir()
+	createTestPlugin(t, profilePluginDir, "profile-plugin", "1.0.0", "Profile plugin")
+
+	hcl := `
+plugin "default-plugin" {
+  source = "file:` + defaultPluginDir + `"
+}
+
+profile "qa" {
+  plugin "profile-plugin" {
+    source = "file:` + profilePluginDir + `"
+  }
+}
+`
+	createTestProject(t, projectDir, hcl)
+
+	// Sync without profile — should only install default plugin
+	inst, err := NewInstaller(projectDir, "")
+	require.NoError(t, err)
+
+	results, err := inst.Sync(false)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Equal(t, "default-plugin", results[0].Name)
+	assert.Equal(t, SyncInstalled, results[0].Action)
+
+	// Verify CLAUDE.md only has default content
+	claudeContent, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(claudeContent), "Follow this rule from default-plugin")
+	assert.NotContains(t, string(claudeContent), "profile-plugin")
+}
+
+func TestSync_ProfileExcludeDefaultsPrunesDefaultPlugins(t *testing.T) {
+	projectDir := t.TempDir()
+
+	defaultPluginDir := t.TempDir()
+	createTestPlugin(t, defaultPluginDir, "default-plugin", "1.0.0", "Default plugin")
+
+	profilePluginDir := t.TempDir()
+	createTestPlugin(t, profilePluginDir, "profile-plugin", "1.0.0", "Profile plugin")
+
+	hcl := `
+plugin "default-plugin" {
+  source = "file:` + defaultPluginDir + `"
+}
+
+profile "clean" {
+  exclude_defaults = true
+
+  plugin "profile-plugin" {
+    source = "file:` + profilePluginDir + `"
+  }
+}
+`
+	createTestProject(t, projectDir, hcl)
+
+	// Sync with exclude_defaults — only profile plugin
+	inst, err := NewInstaller(projectDir, "clean")
+	require.NoError(t, err)
+
+	results, err := inst.Sync(false)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Equal(t, "profile-plugin", results[0].Name)
+	assert.Equal(t, SyncInstalled, results[0].Action)
+
+	// Verify CLAUDE.md only has profile content
+	claudeContent, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(claudeContent), "Follow this rule from profile-plugin")
+	assert.NotContains(t, string(claudeContent), "default-plugin")
+}
+
+func TestSync_ProfileReplacesDefaultThenRevert(t *testing.T) {
+	projectDir := t.TempDir()
+
+	pluginDir := t.TempDir()
+	createTestPlugin(t, pluginDir, "shared-plugin", "1.0.0", "Shared plugin")
+
+	profilePluginDir := t.TempDir()
+	createTestPlugin(t, profilePluginDir, "extra-plugin", "1.0.0", "Extra plugin")
+
+	hcl := `
+plugin "shared-plugin" {
+  source = "file:` + pluginDir + `"
+}
+
+profile "qa" {
+  plugin "extra-plugin" {
+    source = "file:` + profilePluginDir + `"
+  }
+}
+`
+	createTestProject(t, projectDir, hcl)
+
+	// Step 1: Sync with profile
+	inst1, err := NewInstaller(projectDir, "qa")
+	require.NoError(t, err)
+
+	results1, err := inst1.Sync(false)
+	require.NoError(t, err)
+
+	names1 := make(map[string]bool)
+	for _, r := range results1 {
+		names1[r.Name] = true
+	}
+	assert.True(t, names1["shared-plugin"])
+	assert.True(t, names1["extra-plugin"])
+
+	// Step 2: Sync back to default — extra-plugin should be pruned
+	inst2, err := NewInstaller(projectDir, "")
+	require.NoError(t, err)
+
+	results2, err := inst2.Sync(false)
+	require.NoError(t, err)
+
+	var pruned []string
+	var upToDate []string
+	for _, r := range results2 {
+		switch r.Action {
+		case SyncPruned:
+			pruned = append(pruned, r.Name)
+		case SyncUpToDate:
+			upToDate = append(upToDate, r.Name)
+		}
+	}
+	assert.Contains(t, upToDate, "shared-plugin", "default plugin should remain")
+	assert.Contains(t, pruned, "extra-plugin", "profile plugin should be pruned on revert")
+
+	// Verify CLAUDE.md no longer has extra-plugin content
+	claudeContent, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(claudeContent), "Follow this rule from shared-plugin")
+	assert.NotContains(t, string(claudeContent), "extra-plugin")
+}
+
+func TestSync_ProfileNotFoundErrors(t *testing.T) {
+	projectDir := t.TempDir()
+	createTestProject(t, projectDir, `
+profile "qa" {}
+`)
+
+	_, err := NewInstaller(projectDir, "bogus")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `profile "bogus" not found`)
+	assert.Contains(t, err.Error(), "qa")
+}
+
+func TestSync_ProfileAgentInstructions(t *testing.T) {
+	projectDir := t.TempDir()
+
+	pluginDir := t.TempDir()
+	createTestPlugin(t, pluginDir, "test-plugin", "1.0.0", "Test plugin")
+
+	// Write full dex.hcl with project-level agent_instructions and a profile that overrides them
+	content := `project {
+  name = "test-project"
+  default_platform = "claude-code"
+  agent_instructions = "Default instructions"
+}
+
+plugin "test-plugin" {
+  source = "file:` + pluginDir + `"
+}
+
+profile "qa" {
+  agent_instructions = "QA-specific instructions"
+}
+`
+	err := os.WriteFile(filepath.Join(projectDir, "dex.hcl"), []byte(content), 0644)
+	require.NoError(t, err)
+
+	// Sync with profile
+	inst, err := NewInstaller(projectDir, "qa")
+	require.NoError(t, err)
+
+	_, err = inst.Sync(false)
+	require.NoError(t, err)
+
+	// Verify CLAUDE.md starts with profile's agent instructions
+	claudeContent, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
+	require.NoError(t, err)
+	assert.True(t, len(claudeContent) > 0)
+	assert.Contains(t, string(claudeContent), "QA-specific instructions")
+	assert.NotContains(t, string(claudeContent), "Default instructions")
 }

@@ -58,7 +58,7 @@ plugin "test-settings-plugin" {
 	require.NoError(t, err)
 
 	// Create installer and run installation
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	_, err = installer.Install(nil)
@@ -145,7 +145,7 @@ plugin "multi-resource-plugin" {
 	require.NoError(t, err)
 
 	// Install
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = installer.Install(nil)
 	require.NoError(t, err)

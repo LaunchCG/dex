@@ -35,7 +35,7 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 	projectPath, _ := cmd.Flags().GetString("path")
 
 	// Create installer
-	inst, err := installer.NewInstaller(projectPath)
+	inst, err := installer.NewInstaller(projectPath, "")
 	if err != nil {
 		return fmt.Errorf("failed to initialize installer: %w", err)
 	}

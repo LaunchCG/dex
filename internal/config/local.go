@@ -51,32 +51,53 @@ type LocalConfig struct {
 	ResolvedVars map[string]string
 }
 
+// toResourceSet extracts the resource fields into a ResourceSet.
+func (l *LocalConfig) toResourceSet() ResourceSet {
+	return ResourceSet{
+		Skills: l.Skills, Commands: l.Commands, Subagents: l.Subagents,
+		Rules: l.Rules, RulesFiles: l.RulesFiles, Settings: l.Settings,
+		MCPServers: l.MCPServers, UniversalMCPServers: l.UniversalMCPServers,
+		CopilotInstruction: l.CopilotInstruction, CopilotMCPServers: l.CopilotMCPServers,
+		CopilotInstructions: l.CopilotInstructions, CopilotPrompts: l.CopilotPrompts,
+		CopilotAgents: l.CopilotAgents, CopilotSkills: l.CopilotSkills,
+		CursorRules_: l.CursorRules_, CursorMCPServers: l.CursorMCPServers,
+		CursorRules: l.CursorRules, CursorCommands: l.CursorCommands,
+	}
+}
+
+// applyResourceSet writes the ResourceSet fields back into LocalConfig.
+func (l *LocalConfig) applyResourceSet(r *ResourceSet) {
+	l.Skills = r.Skills
+	l.Commands = r.Commands
+	l.Subagents = r.Subagents
+	l.Rules = r.Rules
+	l.RulesFiles = r.RulesFiles
+	l.Settings = r.Settings
+	l.MCPServers = r.MCPServers
+	l.UniversalMCPServers = r.UniversalMCPServers
+	l.CopilotInstruction = r.CopilotInstruction
+	l.CopilotMCPServers = r.CopilotMCPServers
+	l.CopilotInstructions = r.CopilotInstructions
+	l.CopilotPrompts = r.CopilotPrompts
+	l.CopilotAgents = r.CopilotAgents
+	l.CopilotSkills = r.CopilotSkills
+	l.CursorRules_ = r.CursorRules_
+	l.CursorMCPServers = r.CursorMCPServers
+	l.CursorRules = r.CursorRules
+	l.CursorCommands = r.CursorCommands
+}
+
 // merge appends all slices from src into dst.
-// This is the single source of truth for LocalConfig field merging.
-// When adding a new field here, also update ProjectConfig.toLocalConfig and
-// ProjectConfig.applyLocalConfig in project.go. Run TestMergeLocal_AllResourceFields
-// to verify all fields are wired correctly.
+// Resource fields are handled via ResourceSet.appendFrom. When adding a new resource
+// type, update ResourceSet and its methods in project.go, then add toResourceSet/
+// applyResourceSet mappings. Run TestMergeLocal_AllResourceFields to verify.
 func (dst *LocalConfig) merge(src *LocalConfig) {
 	dst.Registries = append(dst.Registries, src.Registries...)
 	dst.Plugins = append(dst.Plugins, src.Plugins...)
-	dst.Skills = append(dst.Skills, src.Skills...)
-	dst.Commands = append(dst.Commands, src.Commands...)
-	dst.Subagents = append(dst.Subagents, src.Subagents...)
-	dst.Rules = append(dst.Rules, src.Rules...)
-	dst.RulesFiles = append(dst.RulesFiles, src.RulesFiles...)
-	dst.Settings = append(dst.Settings, src.Settings...)
-	dst.MCPServers = append(dst.MCPServers, src.MCPServers...)
-	dst.UniversalMCPServers = append(dst.UniversalMCPServers, src.UniversalMCPServers...)
-	dst.CopilotInstruction = append(dst.CopilotInstruction, src.CopilotInstruction...)
-	dst.CopilotMCPServers = append(dst.CopilotMCPServers, src.CopilotMCPServers...)
-	dst.CopilotInstructions = append(dst.CopilotInstructions, src.CopilotInstructions...)
-	dst.CopilotPrompts = append(dst.CopilotPrompts, src.CopilotPrompts...)
-	dst.CopilotAgents = append(dst.CopilotAgents, src.CopilotAgents...)
-	dst.CopilotSkills = append(dst.CopilotSkills, src.CopilotSkills...)
-	dst.CursorRules_ = append(dst.CursorRules_, src.CursorRules_...)
-	dst.CursorMCPServers = append(dst.CursorMCPServers, src.CursorMCPServers...)
-	dst.CursorRules = append(dst.CursorRules, src.CursorRules...)
-	dst.CursorCommands = append(dst.CursorCommands, src.CursorCommands...)
+	dstRS := dst.toResourceSet()
+	srcRS := src.toResourceSet()
+	dstRS.appendFrom(&srcRS)
+	dst.applyResourceSet(&dstRS)
 	dst.Variables = append(dst.Variables, src.Variables...)
 
 	// Var precedence within a LocalConfig merge: last writer wins.

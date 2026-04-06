@@ -33,7 +33,7 @@ EOF
 	require.NoError(t, err)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -99,7 +99,7 @@ plugin "linting-rules" {
 	require.NoError(t, err)
 
 	// Create installer and install
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	err = installer.InstallAll()
@@ -137,7 +137,7 @@ plugin "my-plugin" {
 	require.NoError(t, err)
 
 	// Install v1
-	installer1, err := NewInstaller(projectDir)
+	installer1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = installer1.InstallAll()
 	require.NoError(t, err)
@@ -163,7 +163,7 @@ plugin "my-plugin" {
 	require.NoError(t, err)
 
 	// Reinstall
-	installer2, err := NewInstaller(projectDir)
+	installer2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = installer2.InstallAll()
 	require.NoError(t, err)
@@ -198,7 +198,7 @@ plugin "my-plugin" {
 	require.NoError(t, err)
 
 	// Install
-	installer1, err := NewInstaller(projectDir)
+	installer1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = installer1.InstallAll()
 	require.NoError(t, err)
@@ -223,7 +223,7 @@ plugin "my-plugin" {
 	require.NoError(t, err)
 
 	// Reinstall
-	installer2, err := NewInstaller(projectDir)
+	installer2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = installer2.InstallAll()
 	require.NoError(t, err)
@@ -250,7 +250,7 @@ func TestInstaller_ProjectAgentInstructions_Cursor(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create installer and install
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	err = installer.InstallAll()
@@ -282,7 +282,7 @@ func TestInstaller_ProjectAgentInstructions_Copilot(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create installer and install
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	err = installer.InstallAll()
@@ -341,7 +341,7 @@ plugin "plugin-c" {
 	require.NoError(t, err)
 
 	// Install
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = installer.InstallAll()
 	require.NoError(t, err)
@@ -373,7 +373,7 @@ func TestInstaller_ProjectAgentInstructions_NoInstructionsNoPlugins(t *testing.T
 	require.NoError(t, err)
 
 	// Install
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = installer.InstallAll()
 	require.NoError(t, err)
@@ -407,7 +407,7 @@ plugin "my-plugin" {
 	require.NoError(t, err)
 
 	// Install specific plugin (not bare install)
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	_, err = installer.Install([]PluginSpec{
