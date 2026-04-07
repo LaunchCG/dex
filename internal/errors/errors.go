@@ -8,7 +8,7 @@
 // Error types include:
 //   - ConfigError: Configuration file parsing errors with location info
 //   - RegistryError: Registry operation failures
-//   - InstallError: Plugin installation failures with phase information
+//   - InstallError: Package installation failures with phase information
 //   - ValidationError: Resource validation failures
 //   - NotFoundError: Resource not found errors
 //   - VersionError: Version constraint resolution failures
@@ -76,20 +76,20 @@ func (e *RegistryError) Unwrap() error {
 	return e.Err
 }
 
-// InstallError represents an error during plugin installation.
-// It includes the plugin name and the installation phase where the error occurred.
+// InstallError represents an error during package installation.
+// It includes the package name and the installation phase where the error occurred.
 type InstallError struct {
-	Plugin string // Plugin name
-	Phase  string // Phase: "fetch", "parse", "validate", "install", "merge"
-	Err    error  // Underlying error
+	Package string // Package name
+	Phase   string // Phase: "fetch", "parse", "validate", "install", "merge"
+	Err     error  // Underlying error
 }
 
 // Error returns a human-readable error message describing the installation failure.
 func (e *InstallError) Error() string {
 	if e.Err != nil {
-		return fmt.Sprintf("install error for %s during %s: %v", e.Plugin, e.Phase, e.Err)
+		return fmt.Sprintf("install error for %s during %s: %v", e.Package, e.Phase, e.Err)
 	}
-	return fmt.Sprintf("install error for %s during %s", e.Plugin, e.Phase)
+	return fmt.Sprintf("install error for %s during %s", e.Package, e.Phase)
 }
 
 // Unwrap returns the underlying error for use with errors.Is and errors.As.
@@ -101,7 +101,7 @@ func (e *InstallError) Unwrap() error {
 // It includes the resource identifier, the field that failed validation,
 // and a message describing the validation failure.
 type ValidationError struct {
-	Resource string // Resource type and name (e.g., "plugin:my-plugin")
+	Resource string // Resource type and name (e.g., "package:my-package")
 	Field    string // Field that failed validation
 	Message  string // Validation error message
 }
@@ -115,9 +115,9 @@ func (e *ValidationError) Error() string {
 }
 
 // NotFoundError represents a not found error.
-// It is used when a requested resource (plugin, file, registry, etc.) cannot be found.
+// It is used when a requested resource (package, file, registry, etc.) cannot be found.
 type NotFoundError struct {
-	What string // What wasn't found (e.g., "plugin", "file", "registry")
+	What string // What wasn't found (e.g., "package", "file", "registry")
 	Name string // Name of the thing
 }
 
@@ -129,13 +129,13 @@ func (e *NotFoundError) Error() string {
 // VersionError represents a version resolution error.
 // It is used when a version constraint cannot be satisfied by any available version.
 type VersionError struct {
-	Plugin     string   // Plugin name
+	Package    string   // Package name
 	Constraint string   // Version constraint that couldn't be satisfied
 	Available  []string // Available versions
 	Message    string   // Additional context message
 }
 
-// PackError represents an error during plugin packing.
+// PackError represents an error during package packing.
 // It includes the directory being packed and the phase where the error occurred.
 type PackError struct {
 	Dir   string // Directory being packed
@@ -156,7 +156,7 @@ func (e *PackError) Unwrap() error {
 	return e.Err
 }
 
-// PublishError represents an error during plugin publishing.
+// PublishError represents an error during package publishing.
 // It includes the tarball, registry, and the phase where the error occurred.
 type PublishError struct {
 	Tarball  string // Tarball being published
@@ -185,7 +185,7 @@ func (e *PublishError) Unwrap() error {
 // Error returns a human-readable error message describing the version resolution failure.
 func (e *VersionError) Error() string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("version error for %s: ", e.Plugin))
+	sb.WriteString(fmt.Sprintf("version error for %s: ", e.Package))
 
 	if e.Message != "" {
 		sb.WriteString(e.Message)
@@ -224,11 +224,11 @@ func NewRegistryError(url, op string, err error) *RegistryError {
 
 // NewInstallError creates a new InstallError with the given parameters.
 // Common phases are: "fetch", "parse", "validate", "install", "merge".
-func NewInstallError(plugin, phase string, err error) *InstallError {
+func NewInstallError(pkg, phase string, err error) *InstallError {
 	return &InstallError{
-		Plugin: plugin,
-		Phase:  phase,
-		Err:    err,
+		Package: pkg,
+		Phase:   phase,
+		Err:     err,
 	}
 }
 
@@ -243,7 +243,7 @@ func NewValidationError(resource, field, message string) *ValidationError {
 }
 
 // NewNotFoundError creates a new NotFoundError with the given parameters.
-// Common values for what: "plugin", "file", "registry", "version", "command".
+// Common values for what: "package", "file", "registry", "version", "command".
 func NewNotFoundError(what, name string) *NotFoundError {
 	return &NotFoundError{
 		What: what,
@@ -253,9 +253,9 @@ func NewNotFoundError(what, name string) *NotFoundError {
 
 // NewVersionError creates a new VersionError with the given parameters.
 // The available slice may be nil or empty if available versions are unknown.
-func NewVersionError(plugin, constraint string, available []string, msg string) *VersionError {
+func NewVersionError(pkg, constraint string, available []string, msg string) *VersionError {
 	return &VersionError{
-		Plugin:     plugin,
+		Package:    pkg,
 		Constraint: constraint,
 		Available:  available,
 		Message:    msg,

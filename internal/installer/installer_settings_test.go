@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestInstaller_ClaudeSettingsIntegration tests that a plugin with claude_settings
+// TestInstaller_ClaudeSettingsIntegration tests that a plugin with settings
 // creates .claude/settings.json during installation.
 // This is a full integration test that simulates real plugin installation.
 func TestInstaller_ClaudeSettingsIntegration(t *testing.T) {
@@ -20,24 +20,26 @@ func TestInstaller_ClaudeSettingsIntegration(t *testing.T) {
 	// Create a temporary directory for the test plugin
 	pluginDir := t.TempDir()
 
-	// Write package.hcl with claude_settings
-	packageHCL := `package {
+	// Write package.hcl with settings
+	packageHCL := `meta {
   name        = "test-settings-plugin"
   version     = "1.0.0"
   description = "Test plugin with settings"
   platforms   = ["claude-code"]
 }
 
-claude_settings "mcp-permissions" {
-  allow = [
-    "mcp__test-server",
-    "Bash(docker:*)"
-  ]
-  deny = [
-    "Bash(rm -rf /)"
-  ]
-  env = {
-    TEST_VAR = "test_value"
+settings "mcp-permissions" {
+  claude {
+    allow = [
+      "mcp__test-server",
+      "Bash(docker:*)"
+    ]
+    deny = [
+      "Bash(rm -rf /)"
+    ]
+    env = {
+      TEST_VAR = "test_value"
+    }
   }
 }
 `
@@ -50,7 +52,7 @@ claude_settings "mcp-permissions" {
   default_platform = "claude-code"
 }
 
-plugin "test-settings-plugin" {
+package "test-settings-plugin" {
   source = "file://` + pluginDir + `"
 }
 `
@@ -58,7 +60,7 @@ plugin "test-settings-plugin" {
 	require.NoError(t, err)
 
 	// Create installer and run installation
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	_, err = installer.Install(nil)
@@ -90,7 +92,7 @@ plugin "test-settings-plugin" {
 	}, settings)
 }
 
-// TestInstaller_ClaudeSettingsWithOtherResources tests that claude_settings
+// TestInstaller_ClaudeSettingsWithOtherResources tests that settings
 // works correctly when a plugin has multiple resource types.
 func TestInstaller_ClaudeSettingsWithOtherResources(t *testing.T) {
 	projectDir := t.TempDir()
@@ -103,29 +105,30 @@ func TestInstaller_ClaudeSettingsWithOtherResources(t *testing.T) {
 	err = os.WriteFile(filepath.Join(skillDir, "test.md"), []byte("Test skill content"), 0644)
 	require.NoError(t, err)
 
-	// Write package.hcl with multiple resources including claude_settings
-	packageHCL := `package {
+	// Write package.hcl with multiple resources including settings
+	packageHCL := `meta {
   name        = "multi-resource-plugin"
   version     = "1.0.0"
   description = "Plugin with multiple resource types"
   platforms   = ["claude-code"]
 }
 
-claude_skill "test-skill" {
+skill "test-skill" {
   description = "A test skill"
   content     = file("skills/test.md")
 }
 
-claude_mcp_server "test-server" {
-  type    = "command"
+mcp_server "test-server" {
   command = "npx"
   args    = ["-y", "test-mcp"]
 }
 
-claude_settings "permissions" {
-  allow = [
-    "mcp__test-server"
-  ]
+settings "permissions" {
+  claude {
+    allow = [
+      "mcp__test-server"
+    ]
+  }
 }
 `
 	err = os.WriteFile(filepath.Join(pluginDir, "package.hcl"), []byte(packageHCL), 0644)
@@ -137,7 +140,7 @@ claude_settings "permissions" {
   default_platform = "claude-code"
 }
 
-plugin "multi-resource-plugin" {
+package "multi-resource-plugin" {
   source = "file://` + pluginDir + `"
 }
 `
@@ -145,7 +148,7 @@ plugin "multi-resource-plugin" {
 	require.NoError(t, err)
 
 	// Install
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = installer.Install(nil)
 	require.NoError(t, err)

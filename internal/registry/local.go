@@ -112,10 +112,10 @@ func (r *LocalRegistry) getPackageFromManifest(name string) (*PackageInfo, error
 
 	// For local packages, the package defines its own name and version
 	return &PackageInfo{
-		Name:        pkgConfig.Package.Name,
-		Versions:    []string{pkgConfig.Package.Version},
-		Latest:      pkgConfig.Package.Version,
-		Description: pkgConfig.Package.Description,
+		Name:        pkgConfig.Meta.Name,
+		Versions:    []string{pkgConfig.Meta.Version},
+		Latest:      pkgConfig.Meta.Version,
+		Description: pkgConfig.Meta.Description,
 	}, nil
 }
 
@@ -239,7 +239,7 @@ func (r *LocalRegistry) ListPackages() ([]string, error) {
 		return nil, errors.NewRegistryError("file:"+r.basePath, "list", err)
 	}
 
-	return []string{pkgConfig.Package.Name}, nil
+	return []string{pkgConfig.Meta.Name}, nil
 }
 
 // loadRegistryIndex reads and parses registry.json.

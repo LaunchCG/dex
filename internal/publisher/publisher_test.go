@@ -19,53 +19,53 @@ func TestParseTarball(t *testing.T) {
 	}{
 		{
 			name:        "standard format",
-			path:        "/path/to/my-plugin-1.0.0.tar.gz",
-			wantName:    "my-plugin",
+			path:        "/path/to/my-pkg-1.0.0.tar.gz",
+			wantName:    "my-pkg",
 			wantVersion: "1.0.0",
 		},
 		{
 			name:        "with v prefix",
-			path:        "plugin-v2.3.4.tar.gz",
-			wantName:    "plugin",
+			path:        "pkg-v2.3.4.tar.gz",
+			wantName:    "pkg",
 			wantVersion: "2.3.4",
 		},
 		{
 			name:        "with underscore",
-			path:        "my_plugin_1.0.0.tar.gz",
-			wantName:    "my_plugin",
+			path:        "my_pkg_1.0.0.tar.gz",
+			wantName:    "my_pkg",
 			wantVersion: "1.0.0",
 		},
 		{
 			name:        "tgz extension",
-			path:        "plugin-1.2.3.tgz",
-			wantName:    "plugin",
+			path:        "pkg-1.2.3.tgz",
+			wantName:    "pkg",
 			wantVersion: "1.2.3",
 		},
 		{
 			name:        "with prerelease",
-			path:        "plugin-1.0.0-beta.1.tar.gz",
-			wantName:    "plugin",
+			path:        "pkg-1.0.0-beta.1.tar.gz",
+			wantName:    "pkg",
 			wantVersion: "1.0.0-beta.1",
 		},
 		{
 			name:        "with build metadata",
-			path:        "plugin-1.0.0+build.123.tar.gz",
-			wantName:    "plugin",
+			path:        "pkg-1.0.0+build.123.tar.gz",
+			wantName:    "pkg",
 			wantVersion: "1.0.0+build.123",
 		},
 		{
 			name:    "invalid format - no version",
-			path:    "plugin.tar.gz",
+			path:    "pkg.tar.gz",
 			wantErr: true,
 		},
 		{
 			name:    "invalid format - no extension",
-			path:    "plugin-1.0.0",
+			path:    "pkg-1.0.0",
 			wantErr: true,
 		},
 		{
 			name:    "invalid format - wrong extension",
-			path:    "plugin-1.0.0.zip",
+			path:    "pkg-1.0.0.zip",
 			wantErr: true,
 		},
 	}
@@ -87,14 +87,14 @@ func TestParseTarball(t *testing.T) {
 
 func TestUpdateRegistryIndex(t *testing.T) {
 	t.Run("creates new index when nil", func(t *testing.T) {
-		index := UpdateRegistryIndex(nil, "my-plugin", "1.0.0")
+		index := UpdateRegistryIndex(nil, "my-pkg", "1.0.0")
 
 		require.NotNil(t, index)
 		assert.Equal(t, "dex-registry", index.Name)
 		assert.Equal(t, "1.0", index.Version)
-		require.Contains(t, index.Packages, "my-plugin")
-		assert.Equal(t, []string{"1.0.0"}, index.Packages["my-plugin"].Versions)
-		assert.Equal(t, "1.0.0", index.Packages["my-plugin"].Latest)
+		require.Contains(t, index.Packages, "my-pkg")
+		assert.Equal(t, []string{"1.0.0"}, index.Packages["my-pkg"].Versions)
+		assert.Equal(t, "1.0.0", index.Packages["my-pkg"].Latest)
 	})
 
 	t.Run("adds new package to existing index", func(t *testing.T) {
@@ -102,20 +102,20 @@ func TestUpdateRegistryIndex(t *testing.T) {
 			Name:    "test-registry",
 			Version: "1.0",
 			Packages: map[string]registry.PackageEntry{
-				"existing-plugin": {
+				"existing-pkg": {
 					Versions: []string{"1.0.0"},
 					Latest:   "1.0.0",
 				},
 			},
 		}
 
-		index := UpdateRegistryIndex(existing, "new-plugin", "2.0.0")
+		index := UpdateRegistryIndex(existing, "new-pkg", "2.0.0")
 
 		assert.Equal(t, "test-registry", index.Name)
 		assert.Len(t, index.Packages, 2)
-		require.Contains(t, index.Packages, "new-plugin")
-		assert.Equal(t, []string{"2.0.0"}, index.Packages["new-plugin"].Versions)
-		assert.Equal(t, "2.0.0", index.Packages["new-plugin"].Latest)
+		require.Contains(t, index.Packages, "new-pkg")
+		assert.Equal(t, []string{"2.0.0"}, index.Packages["new-pkg"].Versions)
+		assert.Equal(t, "2.0.0", index.Packages["new-pkg"].Latest)
 	})
 
 	t.Run("adds new version to existing package", func(t *testing.T) {
@@ -123,18 +123,18 @@ func TestUpdateRegistryIndex(t *testing.T) {
 			Name:    "test-registry",
 			Version: "1.0",
 			Packages: map[string]registry.PackageEntry{
-				"my-plugin": {
+				"my-pkg": {
 					Versions: []string{"1.0.0"},
 					Latest:   "1.0.0",
 				},
 			},
 		}
 
-		index := UpdateRegistryIndex(existing, "my-plugin", "1.1.0")
+		index := UpdateRegistryIndex(existing, "my-pkg", "1.1.0")
 
-		require.Contains(t, index.Packages, "my-plugin")
-		assert.Equal(t, []string{"1.0.0", "1.1.0"}, index.Packages["my-plugin"].Versions)
-		assert.Equal(t, "1.1.0", index.Packages["my-plugin"].Latest)
+		require.Contains(t, index.Packages, "my-pkg")
+		assert.Equal(t, []string{"1.0.0", "1.1.0"}, index.Packages["my-pkg"].Versions)
+		assert.Equal(t, "1.1.0", index.Packages["my-pkg"].Latest)
 	})
 
 	t.Run("does not duplicate existing version", func(t *testing.T) {
@@ -142,19 +142,19 @@ func TestUpdateRegistryIndex(t *testing.T) {
 			Name:    "test-registry",
 			Version: "1.0",
 			Packages: map[string]registry.PackageEntry{
-				"my-plugin": {
+				"my-pkg": {
 					Versions: []string{"1.0.0", "1.1.0"},
 					Latest:   "1.1.0",
 				},
 			},
 		}
 
-		index := UpdateRegistryIndex(existing, "my-plugin", "1.0.0")
+		index := UpdateRegistryIndex(existing, "my-pkg", "1.0.0")
 
-		require.Contains(t, index.Packages, "my-plugin")
-		assert.Equal(t, []string{"1.0.0", "1.1.0"}, index.Packages["my-plugin"].Versions)
+		require.Contains(t, index.Packages, "my-pkg")
+		assert.Equal(t, []string{"1.0.0", "1.1.0"}, index.Packages["my-pkg"].Versions)
 		// Latest should update to the "published" version
-		assert.Equal(t, "1.0.0", index.Packages["my-plugin"].Latest)
+		assert.Equal(t, "1.0.0", index.Packages["my-pkg"].Latest)
 	})
 
 	t.Run("handles nil packages map", func(t *testing.T) {
@@ -164,10 +164,10 @@ func TestUpdateRegistryIndex(t *testing.T) {
 			Packages: nil,
 		}
 
-		index := UpdateRegistryIndex(existing, "my-plugin", "1.0.0")
+		index := UpdateRegistryIndex(existing, "my-pkg", "1.0.0")
 
 		require.NotNil(t, index.Packages)
-		require.Contains(t, index.Packages, "my-plugin")
+		require.Contains(t, index.Packages, "my-pkg")
 	})
 }
 

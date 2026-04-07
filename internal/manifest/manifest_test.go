@@ -14,17 +14,17 @@ func TestManifest_TrackMergedFile(t *testing.T) {
 	require.NoError(t, err)
 
 	// Track a merged file
-	m.TrackMergedFile("test-plugin", ".mcp.json")
-	m.TrackMergedFile("test-plugin", ".claude/settings.json")
+	m.TrackMergedFile("test-package", ".mcp.json")
+	m.TrackMergedFile("test-package", ".claude/settings.json")
 
 	// Verify merged files are tracked
-	plugin := m.GetPlugin("test-plugin")
-	require.NotNil(t, plugin)
-	assert.Equal(t, []string{".mcp.json", ".claude/settings.json"}, plugin.MergedFiles)
+	pkg := m.GetPackage("test-package")
+	require.NotNil(t, pkg)
+	assert.Equal(t, []string{".mcp.json", ".claude/settings.json"}, pkg.MergedFiles)
 
 	// Verify no duplicates
-	m.TrackMergedFile("test-plugin", ".mcp.json")
-	assert.Len(t, plugin.MergedFiles, 2)
+	m.TrackMergedFile("test-package", ".mcp.json")
+	assert.Len(t, pkg.MergedFiles, 2)
 }
 
 func TestManifest_AllFiles_IncludesMergedFiles(t *testing.T) {
@@ -33,12 +33,12 @@ func TestManifest_AllFiles_IncludesMergedFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	// Track regular files and merged files
-	m.Track("plugin1", []string{"skills/skill1.md"}, nil)
-	m.TrackMergedFile("plugin1", ".mcp.json")
+	m.Track("package1", []string{"skills/skill1.md"}, nil)
+	m.TrackMergedFile("package1", ".mcp.json")
 
-	m.Track("plugin2", []string{"commands/cmd1.md"}, nil)
-	m.TrackMergedFile("plugin2", ".mcp.json")
-	m.TrackMergedFile("plugin2", ".claude/settings.json")
+	m.Track("pkg2", []string{"commands/cmd1.md"}, nil)
+	m.TrackMergedFile("pkg2", ".mcp.json")
+	m.TrackMergedFile("pkg2", ".claude/settings.json")
 
 	// Get all files
 	allFiles := m.AllFiles()
@@ -58,20 +58,20 @@ func TestManifest_Untrack_ReturnsMergedFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	// Track files and merged files
-	m.Track("test-plugin", []string{"skills/skill1.md"}, nil)
-	m.TrackMergedFile("test-plugin", ".mcp.json")
-	m.TrackMergedFile("test-plugin", "CLAUDE.md")
+	m.Track("test-package", []string{"skills/skill1.md"}, nil)
+	m.TrackMergedFile("test-package", ".mcp.json")
+	m.TrackMergedFile("test-package", "CLAUDE.md")
 
-	// Untrack the plugin
-	result := m.Untrack("test-plugin")
+	// Untrack the package
+	result := m.Untrack("test-package")
 
 	// Verify merged files are returned
 	require.NotNil(t, result)
 	assert.Equal(t, []string{".mcp.json", "CLAUDE.md"}, result.MergedFiles)
 	assert.Equal(t, []string{"skills/skill1.md"}, result.Files)
 
-	// Verify plugin is removed
-	assert.Nil(t, m.GetPlugin("test-plugin"))
+	// Verify package is removed
+	assert.Nil(t, m.GetPackage("test-package"))
 }
 
 func TestManifest_IsMergedFileUsedByOthers(t *testing.T) {
@@ -79,28 +79,28 @@ func TestManifest_IsMergedFileUsedByOthers(t *testing.T) {
 	m, err := Load(tmpDir)
 	require.NoError(t, err)
 
-	// Track merged files for multiple plugins
-	m.TrackMergedFile("plugin1", ".mcp.json")
-	m.TrackMergedFile("plugin1", "CLAUDE.md")
-	m.TrackMergedFile("plugin2", ".mcp.json")
-	m.TrackMergedFile("plugin2", ".claude/settings.json")
+	// Track merged files for multiple packages
+	m.TrackMergedFile("package1", ".mcp.json")
+	m.TrackMergedFile("package1", "CLAUDE.md")
+	m.TrackMergedFile("pkg2", ".mcp.json")
+	m.TrackMergedFile("pkg2", ".claude/settings.json")
 
 	// Test that .mcp.json is used by others
-	assert.True(t, m.IsMergedFileUsedByOthers("plugin1", ".mcp.json"),
-		".mcp.json should be used by plugin2")
-	assert.True(t, m.IsMergedFileUsedByOthers("plugin2", ".mcp.json"),
-		".mcp.json should be used by plugin1")
+	assert.True(t, m.IsMergedFileUsedByOthers("package1", ".mcp.json"),
+		".mcp.json should be used by pkg2")
+	assert.True(t, m.IsMergedFileUsedByOthers("pkg2", ".mcp.json"),
+		".mcp.json should be used by package1")
 
 	// Test that CLAUDE.md is not used by others
-	assert.False(t, m.IsMergedFileUsedByOthers("plugin1", "CLAUDE.md"),
-		"CLAUDE.md should only be used by plugin1")
+	assert.False(t, m.IsMergedFileUsedByOthers("package1", "CLAUDE.md"),
+		"CLAUDE.md should only be used by package1")
 
 	// Test that settings.json is not used by others
-	assert.False(t, m.IsMergedFileUsedByOthers("plugin2", ".claude/settings.json"),
-		".claude/settings.json should only be used by plugin2")
+	assert.False(t, m.IsMergedFileUsedByOthers("pkg2", ".claude/settings.json"),
+		".claude/settings.json should only be used by pkg2")
 
 	// Test with non-existent file
-	assert.False(t, m.IsMergedFileUsedByOthers("plugin1", "nonexistent.json"),
+	assert.False(t, m.IsMergedFileUsedByOthers("package1", "nonexistent.json"),
 		"non-existent file should not be used by others")
 }
 
@@ -111,10 +111,10 @@ func TestManifest_SaveAndLoad_PreservesMergedFiles(t *testing.T) {
 	m1, err := Load(tmpDir)
 	require.NoError(t, err)
 
-	m1.Track("plugin1", []string{"skills/skill1.md"}, []string{".claude/skills"})
-	m1.TrackMergedFile("plugin1", ".mcp.json")
-	m1.TrackMergedFile("plugin1", "CLAUDE.md")
-	m1.TrackAgentContent("plugin1")
+	m1.Track("package1", []string{"skills/skill1.md"}, []string{".claude/skills"})
+	m1.TrackMergedFile("package1", ".mcp.json")
+	m1.TrackMergedFile("package1", "CLAUDE.md")
+	m1.TrackAgentContent("package1")
 
 	// Save manifest
 	err = m1.Save()
@@ -125,12 +125,12 @@ func TestManifest_SaveAndLoad_PreservesMergedFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify merged files are preserved
-	plugin := m2.GetPlugin("plugin1")
-	require.NotNil(t, plugin)
-	assert.Equal(t, []string{".mcp.json", "CLAUDE.md"}, plugin.MergedFiles)
-	assert.True(t, plugin.HasAgentContent)
+	pkg := m2.GetPackage("package1")
+	require.NotNil(t, pkg)
+	assert.Equal(t, []string{".mcp.json", "CLAUDE.md"}, pkg.MergedFiles)
+	assert.True(t, pkg.HasAgentContent)
 
-	// Verify all files are included (single plugin, so order is deterministic)
+	// Verify all files are included (single package, so order is deterministic)
 	allFiles := m2.AllFiles()
 	assert.ElementsMatch(t, []string{"skills/skill1.md", ".mcp.json", "CLAUDE.md"}, allFiles)
 }
@@ -140,13 +140,13 @@ func TestManifest_MergedFiles_EmptyByDefault(t *testing.T) {
 	m, err := Load(tmpDir)
 	require.NoError(t, err)
 
-	// Track a plugin without merged files
-	m.Track("test-plugin", []string{"skills/skill1.md"}, nil)
+	// Track a package without merged files
+	m.Track("test-package", []string{"skills/skill1.md"}, nil)
 
 	// Verify MergedFiles is empty
-	plugin := m.GetPlugin("test-plugin")
-	require.NotNil(t, plugin)
-	assert.Empty(t, plugin.MergedFiles)
+	pkg := m.GetPackage("test-package")
+	require.NotNil(t, pkg)
+	assert.Empty(t, pkg.MergedFiles)
 
 	// Verify manifest can still be saved
 	err = m.Save()
@@ -155,45 +155,45 @@ func TestManifest_MergedFiles_EmptyByDefault(t *testing.T) {
 	// Verify it can be loaded again
 	m2, err := Load(tmpDir)
 	require.NoError(t, err)
-	plugin2 := m2.GetPlugin("test-plugin")
-	require.NotNil(t, plugin2)
-	assert.Empty(t, plugin2.MergedFiles)
+	pkg2 := m2.GetPackage("test-package")
+	require.NotNil(t, pkg2)
+	assert.Empty(t, pkg2.MergedFiles)
 }
 
-func TestManifest_MultiplePlugins_SharedMergedFiles(t *testing.T) {
+func TestManifest_MultiplePackages_SharedMergedFiles(t *testing.T) {
 	tmpDir := t.TempDir()
 	m, err := Load(tmpDir)
 	require.NoError(t, err)
 
-	// Simulate three plugins all contributing to .mcp.json
-	m.TrackMergedFile("plugin1", ".mcp.json")
-	m.TrackMergedFile("plugin2", ".mcp.json")
-	m.TrackMergedFile("plugin3", ".mcp.json")
+	// Simulate three packages all contributing to .mcp.json
+	m.TrackMergedFile("package1", ".mcp.json")
+	m.TrackMergedFile("pkg2", ".mcp.json")
+	m.TrackMergedFile("package3", ".mcp.json")
 
-	// Untrack plugin1
-	result := m.Untrack("plugin1")
+	// Untrack package1
+	result := m.Untrack("package1")
 	assert.Equal(t, []string{".mcp.json"}, result.MergedFiles)
 
 	// Verify .mcp.json is still used by others
-	assert.True(t, m.IsMergedFileUsedByOthers("plugin1", ".mcp.json"))
+	assert.True(t, m.IsMergedFileUsedByOthers("package1", ".mcp.json"))
 
-	// Untrack plugin2
-	m.Untrack("plugin2")
+	// Untrack pkg2
+	m.Untrack("pkg2")
 
-	// Verify .mcp.json is still used by plugin3
-	plugin3 := m.GetPlugin("plugin3")
-	require.NotNil(t, plugin3)
-	assert.Equal(t, []string{".mcp.json"}, plugin3.MergedFiles)
+	// Verify .mcp.json is still used by package3
+	package3 := m.GetPackage("package3")
+	require.NotNil(t, package3)
+	assert.Equal(t, []string{".mcp.json"}, package3.MergedFiles)
 
-	// Untrack plugin3
-	result = m.Untrack("plugin3")
+	// Untrack package3
+	result = m.Untrack("package3")
 	assert.Equal(t, []string{".mcp.json"}, result.MergedFiles)
 
-	// Now no plugin uses .mcp.json
+	// Now no package uses .mcp.json
 	assert.Empty(t, m.AllFiles())
 }
 
-func TestManifest_ProjectPlugin_MergedFiles(t *testing.T) {
+func TestManifest_ProjectPackage_MergedFiles(t *testing.T) {
 	tmpDir := t.TempDir()
 	m, err := Load(tmpDir)
 	require.NoError(t, err)
@@ -202,43 +202,43 @@ func TestManifest_ProjectPlugin_MergedFiles(t *testing.T) {
 	m.TrackAgentContent("__project__")
 	m.TrackMergedFile("__project__", "CLAUDE.md")
 
-	// Track plugin resources
-	m.TrackMergedFile("plugin1", "CLAUDE.md")
-	m.TrackMergedFile("plugin1", ".mcp.json")
+	// Track package resources
+	m.TrackMergedFile("package1", "CLAUDE.md")
+	m.TrackMergedFile("package1", ".mcp.json")
 
 	// Verify both use CLAUDE.md
 	assert.True(t, m.IsMergedFileUsedByOthers("__project__", "CLAUDE.md"))
-	assert.True(t, m.IsMergedFileUsedByOthers("plugin1", "CLAUDE.md"))
+	assert.True(t, m.IsMergedFileUsedByOthers("package1", "CLAUDE.md"))
 
-	// Untrack project - CLAUDE.md should still be used by plugin1
+	// Untrack project - CLAUDE.md should still be used by package1
 	result := m.Untrack("__project__")
 	assert.Equal(t, []string{"CLAUDE.md"}, result.MergedFiles)
 	assert.True(t, m.IsMergedFileUsedByOthers("__project__", "CLAUDE.md"))
 
-	// Verify plugin still has CLAUDE.md
-	plugin := m.GetPlugin("plugin1")
-	require.NotNil(t, plugin)
-	assert.Equal(t, []string{"CLAUDE.md", ".mcp.json"}, plugin.MergedFiles)
+	// Verify package still has CLAUDE.md
+	pkg := m.GetPackage("package1")
+	require.NotNil(t, pkg)
+	assert.Equal(t, []string{"CLAUDE.md", ".mcp.json"}, pkg.MergedFiles)
 }
 
-func TestManifest_AllFiles_MultiplePlugins_ExactOutput(t *testing.T) {
+func TestManifest_AllFiles_MultiplePackages_ExactOutput(t *testing.T) {
 	tmpDir := t.TempDir()
 	m, err := Load(tmpDir)
 	require.NoError(t, err)
 
-	// Track 3 plugins with different merged files
-	m.Track("plugin-a", []string{".claude/skills/a-skill.md"}, nil)
-	m.TrackMergedFile("plugin-a", ".mcp.json")
-	m.TrackMergedFile("plugin-a", ".claude/settings.json")
-	m.TrackMergedFile("plugin-a", "CLAUDE.md")
+	// Track 3 packages with different merged files
+	m.Track("package-a", []string{".claude/skills/a-skill.md"}, nil)
+	m.TrackMergedFile("package-a", ".mcp.json")
+	m.TrackMergedFile("package-a", ".claude/settings.json")
+	m.TrackMergedFile("package-a", "CLAUDE.md")
 
-	m.Track("plugin-b", []string{".claude/skills/b-skill.md"}, nil)
-	m.TrackMergedFile("plugin-b", ".mcp.json")
-	m.TrackMergedFile("plugin-b", "CLAUDE.md")
+	m.Track("package-b", []string{".claude/skills/b-skill.md"}, nil)
+	m.TrackMergedFile("package-b", ".mcp.json")
+	m.TrackMergedFile("package-b", "CLAUDE.md")
 
-	m.Track("plugin-c", []string{".claude/skills/c-skill.md"}, nil)
-	m.TrackMergedFile("plugin-c", ".claude/settings.json")
-	m.TrackMergedFile("plugin-c", "CLAUDE.md")
+	m.Track("package-c", []string{".claude/skills/c-skill.md"}, nil)
+	m.TrackMergedFile("package-c", ".claude/settings.json")
+	m.TrackMergedFile("package-c", "CLAUDE.md")
 
 	allFiles := m.AllFiles()
 	sort.Strings(allFiles)

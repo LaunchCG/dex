@@ -54,7 +54,7 @@ func NormalizeName(name string) string {
 }
 
 // NamesMatch checks if two package names match after normalization.
-// This handles variations like "my-plugin" vs "my_plugin".
+// This handles variations like "my-package" vs "my_package".
 func NamesMatch(name1, name2 string) bool {
 	return NormalizeName(name1) == NormalizeName(name2)
 }

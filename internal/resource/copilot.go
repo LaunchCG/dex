@@ -3,27 +3,27 @@ package resource
 import "fmt"
 
 // =============================================================================
-// MERGED RESOURCES (multiple plugins contribute to same file)
+// MERGED RESOURCES (multiple packages contribute to same file)
 // =============================================================================
 
 // CopilotInstruction (singular) represents an instruction merged into .github/copilot-instructions.md.
-// Similar to ClaudeRule which merges into CLAUDE.md, multiple plugins can contribute
+// Similar to ClaudeRule which merges into CLAUDE.md, multiple packages can contribute
 // instructions which are combined together using marker-based sections.
 type CopilotInstruction struct {
 	// Name is the block label identifying this instruction
-	Name string `hcl:"name,label"`
+	Name string
 
 	// Description explains what this instruction provides
-	Description string `hcl:"description,attr"`
+	Description string
 
 	// Content is the instruction text to merge
-	Content string `hcl:"content,optional"`
+	Content string
 
 	// Files lists static files to copy alongside the instruction
-	Files []FileBlock `hcl:"file,block"`
+	Files []FileBlock
 
 	// TemplateFiles lists template files to render and copy
-	TemplateFiles []TemplateFileBlock `hcl:"template_file,block"`
+	TemplateFiles []TemplateFileBlock
 }
 
 // ResourceType returns the HCL block type for Copilot instructions (singular).
@@ -74,35 +74,35 @@ func (i *CopilotInstruction) Validate() error {
 // MCP servers provide additional tools and capabilities to GitHub Copilot.
 type CopilotMCPServer struct {
 	// Name is the unique identifier for this MCP server
-	Name string `hcl:"name,label"`
+	Name string
 
 	// Description explains what this MCP server provides
-	Description string `hcl:"description,optional"`
+	Description string
 
 	// Type specifies the server type: "stdio" or "http"/"sse"
-	Type string `hcl:"type,attr"`
+	Type string
 
 	// Command is the executable to run (required for type="stdio")
-	Command string `hcl:"command,optional"`
+	Command string
 
 	// Args are the command-line arguments for the command
-	Args []string `hcl:"args,optional"`
+	Args []string
 
 	// Env contains environment variables for the server
-	Env map[string]string `hcl:"env,optional"`
+	Env map[string]string
 
 	// EnvFile is the path to an env file to load
-	EnvFile string `hcl:"env_file,optional"`
+	EnvFile string
 
 	// URL is the HTTP/SSE endpoint (required for type="http" or type="sse")
-	URL string `hcl:"url,optional"`
+	URL string
 
 	// Headers contains HTTP headers for http/sse type servers
-	Headers map[string]string `hcl:"headers,optional"`
+	Headers map[string]string
 
 	// Inputs defines VS Code input prompts for dynamic configuration.
 	// Referenced via ${input:id} in server args/env values.
-	Inputs []MCPInput `hcl:"input,block"`
+	Inputs []MCPInput
 }
 
 // ResourceType returns the HCL block type for Copilot MCP servers.
@@ -169,22 +169,22 @@ func (m *CopilotMCPServer) Validate() error {
 // this creates standalone files in .github/instructions/.
 type CopilotInstructions struct {
 	// Name is the block label identifying this instructions file
-	Name string `hcl:"name,label"`
+	Name string
 
 	// Description explains what these instructions provide
-	Description string `hcl:"description,attr"`
+	Description string
 
 	// Content is the instruction text
-	Content string `hcl:"content,optional"`
+	Content string
 
 	// ApplyTo is an optional glob pattern for selective application
-	ApplyTo string `hcl:"apply_to,optional"`
+	ApplyTo string
 
 	// Files lists static files to copy alongside the instructions
-	Files []FileBlock `hcl:"file,block"`
+	Files []FileBlock
 
 	// TemplateFiles lists template files to render and copy
-	TemplateFiles []TemplateFileBlock `hcl:"template_file,block"`
+	TemplateFiles []TemplateFileBlock
 }
 
 // ResourceType returns the HCL block type for Copilot instructions (plural).
@@ -232,35 +232,35 @@ func (i *CopilotInstructions) Validate() error {
 }
 
 // CopilotPrompt represents a prompt for GitHub Copilot.
-// Prompts are installed to .github/prompts/{plugin}-{name}.prompt.md
+// Prompts are installed to .github/prompts/{package}-{name}.prompt.md
 // and can be invoked by users.
 type CopilotPrompt struct {
 	// Name is the block label identifying this prompt
-	Name string `hcl:"name,label"`
+	Name string
 
 	// Description explains what this prompt does
-	Description string `hcl:"description,attr"`
+	Description string
 
 	// Content is the prompt body
-	Content string `hcl:"content,optional"`
+	Content string
 
 	// ArgumentHint is an optional hint shown during autocomplete
-	ArgumentHint string `hcl:"argument_hint,optional"`
+	ArgumentHint string
 
 	// Agent specifies the agent mode: "ask", "edit", "agent", or custom
-	Agent string `hcl:"agent,optional"`
+	Agent string
 
 	// Model is an optional model selection
-	Model string `hcl:"model,optional"`
+	Model string
 
 	// Tools is an optional list of tools to enable
-	Tools []string `hcl:"tools,optional"`
+	Tools []string
 
 	// Files lists static files to copy alongside the prompt
-	Files []FileBlock `hcl:"file,block"`
+	Files []FileBlock
 
 	// TemplateFiles lists template files to render and copy
-	TemplateFiles []TemplateFileBlock `hcl:"template_file,block"`
+	TemplateFiles []TemplateFileBlock
 }
 
 // ResourceType returns the HCL block type for Copilot prompts.
@@ -308,38 +308,38 @@ func (p *CopilotPrompt) Validate() error {
 }
 
 // CopilotAgent represents an agent for GitHub Copilot.
-// Agents are installed to .github/agents/{plugin}-{name}.agent.md
+// Agents are installed to .github/agents/{package}-{name}.agent.md
 // and provide specialized agent behaviors.
 type CopilotAgent struct {
 	// Name is the block label identifying this agent
-	Name string `hcl:"name,label"`
+	Name string
 
 	// Description explains what this agent does
-	Description string `hcl:"description,attr"`
+	Description string
 
 	// Content is the agent instructions
-	Content string `hcl:"content,optional"`
+	Content string
 
 	// Model is an optional model selection
-	Model string `hcl:"model,optional"`
+	Model string
 
 	// Tools lists available tools for this agent
-	Tools []string `hcl:"tools,optional"`
+	Tools []string
 
 	// Handoffs lists sequential workflow transitions to other agents
-	Handoffs []string `hcl:"handoffs,optional"`
+	Handoffs []string
 
 	// Infer enables subagent usage (default: true)
-	Infer *bool `hcl:"infer,optional"`
+	Infer *bool
 
 	// Target specifies the target environment: "vscode" or "github-copilot"
-	Target string `hcl:"target,optional"`
+	Target string
 
 	// Files lists static files to copy alongside the agent
-	Files []FileBlock `hcl:"file,block"`
+	Files []FileBlock
 
 	// TemplateFiles lists template files to render and copy
-	TemplateFiles []TemplateFileBlock `hcl:"template_file,block"`
+	TemplateFiles []TemplateFileBlock
 }
 
 // ResourceType returns the HCL block type for Copilot agents.
@@ -387,23 +387,23 @@ func (a *CopilotAgent) Validate() error {
 }
 
 // CopilotSkill represents a skill for GitHub Copilot.
-// Skills are installed to .github/skills/{plugin}-{name}/SKILL.md
+// Skills are installed to .github/skills/{package}-{name}/SKILL.md
 // and provide specialized knowledge or capabilities.
 type CopilotSkill struct {
 	// Name is the block label identifying this skill (max 64 chars)
-	Name string `hcl:"name,label"`
+	Name string
 
 	// Description explains when and how to use this skill (max 1024 chars)
-	Description string `hcl:"description,attr"`
+	Description string
 
 	// Content is the skill instructions
-	Content string `hcl:"content,optional"`
+	Content string
 
 	// Files lists static files to copy alongside the skill
-	Files []FileBlock `hcl:"file,block"`
+	Files []FileBlock
 
 	// TemplateFiles lists template files to render and copy
-	TemplateFiles []TemplateFileBlock `hcl:"template_file,block"`
+	TemplateFiles []TemplateFileBlock
 }
 
 // ResourceType returns the HCL block type for Copilot skills.

@@ -12,9 +12,9 @@ import (
 )
 
 var manifestCmd = &cobra.Command{
-	Use:   "manifest [plugin]",
+	Use:   "manifest [package]",
 	Short: "Show files managed by dex",
-	Long:  "Display all files tracked by dex, optionally filtered by plugin.",
+	Long:  "Display all files tracked by dex, optionally filtered by package.",
 	RunE:  runManifest,
 }
 
@@ -43,34 +43,34 @@ func runManifest(cmd *cobra.Command, args []string) error {
 	gray := color.New(color.FgHiBlack).SprintFunc()
 	bold := color.New(color.Bold).SprintFunc()
 
-	// If a specific plugin is requested
+	// If a specific package is requested
 	if len(args) > 0 {
-		pluginName := args[0]
-		pluginManifest := mf.GetPlugin(pluginName)
-		if pluginManifest == nil {
-			return fmt.Errorf("plugin %q is not installed", pluginName)
+		pkgName := args[0]
+		pkgManifest := mf.GetPackage(pkgName)
+		if pkgManifest == nil {
+			return fmt.Errorf("package %q is not installed", pkgName)
 		}
 
-		fmt.Printf("%s %s\n\n", bold("Files managed by"), cyan(pluginName))
+		fmt.Printf("%s %s\n\n", bold("Files managed by"), cyan(pkgName))
 
-		if len(pluginManifest.Files) == 0 {
+		if len(pkgManifest.Files) == 0 {
 			fmt.Println("  (no files)")
 		} else {
-			for _, file := range pluginManifest.Files {
+			for _, file := range pkgManifest.Files {
 				fmt.Printf("  %s\n", file)
 			}
 		}
 
-		if len(pluginManifest.Directories) > 0 {
+		if len(pkgManifest.Directories) > 0 {
 			fmt.Printf("\n%s\n", bold("Directories:"))
-			for _, dir := range pluginManifest.Directories {
+			for _, dir := range pkgManifest.Directories {
 				fmt.Printf("  %s\n", dir)
 			}
 		}
 
-		if len(pluginManifest.MCPServers) > 0 {
+		if len(pkgManifest.MCPServers) > 0 {
 			fmt.Printf("\n%s\n", bold("MCP Servers:"))
-			for _, server := range pluginManifest.MCPServers {
+			for _, server := range pkgManifest.MCPServers {
 				fmt.Printf("  %s\n", server)
 			}
 		}
@@ -79,8 +79,8 @@ func runManifest(cmd *cobra.Command, args []string) error {
 	}
 
 	// Show all files
-	plugins := mf.InstalledPlugins()
-	if len(plugins) == 0 {
+	packages := mf.InstalledPackages()
+	if len(packages) == 0 {
 		fmt.Println("No files are currently managed by dex.")
 		return nil
 	}
@@ -88,25 +88,25 @@ func runManifest(cmd *cobra.Command, args []string) error {
 	fmt.Printf("%s\n\n", bold("Files managed by dex:"))
 
 	totalFiles := 0
-	for _, pluginName := range plugins {
-		pluginManifest := mf.GetPlugin(pluginName)
-		if pluginManifest == nil {
+	for _, pkgName := range packages {
+		pkgManifest := mf.GetPackage(pkgName)
+		if pkgManifest == nil {
 			continue
 		}
 
-		fmt.Printf("%s\n", cyan(pluginName))
+		fmt.Printf("%s\n", cyan(pkgName))
 
-		if len(pluginManifest.Files) == 0 {
+		if len(pkgManifest.Files) == 0 {
 			fmt.Printf("  %s\n", gray("(no files)"))
 		} else {
-			for _, file := range pluginManifest.Files {
+			for _, file := range pkgManifest.Files {
 				fmt.Printf("  %s\n", file)
 				totalFiles++
 			}
 		}
 
-		if len(pluginManifest.MCPServers) > 0 {
-			for _, server := range pluginManifest.MCPServers {
+		if len(pkgManifest.MCPServers) > 0 {
+			for _, server := range pkgManifest.MCPServers {
 				fmt.Printf("  %s %s\n", gray("mcp:"), server)
 			}
 		}
@@ -114,6 +114,6 @@ func runManifest(cmd *cobra.Command, args []string) error {
 		fmt.Println()
 	}
 
-	fmt.Printf("%d file(s) managed across %d plugin(s)\n", totalFiles, len(plugins))
+	fmt.Printf("%d file(s) managed across %d package(s)\n", totalFiles, len(packages))
 	return nil
 }

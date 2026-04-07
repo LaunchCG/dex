@@ -22,6 +22,7 @@ type MCPServer struct {
 	// Optional fields
 	EnvFile string            `hcl:"env_file,optional"`
 	Headers map[string]string `hcl:"headers,optional"`
+	Inputs  []MCPInput        `hcl:"input,block"`
 
 	// Platform-specific overrides
 	Claude  *MCPServerPlatformOverride `hcl:"claude,block"`

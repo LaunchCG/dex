@@ -3,50 +3,50 @@ package resource
 import "fmt"
 
 // ClaudeSkill represents a skill for Claude Code.
-// Skills are installed to .claude/skills/{plugin}-{name}/SKILL.md
+// Skills are installed to .claude/skills/{package}-{name}/SKILL.md
 // and provide specialized knowledge or capabilities to the AI assistant.
 type ClaudeSkill struct {
 	// Name is the block label identifying this skill
-	Name string `hcl:"name,label"`
+	Name string
 
 	// Description explains when and how to use this skill
-	Description string `hcl:"description,attr"`
+	Description string
 
 	// Content is the main body/instructions of the skill
-	Content string `hcl:"content,optional"`
+	Content string
 
 	// Files lists static files to copy alongside the skill
-	Files []FileBlock `hcl:"file,block"`
+	Files []FileBlock
 
 	// TemplateFiles lists template files to render and copy
-	TemplateFiles []TemplateFileBlock `hcl:"template_file,block"`
+	TemplateFiles []TemplateFileBlock
 
 	// ArgumentHint provides a hint shown during autocomplete (e.g., "[filename]")
-	ArgumentHint string `hcl:"argument_hint,optional"`
+	ArgumentHint string
 
 	// DisableModelInvocation prevents Claude from auto-loading this skill; user must invoke manually
-	DisableModelInvocation bool `hcl:"disable_model_invocation,optional"`
+	DisableModelInvocation bool
 
 	// UserInvocable controls whether the skill appears in the / menu (default: true when nil)
-	UserInvocable *bool `hcl:"user_invocable,optional"`
+	UserInvocable *bool
 
 	// AllowedTools lists tools Claude can use without asking permission (e.g., ["Read", "Grep"])
-	AllowedTools []string `hcl:"allowed_tools,optional"`
+	AllowedTools []string
 
 	// Model specifies the model to use when skill is active: "sonnet", "haiku", or "opus"
-	Model string `hcl:"model,optional"`
+	Model string
 
 	// Context controls execution context; set to "fork" to run in isolated subagent
-	Context string `hcl:"context,optional"`
+	Context string
 
 	// Agent specifies which subagent type to use when Context is "fork" (e.g., "Explore", "Plan")
-	Agent string `hcl:"agent,optional"`
+	Agent string
 
 	// Metadata contains additional frontmatter fields for the skill
-	Metadata map[string]string `hcl:"metadata,optional"`
+	Metadata map[string]string
 
 	// Hooks defines lifecycle hooks scoped to this skill
-	Hooks map[string]interface{} `hcl:"hooks,optional"`
+	Hooks map[string]interface{}
 }
 
 // ResourceType returns the HCL block type for Claude skills.
@@ -94,32 +94,32 @@ func (s *ClaudeSkill) Validate() error {
 }
 
 // ClaudeCommand represents a command for Claude Code.
-// Commands are installed to .claude/commands/{plugin}-{name}.md
+// Commands are installed to .claude/commands/{package}-{name}.md
 // and can be invoked by users with /{name} syntax.
 type ClaudeCommand struct {
 	// Name is the block label identifying this command
-	Name string `hcl:"name,label"`
+	Name string
 
 	// Description explains when and how to use this command
-	Description string `hcl:"description,attr"`
+	Description string
 
 	// Content is the main body/instructions of the command
-	Content string `hcl:"content,optional"`
+	Content string
 
 	// Files lists static files to copy alongside the command
-	Files []FileBlock `hcl:"file,block"`
+	Files []FileBlock
 
 	// TemplateFiles lists template files to render and copy
-	TemplateFiles []TemplateFileBlock `hcl:"template_file,block"`
+	TemplateFiles []TemplateFileBlock
 
 	// ArgumentHint provides a hint for command arguments (e.g., "[environment]")
-	ArgumentHint string `hcl:"argument_hint,optional"`
+	ArgumentHint string
 
 	// AllowedTools restricts which tools this command can use
-	AllowedTools []string `hcl:"allowed_tools,optional"`
+	AllowedTools []string
 
 	// Model specifies the model to use: "sonnet", "haiku", or "opus"
-	Model string `hcl:"model,optional"`
+	Model string
 }
 
 // ResourceType returns the HCL block type for Claude commands.
@@ -167,35 +167,35 @@ func (c *ClaudeCommand) Validate() error {
 }
 
 // ClaudeSubagent represents a subagent for Claude Code.
-// Subagents are installed to .claude/agents/{plugin}-{name}.md
+// Subagents are installed to .claude/agents/{package}-{name}.md
 // and provide specialized agent behaviors.
 type ClaudeSubagent struct {
 	// Name is the block label identifying this subagent
-	Name string `hcl:"name,label"`
+	Name string
 
 	// Description explains when and how to use this subagent
-	Description string `hcl:"description,attr"`
+	Description string
 
 	// Content is the main body/instructions of the subagent
-	Content string `hcl:"content,optional"`
+	Content string
 
 	// Files lists static files to copy alongside the subagent
-	Files []FileBlock `hcl:"file,block"`
+	Files []FileBlock
 
 	// TemplateFiles lists template files to render and copy
-	TemplateFiles []TemplateFileBlock `hcl:"template_file,block"`
+	TemplateFiles []TemplateFileBlock
 
 	// Model specifies the model: "inherit", "sonnet", "haiku", or "opus"
-	Model string `hcl:"model,optional"`
+	Model string
 
 	// Color sets the agent's display color: "blue", "green", "yellow", "red", "purple"
-	Color string `hcl:"color,optional"`
+	Color string
 
 	// Tools lists the tools this subagent is allowed to use
-	Tools []string `hcl:"tools,optional"`
+	Tools []string
 
 	// Hooks defines lifecycle hooks scoped to this subagent
-	Hooks map[string]interface{} `hcl:"hooks,optional"`
+	Hooks map[string]interface{}
 }
 
 // ResourceType returns the HCL block type for Claude subagents.
@@ -243,25 +243,25 @@ func (a *ClaudeSubagent) Validate() error {
 }
 
 // ClaudeRule represents a singular rule that is merged into CLAUDE.md.
-// Multiple plugins can contribute rules which are combined together.
+// Multiple packages can contribute rules which are combined together.
 type ClaudeRule struct {
 	// Name is the block label identifying this rule
-	Name string `hcl:"name,label"`
+	Name string
 
 	// Description explains when and how to use this rule
-	Description string `hcl:"description,attr"`
+	Description string
 
 	// Content is the main body/instructions of the rule
-	Content string `hcl:"content,optional"`
+	Content string
 
 	// Files lists static files to copy alongside the rule
-	Files []FileBlock `hcl:"file,block"`
+	Files []FileBlock
 
 	// TemplateFiles lists template files to render and copy
-	TemplateFiles []TemplateFileBlock `hcl:"template_file,block"`
+	TemplateFiles []TemplateFileBlock
 
 	// Paths contains file patterns to scope when this rule applies
-	Paths []string `hcl:"paths,optional"`
+	Paths []string
 }
 
 // ResourceType returns the HCL block type for Claude rules (singular).
@@ -309,26 +309,26 @@ func (r *ClaudeRule) Validate() error {
 }
 
 // ClaudeRules represents a standalone rules file.
-// Installed to .claude/rules/{plugin}-{name}.md as a complete file
-// owned by a single plugin.
+// Installed to .claude/rules/{package}-{name}.md as a complete file
+// owned by a single package.
 type ClaudeRules struct {
 	// Name is the block label identifying this rules file
-	Name string `hcl:"name,label"`
+	Name string
 
 	// Description explains when and how to use these rules
-	Description string `hcl:"description,attr"`
+	Description string
 
 	// Content is the main body/instructions of the rules
-	Content string `hcl:"content,optional"`
+	Content string
 
 	// Files lists static files to copy alongside the rules
-	Files []FileBlock `hcl:"file,block"`
+	Files []FileBlock
 
 	// TemplateFiles lists template files to render and copy
-	TemplateFiles []TemplateFileBlock `hcl:"template_file,block"`
+	TemplateFiles []TemplateFileBlock
 
 	// Paths contains file patterns to scope when these rules apply
-	Paths []string `hcl:"paths,optional"`
+	Paths []string
 }
 
 // ResourceType returns the HCL block type for Claude rules (plural).
@@ -377,50 +377,50 @@ func (r *ClaudeRules) Validate() error {
 }
 
 // ClaudeSettings represents settings merged into .claude/settings.json.
-// Multiple plugins can contribute permissions and environment variables.
-// Project-level settings override plugin settings.
+// Multiple packages can contribute permissions and environment variables.
+// Project-level settings override package settings.
 type ClaudeSettings struct {
 	// Name is the identifier for this settings block
-	Name string `hcl:"name,label"`
+	Name string
 
 	// Allow lists tool patterns that are automatically approved
-	Allow []string `hcl:"allow,optional"`
+	Allow []string
 
 	// Ask lists tool patterns that require user confirmation
-	Ask []string `hcl:"ask,optional"`
+	Ask []string
 
 	// Deny lists tool patterns that are blocked
-	Deny []string `hcl:"deny,optional"`
+	Deny []string
 
 	// Env contains environment variables to set
-	Env map[string]string `hcl:"env,optional"`
+	Env map[string]string
 
 	// EnableAllProjectMCPServers auto-approves all project MCP servers
-	EnableAllProjectMCPServers bool `hcl:"enable_all_project_mcp_servers,optional"`
+	EnableAllProjectMCPServers bool
 
 	// EnabledMCPServers lists specific approved MCP servers
-	EnabledMCPServers []string `hcl:"enabled_mcp_servers,optional"`
+	EnabledMCPServers []string
 
 	// DisabledMCPServers lists rejected MCP servers
-	DisabledMCPServers []string `hcl:"disabled_mcp_servers,optional"`
+	DisabledMCPServers []string
 
 	// RespectGitignore filters suggestions by gitignore rules
-	RespectGitignore bool `hcl:"respect_gitignore,optional"`
+	RespectGitignore bool
 
 	// IncludeCoAuthoredBy includes co-author in commits
-	IncludeCoAuthoredBy bool `hcl:"include_co_authored_by,optional"`
+	IncludeCoAuthoredBy bool
 
 	// Model overrides the default model
-	Model string `hcl:"model,optional"`
+	Model string
 
 	// OutputStyle sets the response style preference
-	OutputStyle string `hcl:"output_style,optional"`
+	OutputStyle string
 
 	// AlwaysThinkingEnabled enables extended thinking mode
-	AlwaysThinkingEnabled bool `hcl:"always_thinking_enabled,optional"`
+	AlwaysThinkingEnabled bool
 
 	// PlansDirectory sets a custom location for plan files
-	PlansDirectory string `hcl:"plans_directory,optional"`
+	PlansDirectory string
 }
 
 // ResourceType returns the HCL block type for Claude settings.
@@ -465,28 +465,28 @@ func (s *ClaudeSettings) Validate() error {
 // MCP servers provide additional tools and capabilities to Claude Code.
 type ClaudeMCPServer struct {
 	// Name is the unique identifier for this MCP server
-	Name string `hcl:"name,label"`
+	Name string
 
 	// Description explains what this MCP server provides
-	Description string `hcl:"description,optional"`
+	Description string
 
 	// Type specifies the server type: "command" or "http"
-	Type string `hcl:"type,attr"`
+	Type string
 
 	// Command is the executable to run (required for type="command")
-	Command string `hcl:"command,optional"`
+	Command string
 
 	// Args are the command-line arguments for the command
-	Args []string `hcl:"args,optional"`
+	Args []string
 
 	// Env contains environment variables for the server
-	Env map[string]string `hcl:"env,optional"`
+	Env map[string]string
 
 	// Source is a shortcut for common package managers: "npm:", "uvx:", "pip:"
-	Source string `hcl:"source,optional"`
+	Source string
 
 	// URL is the HTTP endpoint (required for type="http")
-	URL string `hcl:"url,optional"`
+	URL string
 }
 
 // ResourceType returns the HCL block type for Claude MCP servers.

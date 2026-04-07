@@ -1,7 +1,7 @@
 // Package lockfile provides lock file management for reproducible installs.
 //
 // The lock file is stored at dex.lock and pins exact versions of all installed
-// plugins. This ensures that `dex sync` produces identical results across
+// packages. This ensures that `dex sync` produces identical results across
 // different machines and times.
 package lockfile
 
@@ -31,25 +31,25 @@ type LockFile struct {
 	// Agent is the agentic platform (e.g., "claude-code", "cursor")
 	Agent string `json:"agent"`
 
-	// Plugins maps plugin names to their locked versions
-	Plugins map[string]*LockedPlugin `json:"plugins"`
+	// Packages maps package names to their locked versions
+	Packages map[string]*LockedPackage `json:"packages"`
 
 	// path is the path to the lock file (not serialized)
 	path string
 }
 
-// LockedPlugin represents a locked plugin version.
-type LockedPlugin struct {
+// LockedPackage represents a locked package version.
+type LockedPackage struct {
 	// Version is the exact version string
 	Version string `json:"version"`
 
-	// Resolved is the full URL or path used to fetch the plugin
+	// Resolved is the full URL or path used to fetch the package
 	Resolved string `json:"resolved"`
 
 	// Integrity is the content hash in format "sha256-{base64}"
 	Integrity string `json:"integrity"`
 
-	// Dependencies maps dependency plugin names to version constraints
+	// Dependencies maps dependency package names to version constraints
 	Dependencies map[string]string `json:"dependencies"`
 }
 
@@ -59,9 +59,9 @@ func Load(projectRoot string) (*LockFile, error) {
 	lockPath := filepath.Join(projectRoot, LockFileName)
 
 	l := &LockFile{
-		Version: LockFileVersion,
-		Plugins: make(map[string]*LockedPlugin),
-		path:    lockPath,
+		Version:  LockFileVersion,
+		Packages: make(map[string]*LockedPackage),
+		path:     lockPath,
 	}
 
 	data, err := os.ReadFile(lockPath)
@@ -79,9 +79,9 @@ func Load(projectRoot string) (*LockFile, error) {
 	// Ensure path is set after unmarshaling
 	l.path = lockPath
 
-	// Ensure Plugins map is initialized
-	if l.Plugins == nil {
-		l.Plugins = make(map[string]*LockedPlugin)
+	// Ensure Packages map is initialized
+	if l.Packages == nil {
+		l.Packages = make(map[string]*LockedPackage)
 	}
 
 	return l, nil
@@ -89,7 +89,7 @@ func Load(projectRoot string) (*LockFile, error) {
 
 // Save writes the lock file to disk.
 func (l *LockFile) Save() error {
-	// Sort plugin entries for consistent output
+	// Sort package entries for consistent output
 	data, err := jsonutil.MarshalIndent(l, "", "  ")
 	if err != nil {
 		return err
@@ -98,15 +98,15 @@ func (l *LockFile) Save() error {
 	return os.WriteFile(l.path, data, 0644)
 }
 
-// Get returns the locked version for a plugin (nil if not locked).
-func (l *LockFile) Get(pluginName string) *LockedPlugin {
-	return l.Plugins[pluginName]
+// Get returns the locked version for a package (nil if not locked).
+func (l *LockFile) Get(pkgName string) *LockedPackage {
+	return l.Packages[pkgName]
 }
 
-// Set updates or adds a locked plugin.
-func (l *LockFile) Set(pluginName string, locked *LockedPlugin) {
-	if l.Plugins == nil {
-		l.Plugins = make(map[string]*LockedPlugin)
+// Set updates or adds a locked package.
+func (l *LockFile) Set(pkgName string, locked *LockedPackage) {
+	if l.Packages == nil {
+		l.Packages = make(map[string]*LockedPackage)
 	}
 
 	// Ensure Dependencies map is initialized
@@ -114,24 +114,24 @@ func (l *LockFile) Set(pluginName string, locked *LockedPlugin) {
 		locked.Dependencies = make(map[string]string)
 	}
 
-	l.Plugins[pluginName] = locked
+	l.Packages[pkgName] = locked
 }
 
-// Remove removes a plugin from the lock file.
-func (l *LockFile) Remove(pluginName string) {
-	delete(l.Plugins, pluginName)
+// Remove removes a package from the lock file.
+func (l *LockFile) Remove(pkgName string) {
+	delete(l.Packages, pkgName)
 }
 
-// Has checks if a plugin is in the lock file.
-func (l *LockFile) Has(pluginName string) bool {
-	_, exists := l.Plugins[pluginName]
+// Has checks if a package is in the lock file.
+func (l *LockFile) Has(pkgName string) bool {
+	_, exists := l.Packages[pkgName]
 	return exists
 }
 
-// LockedPlugins returns all locked plugin names (sorted).
-func (l *LockFile) LockedPlugins() []string {
-	names := make([]string, 0, len(l.Plugins))
-	for name := range l.Plugins {
+// LockedPackages returns all locked package names (sorted).
+func (l *LockFile) LockedPackages() []string {
+	names := make([]string, 0, len(l.Packages))
+	for name := range l.Packages {
 		names = append(names, name)
 	}
 	sort.Strings(names)

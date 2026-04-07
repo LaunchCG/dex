@@ -10,16 +10,16 @@ import (
 
 // Engine renders templates using Go's text/template.
 type Engine struct {
-	pluginDir string
-	ctx       *Context
-	funcMap   template.FuncMap
+	pkgDir  string
+	ctx     *Context
+	funcMap template.FuncMap
 }
 
-// NewEngine creates a template engine for the given plugin directory.
-func NewEngine(pluginDir string, ctx *Context) *Engine {
+// NewEngine creates a template engine for the given package directory.
+func NewEngine(pkgDir string, ctx *Context) *Engine {
 	e := &Engine{
-		pluginDir: pluginDir,
-		ctx:       ctx,
+		pkgDir: pkgDir,
+		ctx:    ctx,
 	}
 	e.funcMap = e.builtinFunctions()
 	return e
@@ -42,7 +42,7 @@ func (e *Engine) Render(content string) (string, error) {
 
 // RenderFile reads a file and renders it as a template.
 func (e *Engine) RenderFile(relativePath string) (string, error) {
-	fullPath := filepath.Join(e.pluginDir, relativePath)
+	fullPath := filepath.Join(e.pkgDir, relativePath)
 	content, err := os.ReadFile(fullPath)
 	if err != nil {
 		return "", fmt.Errorf("reading file %s: %w", relativePath, err)
@@ -61,8 +61,8 @@ func (e *Engine) RenderFileWithVars(relativePath string, vars map[string]any) (s
 
 	// Create a temporary engine with the cloned context
 	tempEngine := &Engine{
-		pluginDir: e.pluginDir,
-		ctx:       cloned,
+		pkgDir: e.pkgDir,
+		ctx:    cloned,
 	}
 	tempEngine.funcMap = tempEngine.builtinFunctions()
 
@@ -80,8 +80,8 @@ func (e *Engine) RenderWithVars(content string, vars map[string]any) (string, er
 
 	// Create a temporary engine with the cloned context
 	tempEngine := &Engine{
-		pluginDir: e.pluginDir,
-		ctx:       cloned,
+		pkgDir: e.pkgDir,
+		ctx:    cloned,
 	}
 	tempEngine.funcMap = tempEngine.builtinFunctions()
 
@@ -91,9 +91,9 @@ func (e *Engine) RenderWithVars(content string, vars map[string]any) (string, er
 // builtinFunctions returns the built-in template functions.
 func (e *Engine) builtinFunctions() template.FuncMap {
 	return template.FuncMap{
-		// file reads a file relative to the plugin directory
+		// file reads a file relative to the package directory
 		"file": func(path string) (string, error) {
-			fullPath := filepath.Join(e.pluginDir, path)
+			fullPath := filepath.Join(e.pkgDir, path)
 			content, err := os.ReadFile(fullPath)
 			if err != nil {
 				return "", fmt.Errorf("reading file %s: %w", path, err)

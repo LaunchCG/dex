@@ -31,7 +31,7 @@ func TestExecutor_CreateDirectories(t *testing.T) {
 	executor := NewExecutor(tmpDir, m, false)
 
 	plan := &adapter.Plan{
-		PluginName: "test-plugin",
+		PackageName: "test-plugin",
 		Directories: []adapter.DirectoryCreate{
 			{Path: "dir1", Parents: true},
 			{Path: "dir2/nested", Parents: true},
@@ -55,7 +55,7 @@ func TestExecutor_WriteFiles(t *testing.T) {
 	executor := NewExecutor(tmpDir, m, false)
 
 	plan := &adapter.Plan{
-		PluginName: "test-plugin",
+		PackageName: "test-plugin",
 		Files: []adapter.FileWrite{
 			{Path: "test.txt", Content: "hello world", Chmod: ""},
 			{Path: "subdir/file.txt", Content: "nested content", Chmod: ""},
@@ -81,7 +81,7 @@ func TestExecutor_WriteFiles_WithPermissions(t *testing.T) {
 	executor := NewExecutor(tmpDir, m, false)
 
 	plan := &adapter.Plan{
-		PluginName: "test-plugin",
+		PackageName: "test-plugin",
 		Files: []adapter.FileWrite{
 			{Path: "script.sh", Content: "#!/bin/bash\necho hello", Chmod: "755"},
 		},
@@ -102,7 +102,7 @@ func TestExecutor_WriteFiles_WithTemplateVars(t *testing.T) {
 	executor := NewExecutor(tmpDir, m, false)
 
 	plan := &adapter.Plan{
-		PluginName: "test-plugin",
+		PackageName: "test-plugin",
 		Files: []adapter.FileWrite{
 			{Path: "config.txt", Content: "name: ${NAME}\nversion: {{VERSION}}", Chmod: ""},
 		},
@@ -132,7 +132,7 @@ func TestExecutor_WriteFile_Conflict(t *testing.T) {
 	require.NoError(t, err)
 
 	plan := &adapter.Plan{
-		PluginName: "test-plugin",
+		PackageName: "test-plugin",
 		Files: []adapter.FileWrite{
 			{Path: "existing.txt", Content: "new content", Chmod: ""},
 		},
@@ -160,7 +160,7 @@ func TestExecutor_WriteFile_Force(t *testing.T) {
 	require.NoError(t, err)
 
 	plan := &adapter.Plan{
-		PluginName: "test-plugin",
+		PackageName: "test-plugin",
 		Files: []adapter.FileWrite{
 			{Path: "existing.txt", Content: "new content", Chmod: ""},
 		},
@@ -191,7 +191,7 @@ func TestExecutor_WriteFile_Tracked(t *testing.T) {
 	require.NoError(t, err)
 
 	plan := &adapter.Plan{
-		PluginName: "test-plugin",
+		PackageName: "test-plugin",
 		Files: []adapter.FileWrite{
 			{Path: "existing.txt", Content: "updated content", Chmod: ""},
 		},
@@ -216,7 +216,7 @@ func TestExecutor_EmptyPlan(t *testing.T) {
 	require.NoError(t, err)
 
 	// Empty plan with no operations
-	emptyPlan := &adapter.Plan{PluginName: "test"}
+	emptyPlan := &adapter.Plan{PackageName: "test"}
 	err = executor.Execute(emptyPlan, nil)
 	require.NoError(t, err)
 }
@@ -797,7 +797,7 @@ func TestExecutor_FullPlan(t *testing.T) {
 
 	// Create a comprehensive plan
 	plan := &adapter.Plan{
-		PluginName: "full-test-plugin",
+		PackageName: "full-test-plugin",
 		Directories: []adapter.DirectoryCreate{
 			{Path: ".claude/commands", Parents: true},
 		},
@@ -830,7 +830,7 @@ func TestExecutor_FullPlan(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "---\nname: test\n---\nContent", string(content))
 
-	plugin := m.GetPlugin("full-test-plugin")
+	plugin := m.GetPackage("full-test-plugin")
 	require.NotNil(t, plugin)
 	assert.True(t, plugin.HasAgentContent)
 }
@@ -841,7 +841,7 @@ func TestManifestTracking(t *testing.T) {
 	executor := NewExecutor(tmpDir, m, false)
 
 	plan := &adapter.Plan{
-		PluginName: "tracked-plugin",
+		PackageName: "tracked-plugin",
 		Directories: []adapter.DirectoryCreate{
 			{Path: "test-dir", Parents: true},
 		},
@@ -860,7 +860,7 @@ func TestManifestTracking(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify manifest tracking
-	plugin := m.GetPlugin("tracked-plugin")
+	plugin := m.GetPackage("tracked-plugin")
 	require.NotNil(t, plugin)
 	assert.Equal(t, []string{"test-dir/file.txt"}, plugin.Files)
 	assert.Equal(t, []string{"test-dir"}, plugin.Directories)
@@ -874,7 +874,7 @@ func TestExecutor_MultiplePlugins_AllTrackedInManifest(t *testing.T) {
 
 	// Plugin A: agent + mcp + settings
 	planA := &adapter.Plan{
-		PluginName:       "plugin-a",
+		PackageName:      "plugin-a",
 		AgentFileContent: "Plugin A rules",
 		MCPEntries: map[string]any{
 			"mcpServers": map[string]any{
@@ -890,7 +890,7 @@ func TestExecutor_MultiplePlugins_AllTrackedInManifest(t *testing.T) {
 
 	// Plugin B: agent + mcp + skill file
 	planB := &adapter.Plan{
-		PluginName:       "plugin-b",
+		PackageName:      "plugin-b",
 		AgentFileContent: "Plugin B rules",
 		MCPEntries: map[string]any{
 			"mcpServers": map[string]any{
@@ -909,7 +909,7 @@ func TestExecutor_MultiplePlugins_AllTrackedInManifest(t *testing.T) {
 
 	// Plugin C: agent + settings
 	planC := &adapter.Plan{
-		PluginName:       "plugin-c",
+		PackageName:      "plugin-c",
 		AgentFileContent: "Plugin C rules",
 		SettingsEntries: map[string]any{
 			"allow": []any{"Bash(c:*)"},
@@ -919,7 +919,7 @@ func TestExecutor_MultiplePlugins_AllTrackedInManifest(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert exact plugin names in manifest
-	pluginNames := m.GetPluginNames()
+	pluginNames := m.GetPackageNames()
 	sort.Strings(pluginNames)
 	assert.Equal(t, []string{"plugin-a", "plugin-b", "plugin-c"}, pluginNames)
 
@@ -935,14 +935,14 @@ func TestExecutor_MultiplePlugins_AllTrackedInManifest(t *testing.T) {
 	assert.Equal(t, expected, allFiles)
 
 	// Assert exact merged files per plugin
-	pluginA := m.GetPlugin("plugin-a")
+	pluginA := m.GetPackage("plugin-a")
 	require.NotNil(t, pluginA)
 	sortedA := make([]string, len(pluginA.MergedFiles))
 	copy(sortedA, pluginA.MergedFiles)
 	sort.Strings(sortedA)
 	assert.Equal(t, []string{".claude/settings.json", ".mcp.json", "CLAUDE.md"}, sortedA)
 
-	pluginB := m.GetPlugin("plugin-b")
+	pluginB := m.GetPackage("plugin-b")
 	require.NotNil(t, pluginB)
 	sortedB := make([]string, len(pluginB.MergedFiles))
 	copy(sortedB, pluginB.MergedFiles)
@@ -950,7 +950,7 @@ func TestExecutor_MultiplePlugins_AllTrackedInManifest(t *testing.T) {
 	assert.Equal(t, []string{".mcp.json", "CLAUDE.md"}, sortedB)
 	assert.Equal(t, []string{".claude/skills/b-skill.md"}, pluginB.Files)
 
-	pluginC := m.GetPlugin("plugin-c")
+	pluginC := m.GetPackage("plugin-c")
 	require.NotNil(t, pluginC)
 	sortedC := make([]string, len(pluginC.MergedFiles))
 	copy(sortedC, pluginC.MergedFiles)
@@ -967,7 +967,7 @@ func TestSettingsDeduplicationOnUninstall(t *testing.T) {
 
 	// Install plugin A with settings
 	planA := &adapter.Plan{
-		PluginName: "plugin-a",
+		PackageName: "plugin-a",
 		SettingsEntries: map[string]any{
 			"allow": []any{"bash:npm run *", "write:*.ts"},
 		},
@@ -977,7 +977,7 @@ func TestSettingsDeduplicationOnUninstall(t *testing.T) {
 
 	// Install plugin B with overlapping settings
 	planB := &adapter.Plan{
-		PluginName: "plugin-b",
+		PackageName: "plugin-b",
 		SettingsEntries: map[string]any{
 			"allow": []any{"bash:npm run *", "bash:yarn *"},
 		},
@@ -986,13 +986,13 @@ func TestSettingsDeduplicationOnUninstall(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify manifest tracks each plugin's contributions
-	pluginA := m.GetPlugin("plugin-a")
+	pluginA := m.GetPackage("plugin-a")
 	require.NotNil(t, pluginA)
 	assert.Equal(t, map[string][]string{
 		"allow": {"bash:npm run *", "write:*.ts"},
 	}, pluginA.SettingsValues)
 
-	pluginB := m.GetPlugin("plugin-b")
+	pluginB := m.GetPackage("plugin-b")
 	require.NotNil(t, pluginB)
 	assert.Equal(t, map[string][]string{
 		"allow": {"bash:npm run *", "bash:yarn *"},
@@ -1102,93 +1102,60 @@ func TestCopilotResources_Platform(t *testing.T) {
 	}
 }
 
-func TestPlatformFiltering_ClaudeResourcesSkippedForCopilot(t *testing.T) {
-	// Create a list of mixed resources
+func TestUniversalResources_AllReturnUniversalPlatform(t *testing.T) {
 	resources := []resource.Resource{
-		&resource.CopilotInstruction{Name: "copilot-inst", Description: "test", Content: "test"},
-		&resource.ClaudeRule{Name: "claude-rule", Description: "test", Content: "test"},
-		&resource.CopilotPrompt{Name: "copilot-prompt", Description: "test", Content: "test"},
-		&resource.ClaudeMCPServer{Name: "claude-mcp", Type: "command", Command: "test"},
+		&resource.Skill{Name: "skill", Description: "test", Content: "test"},
+		&resource.Command{Name: "cmd", Description: "test", Content: "test"},
+		&resource.Agent{Name: "agent", Description: "test", Content: "test"},
+		&resource.Rule{Name: "rule", Description: "test", Content: "test"},
+		&resource.Rules{Name: "rules", Description: "test", Content: "test"},
+		&resource.Settings{Name: "settings"},
+		&resource.MCPServer{Name: "mcp", Command: "test"},
 	}
 
-	// Filter for github-copilot platform
-	targetPlatform := "github-copilot"
-	var filtered []resource.Resource
 	for _, res := range resources {
-		if res.Platform() == targetPlatform {
-			filtered = append(filtered, res)
-		}
+		assert.Equal(t, "universal", res.Platform(),
+			"%s should return universal platform", res.ResourceType())
 	}
-
-	// Should only have 2 Copilot resources
-	assert.Len(t, filtered, 2)
-	assert.Equal(t, "copilot_instruction", filtered[0].ResourceType())
-	assert.Equal(t, "copilot_prompt", filtered[1].ResourceType())
 }
 
-func TestPlatformFiltering_CopilotResourcesSkippedForClaude(t *testing.T) {
-	// Create a list of mixed resources
-	resources := []resource.Resource{
-		&resource.CopilotInstruction{Name: "copilot-inst", Description: "test", Content: "test"},
-		&resource.ClaudeRule{Name: "claude-rule", Description: "test", Content: "test"},
-		&resource.CopilotPrompt{Name: "copilot-prompt", Description: "test", Content: "test"},
-		&resource.ClaudeMCPServer{Name: "claude-mcp", Type: "command", Command: "test"},
+func TestUniversalResources_ResourceTypes(t *testing.T) {
+	tests := []struct {
+		resource resource.Resource
+		expected string
+	}{
+		{&resource.Skill{Name: "s", Description: "d", Content: "c"}, "skill"},
+		{&resource.Command{Name: "c", Description: "d", Content: "c"}, "command"},
+		{&resource.Agent{Name: "a", Description: "d", Content: "c"}, "agent"},
+		{&resource.Rule{Name: "r", Description: "d", Content: "c"}, "rule"},
+		{&resource.Rules{Name: "r", Description: "d", Content: "c"}, "rules"},
+		{&resource.Settings{Name: "s"}, "settings"},
+		{&resource.MCPServer{Name: "m", Command: "test"}, "mcp_server"},
 	}
 
-	// Filter for claude-code platform
-	targetPlatform := "claude-code"
-	var filtered []resource.Resource
-	for _, res := range resources {
-		if res.Platform() == targetPlatform {
-			filtered = append(filtered, res)
-		}
+	for _, tt := range tests {
+		assert.Equal(t, tt.expected, tt.resource.ResourceType())
 	}
-
-	// Should only have 2 Claude resources
-	assert.Len(t, filtered, 2)
-	assert.Equal(t, "claude_rule", filtered[0].ResourceType())
-	assert.Equal(t, "claude_mcp_server", filtered[1].ResourceType())
 }
 
-func TestPlatformFiltering_AllResourcesMatchingPlatform(t *testing.T) {
-	// All Claude resources
+func TestUniversalResources_PlatformFilteringPassesAll(t *testing.T) {
 	resources := []resource.Resource{
-		&resource.ClaudeSkill{Name: "skill", Description: "test", Content: "test"},
-		&resource.ClaudeCommand{Name: "cmd", Description: "test", Content: "test"},
-		&resource.ClaudeRule{Name: "rule", Description: "test", Content: "test"},
+		&resource.Skill{Name: "skill", Description: "test", Content: "test"},
+		&resource.Rule{Name: "rule", Description: "test", Content: "test"},
+		&resource.Settings{Name: "settings"},
 	}
 
-	// Filter for claude-code platform
-	targetPlatform := "claude-code"
-	var filtered []resource.Resource
-	for _, res := range resources {
-		if res.Platform() == targetPlatform {
-			filtered = append(filtered, res)
+	// Universal resources should pass through platform filter for any platform
+	for _, platform := range []string{"claude-code", "github-copilot", "cursor"} {
+		var filtered []resource.Resource
+		for _, res := range resources {
+			if res.Platform() == platform || res.Platform() == "universal" {
+				filtered = append(filtered, res)
+			}
 		}
+		assert.Len(t, filtered, 3,
+			"all universal resources should pass filter for %s", platform)
 	}
-
-	// All should be included
-	assert.Len(t, filtered, 3)
-}
-
-func TestPlatformFiltering_NoResourcesMatchingPlatform(t *testing.T) {
-	// All Copilot resources
-	resources := []resource.Resource{
-		&resource.CopilotInstruction{Name: "inst", Description: "test", Content: "test"},
-		&resource.CopilotPrompt{Name: "prompt", Description: "test", Content: "test"},
-	}
-
-	// Filter for claude-code platform
-	targetPlatform := "claude-code"
-	var filtered []resource.Resource
-	for _, res := range resources {
-		if res.Platform() == targetPlatform {
-			filtered = append(filtered, res)
-		}
-	}
-
-	// None should be included
-	assert.Len(t, filtered, 0)
 }
 
 // Test Copilot MCP config with custom path and key
@@ -1212,7 +1179,7 @@ project {
 	lockContent := `{
   "version": "1.0",
   "agent": "claude-code",
-  "plugins": {
+  "packages": {
     "app": {
       "version": "1.0.0",
       "resolved": "file:///tmp/app",
@@ -1241,7 +1208,7 @@ project {
 	err = os.WriteFile(filepath.Join(tmpDir, "dex.lock"), []byte(lockContent), 0644)
 	require.NoError(t, err)
 
-	inst, err := NewInstaller(tmpDir)
+	inst, err := NewInstaller(tmpDir, "")
 	require.NoError(t, err)
 
 	// core is depended on by both app and utils
@@ -1271,7 +1238,7 @@ project {
   default_platform = "claude-code"
 }
 
-plugin "app" {
+package "app" {
   source = "file:///tmp/app"
 }
 `
@@ -1282,7 +1249,7 @@ plugin "app" {
 	lockContent := `{
   "version": "1.0",
   "agent": "claude-code",
-  "plugins": {
+  "packages": {
     "app": {
       "version": "1.0.0",
       "resolved": "file:///tmp/app",
@@ -1308,7 +1275,7 @@ plugin "app" {
 	err = os.WriteFile(filepath.Join(tmpDir, "dex.lock"), []byte(lockContent), 0644)
 	require.NoError(t, err)
 
-	inst, err := NewInstaller(tmpDir)
+	inst, err := NewInstaller(tmpDir, "")
 	require.NoError(t, err)
 
 	// orphan-pkg is not in dex.hcl and not a dependency of anything
@@ -1348,7 +1315,7 @@ project {
   default_platform = "claude-code"
 }
 
-plugin "app" {
+package "app" {
   source = "file:///tmp/app"
 }
 `
@@ -1359,7 +1326,7 @@ plugin "app" {
 	lockContent := `{
   "version": "1.0",
   "agent": "claude-code",
-  "plugins": {
+  "packages": {
     "app": {
       "version": "1.0.0",
       "resolved": "file:///tmp/app",
@@ -1395,7 +1362,7 @@ plugin "app" {
 	err = os.WriteFile(filepath.Join(tmpDir, "dex.lock"), []byte(lockContent), 0644)
 	require.NoError(t, err)
 
-	inst, err := NewInstaller(tmpDir)
+	inst, err := NewInstaller(tmpDir, "")
 	require.NoError(t, err)
 
 	// Direct dependents of core is just utils
@@ -1428,7 +1395,7 @@ project {
   default_platform = "claude-code"
 }
 
-plugin "app" {
+package "app" {
   source = "file:///tmp/app"
 }
 `
@@ -1440,7 +1407,7 @@ plugin "app" {
 	lockContent := `{
   "version": "1.0",
   "agent": "claude-code",
-  "plugins": {
+  "packages": {
     "app": {
       "version": "1.0.0",
       "resolved": "file:///tmp/app",
@@ -1477,7 +1444,7 @@ plugin "app" {
 	err = os.WriteFile(filepath.Join(tmpDir, "dex.lock"), []byte(lockContent), 0644)
 	require.NoError(t, err)
 
-	inst, err := NewInstaller(tmpDir)
+	inst, err := NewInstaller(tmpDir, "")
 	require.NoError(t, err)
 
 	// shared-lib is depended on by both frontend and backend
@@ -1507,11 +1474,11 @@ project {
   default_platform = "claude-code"
 }
 
-plugin "app-a" {
+package "app-a" {
   source = "file:///tmp/app-a"
 }
 
-plugin "app-b" {
+package "app-b" {
   source = "file:///tmp/app-b"
 }
 `
@@ -1521,7 +1488,7 @@ plugin "app-b" {
 	lockContent := `{
   "version": "1.0",
   "agent": "claude-code",
-  "plugins": {
+  "packages": {
     "app-a": {
       "version": "1.0.0",
       "resolved": "file:///tmp/app-a",
@@ -1573,7 +1540,7 @@ plugin "app-b" {
 	err = os.WriteFile(filepath.Join(tmpDir, "dex.lock"), []byte(lockContent), 0644)
 	require.NoError(t, err)
 
-	inst, err := NewInstaller(tmpDir)
+	inst, err := NewInstaller(tmpDir, "")
 	require.NoError(t, err)
 
 	// Direct dependents of core: lib-x, lib-y
@@ -1637,7 +1604,7 @@ func TestExecutor_TracksMCPConfigFile(t *testing.T) {
 	executor := NewExecutor(tmpDir, m, false)
 
 	plan := &adapter.Plan{
-		PluginName: "test-plugin",
+		PackageName: "test-plugin",
 		MCPEntries: map[string]any{
 			"mcpServers": map[string]any{
 				"test-server": map[string]any{
@@ -1651,7 +1618,7 @@ func TestExecutor_TracksMCPConfigFile(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify .mcp.json is tracked as a merged file
-	plugin := m.GetPlugin("test-plugin")
+	plugin := m.GetPackage("test-plugin")
 	require.NotNil(t, plugin)
 	assert.Equal(t, []string{".mcp.json"}, plugin.MergedFiles)
 
@@ -1666,7 +1633,7 @@ func TestExecutor_TracksSettingsFile(t *testing.T) {
 	executor := NewExecutor(tmpDir, m, false)
 
 	plan := &adapter.Plan{
-		PluginName: "test-plugin",
+		PackageName: "test-plugin",
 		SettingsEntries: map[string]any{
 			"allow": []any{"Bash(npm:*)"},
 		},
@@ -1676,7 +1643,7 @@ func TestExecutor_TracksSettingsFile(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify settings.json is tracked as a merged file
-	plugin := m.GetPlugin("test-plugin")
+	plugin := m.GetPackage("test-plugin")
 	require.NotNil(t, plugin)
 	assert.Equal(t, []string{filepath.Join(".claude", "settings.json")}, plugin.MergedFiles)
 
@@ -1691,7 +1658,7 @@ func TestExecutor_TracksAgentFile(t *testing.T) {
 	executor := NewExecutor(tmpDir, m, false)
 
 	plan := &adapter.Plan{
-		PluginName:       "test-plugin",
+		PackageName:      "test-plugin",
 		AgentFileContent: "Test agent content",
 	}
 
@@ -1699,7 +1666,7 @@ func TestExecutor_TracksAgentFile(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify CLAUDE.md is tracked as a merged file
-	plugin := m.GetPlugin("test-plugin")
+	plugin := m.GetPackage("test-plugin")
 	require.NotNil(t, plugin)
 	assert.Equal(t, []string{"CLAUDE.md"}, plugin.MergedFiles)
 
@@ -1715,7 +1682,7 @@ func TestExecutor_TracksCustomAgentFilePath(t *testing.T) {
 
 	customPath := filepath.Join(".github", "copilot-instructions.md")
 	plan := &adapter.Plan{
-		PluginName:       "test-plugin",
+		PackageName:      "test-plugin",
 		AgentFileContent: "Custom agent content",
 		AgentFilePath:    customPath,
 	}
@@ -1724,7 +1691,7 @@ func TestExecutor_TracksCustomAgentFilePath(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify custom path is tracked
-	plugin := m.GetPlugin("test-plugin")
+	plugin := m.GetPackage("test-plugin")
 	require.NotNil(t, plugin)
 	assert.Equal(t, []string{customPath}, plugin.MergedFiles)
 
@@ -1740,7 +1707,7 @@ func TestExecutor_MultiplPlugins_SharedMergedFiles(t *testing.T) {
 
 	// Install plugin1 with MCP config
 	plan1 := &adapter.Plan{
-		PluginName: "plugin1",
+		PackageName: "plugin1",
 		MCPEntries: map[string]any{
 			"mcpServers": map[string]any{
 				"server1": map[string]any{"command": "cmd1"},
@@ -1752,7 +1719,7 @@ func TestExecutor_MultiplPlugins_SharedMergedFiles(t *testing.T) {
 
 	// Install plugin2 with MCP config
 	plan2 := &adapter.Plan{
-		PluginName: "plugin2",
+		PackageName: "plugin2",
 		MCPEntries: map[string]any{
 			"mcpServers": map[string]any{
 				"server2": map[string]any{"command": "cmd2"},
@@ -1763,11 +1730,11 @@ func TestExecutor_MultiplPlugins_SharedMergedFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	// Both should track .mcp.json
-	plugin1 := m.GetPlugin("plugin1")
+	plugin1 := m.GetPackage("plugin1")
 	require.NotNil(t, plugin1)
 	assert.Equal(t, []string{".mcp.json"}, plugin1.MergedFiles)
 
-	plugin2 := m.GetPlugin("plugin2")
+	plugin2 := m.GetPackage("plugin2")
 	require.NotNil(t, plugin2)
 	assert.Equal(t, []string{".mcp.json"}, plugin2.MergedFiles)
 
@@ -1799,7 +1766,7 @@ func TestUninstall_RemovesDedicatedFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create installer
-	inst, err := NewInstaller(tmpDir)
+	inst, err := NewInstaller(tmpDir, "")
 	require.NoError(t, err)
 	inst.manifest = m
 
@@ -1815,7 +1782,7 @@ func TestUninstall_RemovesDedicatedFiles(t *testing.T) {
 	m.Track("test-plugin", []string{".claude/commands/test.md"}, []string{".claude/commands"})
 
 	// Uninstall the plugin
-	err = inst.uninstallPlugin("test-plugin")
+	err = inst.uninstallPackage("test-plugin")
 	require.NoError(t, err)
 
 	// Dedicated file should be removed
@@ -1846,7 +1813,7 @@ func TestInstaller_Update_LocalResourcesOnly(t *testing.T) {
   agent_instructions = "# Initial Instructions"
 }
 
-plugin "my-plugin" {
+package "my-plugin" {
   source = "file:` + pluginDir + `"
 }
 `
@@ -1854,7 +1821,7 @@ plugin "my-plugin" {
 	require.NoError(t, err)
 
 	// Install initial version
-	installer1, err := NewInstaller(projectDir)
+	installer1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = installer1.InstallAll()
 	require.NoError(t, err)
@@ -1872,7 +1839,7 @@ plugin "my-plugin" {
   agent_instructions = "# Updated Instructions\n\nThis is the new content."
 }
 
-plugin "my-plugin" {
+package "my-plugin" {
   source = "file:` + pluginDir + `"
 }
 `
@@ -1880,7 +1847,7 @@ plugin "my-plugin" {
 	require.NoError(t, err)
 
 	// Execute: dex update
-	installer2, err := NewInstaller(projectDir)
+	installer2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	results, err := installer2.Update(nil, false)
 	require.NoError(t, err)
@@ -1896,7 +1863,7 @@ plugin "my-plugin" {
 	assert.Equal(t, "# Updated Instructions\n\nThis is the new content.\n\nFollow this rule from my-plugin", string(content2))
 
 	// Verify: Manifest was saved
-	plugin := installer2.manifest.GetPlugin("__project__")
+	plugin := installer2.manifest.GetPackage("__project__")
 	assert.NotNil(t, plugin)
 	assert.True(t, plugin.HasAgentContent)
 }
@@ -1907,13 +1874,13 @@ func TestInstaller_Update_BothPluginAndLocalChanges(t *testing.T) {
 
 	// Set up plugin v1
 	pluginV1Dir := t.TempDir()
-	pluginV1Content := `package {
+	pluginV1Content := `meta {
   name = "test-plugin"
   version = "1.0.0"
   description = "Test plugin v1"
 }
 
-claude_rule "test-rule" {
+rule "test-rule" {
   description = "Rule from v1"
   content = "This is version 1 content."
 }
@@ -1928,7 +1895,7 @@ claude_rule "test-rule" {
   agent_instructions = "# V1 Instructions"
 }
 
-plugin "test-plugin" {
+package "test-plugin" {
   source = "file:` + pluginV1Dir + `"
 }
 `
@@ -1936,7 +1903,7 @@ plugin "test-plugin" {
 	require.NoError(t, err)
 
 	// Install initial version (v1)
-	installer1, err := NewInstaller(projectDir)
+	installer1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = installer1.InstallAll()
 	require.NoError(t, err)
@@ -1949,13 +1916,13 @@ plugin "test-plugin" {
 
 	// Set up plugin v2 in a different directory
 	pluginV2Dir := t.TempDir()
-	pluginV2Content := `package {
+	pluginV2Content := `meta {
   name = "test-plugin"
   version = "2.0.0"
   description = "Test plugin v2"
 }
 
-claude_rule "test-rule" {
+rule "test-rule" {
   description = "Rule from v2"
   content = "This is version 2 content - updated!"
 }
@@ -1970,7 +1937,7 @@ claude_rule "test-rule" {
   agent_instructions = "# V2 Instructions\n\nUpdated for version 2."
 }
 
-plugin "test-plugin" {
+package "test-plugin" {
   source = "file:` + pluginV2Dir + `"
 }
 `
@@ -1978,7 +1945,7 @@ plugin "test-plugin" {
 	require.NoError(t, err)
 
 	// Execute: sync/update (this should reinstall the plugin since source changed)
-	installer2, err := NewInstaller(projectDir)
+	installer2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	results, err := installer2.Update(nil, false)
 	require.NoError(t, err)
@@ -2010,7 +1977,7 @@ func TestInstaller_Update_DryRunMode(t *testing.T) {
   agent_instructions = "# Initial Instructions"
 }
 
-plugin "my-plugin" {
+package "my-plugin" {
   source = "file:` + pluginDir + `"
 }
 `
@@ -2018,7 +1985,7 @@ plugin "my-plugin" {
 	require.NoError(t, err)
 
 	// Install initial version
-	installer1, err := NewInstaller(projectDir)
+	installer1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = installer1.InstallAll()
 	require.NoError(t, err)
@@ -2037,7 +2004,7 @@ plugin "my-plugin" {
   agent_instructions = "# Updated Instructions\n\nThis should not be applied in dry-run."
 }
 
-plugin "my-plugin" {
+package "my-plugin" {
   source = "file:` + pluginDir + `"
 }
 `
@@ -2045,7 +2012,7 @@ plugin "my-plugin" {
 	require.NoError(t, err)
 
 	// Execute: sync --dry-run (tests Update method internally)
-	installer2, err := NewInstaller(projectDir)
+	installer2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	results, err := installer2.Update(nil, true) // dryRun = true
 	require.NoError(t, err)

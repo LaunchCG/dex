@@ -13,8 +13,8 @@ import (
 // PlanUniversalFile creates an installation plan for a universal file resource.
 // This is shared across all adapters since file resources work the same way on all platforms.
 // Files can have inline content or reference a source file, with optional templating.
-func PlanUniversalFile(fileRes *resource.File, pkg *config.PackageConfig, pluginDir, projectRoot, platform string, ctx *InstallContext) (*Plan, error) {
-	plan := NewPlan(pkg.Package.Name)
+func PlanUniversalFile(fileRes *resource.File, pkg *config.PackageConfig, pkgDir, projectRoot, platform string, ctx *InstallContext) (*Plan, error) {
+	plan := NewPlan(pkg.Meta.Name)
 
 	// Load content from inline or source file
 	var content string
@@ -22,7 +22,7 @@ func PlanUniversalFile(fileRes *resource.File, pkg *config.PackageConfig, plugin
 		content = *fileRes.Content
 	} else if fileRes.Src != nil {
 		// Read from source file
-		srcPath := filepath.Join(pluginDir, *fileRes.Src)
+		srcPath := filepath.Join(pkgDir, *fileRes.Src)
 		data, err := os.ReadFile(srcPath)
 		if err != nil {
 			return nil, fmt.Errorf("reading source file %s: %w", *fileRes.Src, err)
@@ -33,8 +33,8 @@ func PlanUniversalFile(fileRes *resource.File, pkg *config.PackageConfig, plugin
 	// Apply templating if enabled
 	if fileRes.Template {
 		// Create template context with the appropriate platform
-		templateCtx := template.NewContext(pkg.Package.Name, pkg.Package.Version, projectRoot, platform)
-		engine := template.NewEngine(pluginDir, templateCtx)
+		templateCtx := template.NewContext(pkg.Meta.Name, pkg.Meta.Version, projectRoot, platform)
+		engine := template.NewEngine(pkgDir, templateCtx)
 
 		// Convert vars to map[string]any
 		vars := make(map[string]any)
@@ -62,7 +62,7 @@ func PlanUniversalFile(fileRes *resource.File, pkg *config.PackageConfig, plugin
 		// Apply namespacing to the filename (last component)
 		dir := filepath.Dir(destPath)
 		base := filepath.Base(destPath)
-		namespacedBase := fmt.Sprintf("%s-%s", pkg.Package.Name, base)
+		namespacedBase := fmt.Sprintf("%s-%s", pkg.Meta.Name, base)
 		if dir == "." {
 			destPath = namespacedBase
 		} else {
@@ -85,7 +85,7 @@ func PlanUniversalFile(fileRes *resource.File, pkg *config.PackageConfig, plugin
 // PlanUniversalDirectory creates an installation plan for a universal directory resource.
 // This is shared across all adapters since directory resources work the same way on all platforms.
 func PlanUniversalDirectory(dirRes *resource.Directory, pkg *config.PackageConfig, ctx *InstallContext) (*Plan, error) {
-	plan := NewPlan(pkg.Package.Name)
+	plan := NewPlan(pkg.Meta.Name)
 
 	// Determine path with optional namespacing
 	dirPath := dirRes.Path
@@ -93,7 +93,7 @@ func PlanUniversalDirectory(dirRes *resource.Directory, pkg *config.PackageConfi
 		// Apply namespacing to the directory name (last component)
 		parent := filepath.Dir(dirPath)
 		base := filepath.Base(dirPath)
-		namespacedBase := fmt.Sprintf("%s-%s", pkg.Package.Name, base)
+		namespacedBase := fmt.Sprintf("%s-%s", pkg.Meta.Name, base)
 		if parent == "." {
 			dirPath = namespacedBase
 		} else {

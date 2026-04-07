@@ -140,12 +140,12 @@ func (r *GitRegistry) getPackageFromManifest(clonePath, name string) (*PackageIn
 	}
 
 	// Verify name matches if provided
-	if name != "" && pkgCfg.Package.Name != "" && !NamesMatch(name, pkgCfg.Package.Name) {
+	if name != "" && pkgCfg.Meta.Name != "" && !NamesMatch(name, pkgCfg.Meta.Name) {
 		return nil, errors.NewNotFoundError("package", name)
 	}
 
 	// Use name from package.hcl, fall back to provided name
-	pkgName := pkgCfg.Package.Name
+	pkgName := pkgCfg.Meta.Name
 	if pkgName == "" {
 		pkgName = name
 	}
@@ -175,8 +175,8 @@ func (r *GitRegistry) getPackageFromManifest(clonePath, name string) (*PackageIn
 	}
 
 	// If no tags found, use version from package.hcl
-	if len(versions) == 0 && pkgCfg.Package.Version != "" {
-		versions = []string{pkgCfg.Package.Version}
+	if len(versions) == 0 && pkgCfg.Meta.Version != "" {
+		versions = []string{pkgCfg.Meta.Version}
 	}
 
 	latest := ""
@@ -188,7 +188,7 @@ func (r *GitRegistry) getPackageFromManifest(clonePath, name string) (*PackageIn
 		Name:        pkgName,
 		Versions:    versions,
 		Latest:      latest,
-		Description: pkgCfg.Package.Description,
+		Description: pkgCfg.Meta.Description,
 	}, nil
 }
 
@@ -262,19 +262,19 @@ func (r *GitRegistry) FetchPackage(resolved *ResolvedPackage, destDir string) (s
 	if r.cache.Has(cacheKey) {
 		cachedPath := r.cache.GetPath(cacheKey)
 		// Copy from cache to destination
-		pluginDir := filepath.Join(destDir, resolved.Name)
-		if err := os.RemoveAll(pluginDir); err != nil && !os.IsNotExist(err) {
+		pkgDir := filepath.Join(destDir, resolved.Name)
+		if err := os.RemoveAll(pkgDir); err != nil && !os.IsNotExist(err) {
 			return "", fmt.Errorf("failed to remove existing directory: %w", err)
 		}
-		if err := copyDir(cachedPath, pluginDir); err != nil {
+		if err := copyDir(cachedPath, pkgDir); err != nil {
 			return "", fmt.Errorf("failed to copy from cache: %w", err)
 		}
-		return pluginDir, nil
+		return pkgDir, nil
 	}
 
 	// Clone to destination
-	pluginDir := filepath.Join(destDir, resolved.Name)
-	if err := os.RemoveAll(pluginDir); err != nil && !os.IsNotExist(err) {
+	pkgDir := filepath.Join(destDir, resolved.Name)
+	if err := os.RemoveAll(pkgDir); err != nil && !os.IsNotExist(err) {
 		return "", fmt.Errorf("failed to remove existing directory: %w", err)
 	}
 
@@ -297,13 +297,13 @@ func (r *GitRegistry) FetchPackage(resolved *ResolvedPackage, destDir string) (s
 	// Authentication is handled externally via:
 	// - HTTPS: Git credential helpers
 	// - SSH: SSH agent or ~/.ssh keys
-	_, err = git.PlainClone(pluginDir, false, cloneOpts)
+	_, err = git.PlainClone(pkgDir, false, cloneOpts)
 	if err != nil {
 		return "", errors.NewRegistryError(r.repoURL, "clone", err)
 	}
 
 	// Remove .git directory to reduce size
-	gitDir := filepath.Join(pluginDir, ".git")
+	gitDir := filepath.Join(pkgDir, ".git")
 	if err := os.RemoveAll(gitDir); err != nil {
 		return "", fmt.Errorf("failed to remove .git directory: %w", err)
 	}
@@ -313,11 +313,11 @@ func (r *GitRegistry) FetchPackage(resolved *ResolvedPackage, destDir string) (s
 	if err := os.MkdirAll(filepath.Dir(cachePath), 0755); err != nil {
 		return "", fmt.Errorf("failed to create cache directory: %w", err)
 	}
-	if err := copyDir(pluginDir, cachePath); err != nil {
+	if err := copyDir(pkgDir, cachePath); err != nil {
 		return "", fmt.Errorf("failed to copy to cache: %w", err)
 	}
 
-	return pluginDir, nil
+	return pkgDir, nil
 }
 
 // ListPackages returns nil (git repos don't support listing without cloning).

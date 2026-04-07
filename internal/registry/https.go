@@ -1,4 +1,4 @@
-// Package registry provides clients for fetching plugins from various sources.
+// Package registry provides clients for fetching packages from various sources.
 //
 // This package implements support for multiple registry protocols:
 //   - file:// - Local filesystem access

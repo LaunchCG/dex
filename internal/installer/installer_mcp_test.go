@@ -20,7 +20,7 @@ func TestInstaller_MCPServer_ClaudeCode(t *testing.T) {
 
 	// Set up a local plugin with an MCP server
 	pluginDir := t.TempDir()
-	pluginContent := `package {
+	pluginContent := `meta {
   name = "mcp-test"
   version = "1.0.0"
   description = "Plugin with MCP server"
@@ -40,13 +40,13 @@ mcp_server "filesystem" {
 
 	// Create project config
 	createTestProject(t, projectDir, `
-plugin "mcp-test" {
+package "mcp-test" {
   source = "file:`+pluginDir+`"
 }
 `)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -83,7 +83,7 @@ func TestInstaller_MCPServer_ClaudeCode_WithNamespacing(t *testing.T) {
 
 	// Set up a local plugin with an MCP server
 	pluginDir := t.TempDir()
-	pluginContent := `package {
+	pluginContent := `meta {
   name = "mcp-test"
   version = "1.0.0"
   description = "Plugin with MCP server"
@@ -105,7 +105,7 @@ mcp_server "filesystem" {
   namespace_all = true
 }
 
-plugin "mcp-test" {
+package "mcp-test" {
   source = "file:` + pluginDir + `"
 }
 `
@@ -113,7 +113,7 @@ plugin "mcp-test" {
 	require.NoError(t, err)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -149,7 +149,7 @@ func TestInstaller_MCPServer_Cursor(t *testing.T) {
 
 	// Set up a local plugin with an MCP server
 	pluginDir := t.TempDir()
-	pluginContent := `package {
+	pluginContent := `meta {
   name = "mcp-test"
   version = "1.0.0"
   description = "Plugin with MCP server"
@@ -172,7 +172,7 @@ mcp_server "context7" {
   default_platform = "cursor"
 }
 
-plugin "mcp-test" {
+package "mcp-test" {
   source = "file:` + pluginDir + `"
 }
 `
@@ -180,7 +180,7 @@ plugin "mcp-test" {
 	require.NoError(t, err)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -216,7 +216,7 @@ func TestInstaller_MCPServer_Copilot(t *testing.T) {
 
 	// Set up a local plugin with an MCP server
 	pluginDir := t.TempDir()
-	pluginContent := `package {
+	pluginContent := `meta {
   name = "mcp-test"
   version = "1.0.0"
   description = "Plugin with MCP server"
@@ -241,7 +241,7 @@ mcp_server "database" {
   default_platform = "github-copilot"
 }
 
-plugin "mcp-test" {
+package "mcp-test" {
   source = "file:` + pluginDir + `"
 }
 `
@@ -249,7 +249,7 @@ plugin "mcp-test" {
 	require.NoError(t, err)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -287,7 +287,7 @@ func TestInstaller_MCPServer_PlatformOverride(t *testing.T) {
 
 	// Set up a local plugin with platform-specific overrides
 	pluginDir := t.TempDir()
-	pluginContent := `package {
+	pluginContent := `meta {
   name = "mcp-test"
   version = "1.0.0"
   description = "Plugin with platform overrides"
@@ -318,14 +318,14 @@ mcp_server "multi-platform" {
   default_platform = "claude-code"
 }
 
-plugin "mcp-test" {
+package "mcp-test" {
   source = "file:` + pluginDir + `"
 }
 `
 		err = os.WriteFile(filepath.Join(projectDir, "dex.hcl"), []byte(projectContent), 0644)
 		require.NoError(t, err)
 
-		installer, err := NewInstaller(projectDir)
+		installer, err := NewInstaller(projectDir, "")
 		require.NoError(t, err)
 
 		err = installer.InstallAll()
@@ -357,14 +357,14 @@ plugin "mcp-test" {
   default_platform = "cursor"
 }
 
-plugin "mcp-test" {
+package "mcp-test" {
   source = "file:` + pluginDir + `"
 }
 `
 		err = os.WriteFile(filepath.Join(cursorProjectDir, "dex.hcl"), []byte(projectContent), 0644)
 		require.NoError(t, err)
 
-		installer, err := NewInstaller(cursorProjectDir)
+		installer, err := NewInstaller(cursorProjectDir, "")
 		require.NoError(t, err)
 
 		err = installer.InstallAll()
@@ -383,7 +383,7 @@ func TestInstaller_MCPServer_MultipleServers(t *testing.T) {
 
 	// Set up a local plugin with multiple MCP servers
 	pluginDir := t.TempDir()
-	pluginContent := `package {
+	pluginContent := `meta {
   name = "multi-mcp"
   version = "1.0.0"
   description = "Plugin with multiple MCP servers"
@@ -414,13 +414,13 @@ mcp_server "api" {
 
 	// Create project config
 	createTestProject(t, projectDir, `
-plugin "multi-mcp" {
+package "multi-mcp" {
   source = "file:`+pluginDir+`"
 }
 `)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -462,16 +462,15 @@ func TestInstaller_MCPServer_Copilot_WithInputs(t *testing.T) {
 	// Set up the project directory
 	projectDir := t.TempDir()
 
-	// Set up a local plugin with a copilot_mcp_server that has inputs
+	// Set up a local plugin with a mcp_server that has inputs
 	pluginDir := t.TempDir()
-	pluginContent := `package {
+	pluginContent := `meta {
   name = "ado-plugin"
   version = "1.0.0"
   description = "Plugin with MCP server inputs"
 }
 
-copilot_mcp_server "ado" {
-  type    = "stdio"
+mcp_server "ado" {
   command = "npx"
   args    = ["-y", "@azure-devops/mcp", "$${input:ado_org}"]
 
@@ -490,7 +489,7 @@ copilot_mcp_server "ado" {
   default_platform = "github-copilot"
 }
 
-plugin "ado-plugin" {
+package "ado-plugin" {
   source = "file:` + pluginDir + `"
 }
 `
@@ -498,7 +497,7 @@ plugin "ado-plugin" {
 	require.NoError(t, err)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -542,7 +541,7 @@ func TestInstaller_MCPServer_Universal_WithCopilotInputOverride(t *testing.T) {
 
 	// Set up a local plugin with a universal mcp_server + copilot input override
 	pluginDir := t.TempDir()
-	pluginContent := `package {
+	pluginContent := `meta {
   name = "ado-plugin"
   version = "1.0.0"
   description = "Plugin with universal MCP server and copilot input override"
@@ -569,7 +568,7 @@ mcp_server "ado" {
   default_platform = "github-copilot"
 }
 
-plugin "ado-plugin" {
+package "ado-plugin" {
   source = "file:` + pluginDir + `"
 }
 `
@@ -577,7 +576,7 @@ plugin "ado-plugin" {
 	require.NoError(t, err)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -621,7 +620,7 @@ func TestInstaller_MCPServer_Uninstall(t *testing.T) {
 
 	// Set up a local plugin with an MCP server
 	pluginDir := t.TempDir()
-	pluginContent := `package {
+	pluginContent := `meta {
   name = "mcp-test"
   version = "1.0.0"
   description = "Plugin with MCP server"
@@ -637,13 +636,13 @@ mcp_server "test-server" {
 
 	// Create project config
 	createTestProject(t, projectDir, `
-plugin "mcp-test" {
+package "mcp-test" {
   source = "file:`+pluginDir+`"
 }
 `)
 
 	// Create installer and install
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	err = installer.InstallAll()

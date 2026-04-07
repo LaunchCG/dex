@@ -44,7 +44,7 @@ type S3Registry struct {
 // NewS3Registry creates a registry from an S3 URL.
 //
 // URL format: s3://bucket/path/to/registry/
-// Direct tarball: s3://bucket/path/to/plugin-1.0.0.tar.gz
+// Direct tarball: s3://bucket/path/to/package-1.0.0.tar.gz
 //
 // Authentication uses AWS SDK default credential chain.
 func NewS3Registry(url string, mode SourceMode) (*S3Registry, error) {

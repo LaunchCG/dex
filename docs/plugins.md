@@ -1,12 +1,12 @@
-# Plugin Development
+# Package Development
 
-Plugins are the core of Dex. They contain skills, commands, rules, agents, and MCP server configurations that extend AI coding assistants.
+Packages are the core of Dex. They contain skills, commands, rules, agents, and MCP server configurations that extend AI coding assistants.
 
-## Plugin Structure
+## Package Structure
 
 ```
-my-plugin/
-├── package.hcl           # Plugin manifest (required)
+my-package/
+├── package.hcl           # Package manifest (required)
 ├── content/              # Shared content files
 │   └── code-review.md
 ├── skills/               # Skill-specific content
@@ -21,16 +21,16 @@ my-plugin/
 
 ## Package Manifest (package.hcl)
 
-The `package.hcl` file defines your plugin's metadata and resources using HCL syntax.
+The `package.hcl` file defines your package's metadata and resources using HCL syntax.
 
 ```hcl
-package {
-  name        = "my-plugin"
+meta {
+  name        = "my-package"
   version     = "1.0.0"
-  description = "A useful plugin for AI coding assistants"
+  description = "A useful package for AI coding assistants"
   author      = "Your Name"
   license     = "MIT"
-  repository  = "https://github.com/owner/my-plugin"
+  repository  = "https://github.com/owner/my-package"
   platforms   = ["claude-code", "cursor", "github-copilot"]
 }
 
@@ -39,12 +39,12 @@ variable "api_endpoint" {
   default     = "https://api.example.com"
 }
 
-claude_skill "code-review" {
+skill "code-review" {
   description = "Performs thorough code reviews"
   content     = file("skills/code-review.md")
 }
 
-claude_command "deploy" {
+command "deploy" {
   description = "Deploy the application"
   content     = templatefile("commands/deploy.md.tmpl", {
     environment = "production"
@@ -52,21 +52,21 @@ claude_command "deploy" {
 }
 ```
 
-### Package Block
+### Meta Block
 
 | Attribute | Required | Description |
 |-----------|----------|-------------|
-| `name` | yes | Plugin name (lowercase, hyphens allowed) |
+| `name` | yes | Package name (lowercase, hyphens allowed) |
 | `version` | yes | Semantic version (e.g., "1.0.0") |
 | `description` | no | Human-readable description |
-| `author` | no | Plugin author |
+| `author` | no | Package author |
 | `license` | no | License identifier (e.g., "MIT") |
 | `repository` | no | Source repository URL |
 | `platforms` | no | Supported platforms (empty = all) |
 
 ### Variable Block
 
-Variables allow users to customize plugin behavior at installation time.
+Variables allow users to customize package behavior at installation time.
 
 ```hcl
 variable "python_version" {
@@ -89,7 +89,7 @@ variable "python_version" {
 
 ### file()
 
-Reads the contents of a file relative to the plugin directory.
+Reads the contents of a file relative to the package directory.
 
 ```hcl
 content = file("skills/my-skill.md")
@@ -124,15 +124,15 @@ These variables are available in templates rendered via `templatefile()`:
 | Variable | Description |
 |----------|-------------|
 | `{{ .ComponentDir }}` | Absolute path to the installed component directory |
-| `{{ .PluginName }}` | Name of the plugin being installed |
-| `{{ .PluginVersion }}` | Version of the plugin |
+| `{{ .PackageName }}` | Name of the package being installed |
+| `{{ .PackageVersion }}` | Version of the package |
 | `{{ .ProjectRoot }}` | Absolute path to the project root |
 | `{{ .Platform }}` | Target platform (e.g., `claude-code`) |
 
 ### Template Example
 
 ```markdown
-# Setup for {{ .PluginName }}
+# Setup for {{ .PackageName }}
 
 Install dependencies:
 
@@ -141,7 +141,7 @@ cd {{ .ComponentDir }}
 pip install -r requirements.txt
 ```
 
-This skill is part of {{ .PluginName }} v{{ .PluginVersion }}.
+This skill is part of {{ .PackageName }} v{{ .PackageVersion }}.
 ```
 
 ## Platform Resource Mapping
@@ -152,32 +152,24 @@ Each resource type maps to different locations depending on the target platform:
 
 | Platform | Location |
 |----------|----------|
-| Claude Code | `.claude/skills/{plugin}-{name}/SKILL.md` |
-| GitHub Copilot | `.github/skills/{plugin}-{name}/SKILL.md` |
+| Claude Code | `.claude/skills/{pkg}-{name}/SKILL.md` |
+| GitHub Copilot | `.github/skills/{pkg}-{name}/SKILL.md` |
 | Cursor | Not supported |
 
 ### Commands
 
 | Platform | Location |
 |----------|----------|
-| Claude Code | `.claude/commands/{plugin}-{name}.md` |
-| Cursor | `.cursor/commands/{plugin}-{name}.md` |
-| GitHub Copilot | Not supported (use prompts) |
+| Claude Code | `.claude/commands/{pkg}-{name}.md` |
+| Cursor | `.cursor/commands/{pkg}-{name}.md` |
+| GitHub Copilot | `.github/prompts/{pkg}-{name}.prompt.md` |
 
-### Prompts
-
-| Platform | Location |
-|----------|----------|
-| GitHub Copilot | `.github/prompts/{plugin}-{name}.prompt.md` |
-| Claude Code | Not supported (use commands) |
-| Cursor | Not supported |
-
-### Agents/Subagents
+### Agents
 
 | Platform | Location |
 |----------|----------|
-| Claude Code | `.claude/agents/{plugin}-{name}.md` |
-| GitHub Copilot | `.github/agents/{plugin}-{name}.agent.md` |
+| Claude Code | `.claude/agents/{pkg}-{name}.md` |
+| GitHub Copilot | `.github/agents/{pkg}-{name}.agent.md` |
 | Cursor | Not supported |
 
 ### Rules (Merged)
@@ -192,13 +184,13 @@ Content merged into a single file with markers.
 
 ### Rules (Standalone)
 
-Individual rule files per plugin.
+Individual rule files per package.
 
 | Platform | Location |
 |----------|----------|
-| Claude Code | `.claude/rules/{plugin}-{name}.md` |
-| Cursor | `.cursor/rules/{plugin}-{name}.mdc` |
-| GitHub Copilot | `.github/instructions/{plugin}-{name}.instructions.md` |
+| Claude Code | `.claude/rules/{pkg}-{name}.md` |
+| Cursor | `.cursor/rules/{pkg}-{name}.mdc` |
+| GitHub Copilot | `.github/instructions/{pkg}-{name}.instructions.md` |
 
 ### MCP Servers
 
@@ -208,35 +200,17 @@ Individual rule files per plugin.
 | Cursor | `.cursor/mcp.json` |
 | GitHub Copilot | `.vscode/mcp.json` |
 
-## Resource Types by Platform
+## Universal Resource Types
 
-See [resources.md](resources.md) for complete documentation of all resource types.
+All resources use universal block types that translate to the correct platform format at install time. See [RESOURCES.md](RESOURCES.md) for complete documentation.
 
-### Claude Code Resources
-
-- `claude_skill` - Skills with specialized knowledge
-- `claude_command` - User-invokable commands (`/{name}`)
-- `claude_subagent` - Specialized agents
-- `claude_rule` - Rules merged into CLAUDE.md
-- `claude_rules` - Standalone rule files
-- `claude_settings` - Settings merged into settings.json
-- `claude_mcp_server` - MCP server configurations
-
-### Cursor Resources
-
-- `cursor_rule` - Rules merged into AGENTS.md
-- `cursor_rules` - Standalone rule files
-- `cursor_command` - User-invokable commands
-- `cursor_mcp_server` - MCP server configurations
-
-### GitHub Copilot Resources
-
-- `copilot_instruction` - Instructions merged into copilot-instructions.md
-- `copilot_instructions` - Standalone instruction files
-- `copilot_prompt` - User-invokable prompts
-- `copilot_agent` - Specialized agents
-- `copilot_skill` - Skills with specialized knowledge
-- `copilot_mcp_server` - MCP server configurations
+- `skill` - Specialized knowledge/capabilities (Claude Code, GitHub Copilot)
+- `command` - User-invokable commands (all platforms)
+- `agent` - Specialized agent behaviors (Claude Code, GitHub Copilot)
+- `rule` - Rules merged into agent file (all platforms)
+- `rules` - Standalone rule files (all platforms)
+- `settings` - Platform settings/permissions (Claude Code only)
+- `mcp_server` - MCP server configurations (all platforms)
 
 ## File and Template File Blocks
 
@@ -247,7 +221,7 @@ Resources can include additional files:
 Copies a static file alongside the resource.
 
 ```hcl
-claude_skill "data-validation" {
+skill "data-validation" {
   description = "Validates JSON data against schemas"
   content     = file("skills/data-validation.md")
 
@@ -263,18 +237,12 @@ claude_skill "data-validation" {
 }
 ```
 
-| Attribute | Required | Description |
-|-----------|----------|-------------|
-| `src` | yes | Source path relative to plugin root |
-| `dest` | no | Destination filename (defaults to basename) |
-| `chmod` | no | File permissions (e.g., "755") |
-
 ### template_file Block
 
 Renders a template and copies the result.
 
 ```hcl
-claude_command "setup" {
+command "setup" {
   description = "Project setup"
   content     = file("commands/setup.md")
 
@@ -288,70 +256,53 @@ claude_command "setup" {
 }
 ```
 
-| Attribute | Required | Description |
-|-----------|----------|-------------|
-| `src` | yes | Source template path |
-| `dest` | no | Destination filename |
-| `chmod` | no | File permissions |
-| `vars` | no | Additional template variables |
+## Cross-Platform Packages
 
-## Cross-Platform Plugins
-
-Create plugins that work across multiple platforms by defining resources for each:
+With universal resource types, cross-platform packages are simple — define once, use everywhere:
 
 ```hcl
-package {
+meta {
   name      = "code-review-tools"
   version   = "1.0.0"
-  platforms = ["claude-code", "github-copilot", "cursor"]
 }
 
-# Shared content - write once, use everywhere
-claude_skill "code-review" {
+# One skill definition works on Claude Code and GitHub Copilot.
+# Cursor doesn't support skills — automatically skipped with a log warning.
+skill "code-review" {
   description = "Thorough code review capability"
   content     = file("content/code-review.md")
 }
 
-copilot_skill "code-review" {
-  description = "Thorough code review capability"
-  content     = file("content/code-review.md")  # Same file!
-}
-
-# Platform-specific commands using templates
-claude_command "review" {
+# One command definition works on all platforms.
+# Translates to: Claude command, Copilot prompt, Cursor command.
+command "review" {
   description = "Run code review"
-  content     = templatefile("commands/review.md.tmpl", {
-    tool_name = "Read"
-  })
-}
+  content     = file("commands/review.md")
 
-copilot_prompt "review" {
-  description = "Run code review"
-  content     = templatefile("commands/review.md.tmpl", {
-    tool_name = "fetch"
-  })
-}
+  # Platform-specific overrides where needed
+  claude {
+    allowed_tools = ["Read", "Grep"]
+  }
 
-cursor_command "review" {
-  description = "Run code review"
-  content     = templatefile("commands/review.md.tmpl", {
-    tool_name = "read_file"
-  })
+  copilot {
+    agent = "edit"
+    tools = ["terminal"]
+  }
 }
 ```
 
-## Publishing Plugins
+## Publishing Packages
 
 ### Creating a Tarball
 
 ```bash
-cd my-plugin
-tar -czvf ../my-plugin-1.0.0.tar.gz .
+cd my-package
+tar -czvf ../my-package-1.0.0.tar.gz .
 ```
 
 ### Publishing to Git
 
-Simply push your plugin to a Git repository:
+Simply push your package to a Git repository:
 
 ```bash
 git tag v1.0.0
@@ -361,7 +312,7 @@ git push origin v1.0.0
 Users can install directly:
 
 ```bash
-dex sync git+https://github.com/owner/my-plugin.git@v1.0.0
+dex sync git+https://github.com/owner/my-package.git@v1.0.0
 ```
 
 ## Best Practices
@@ -371,4 +322,4 @@ dex sync git+https://github.com/owner/my-plugin.git@v1.0.0
 3. **Share content** - Use `file()` to share content across platforms
 4. **Use templates** - Use `templatefile()` for platform-specific variations
 5. **Pin dependencies** - Use specific version ranges for stability
-6. **Test on all platforms** - Verify your plugin works on each target platform
+6. **Test on all platforms** - Verify your package works on each target platform

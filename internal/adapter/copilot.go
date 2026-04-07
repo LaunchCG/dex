@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -53,36 +54,72 @@ func (a *CopilotAdapter) RulesDir(root string) string {
 }
 
 // PlanInstallation dispatches to the appropriate planner based on resource type.
-func (a *CopilotAdapter) PlanInstallation(res resource.Resource, pkg *config.PackageConfig, pluginDir, projectRoot string, ctx *InstallContext) (*Plan, error) {
+func (a *CopilotAdapter) PlanInstallation(res resource.Resource, pkg *config.PackageConfig, pkgDir, projectRoot string, ctx *InstallContext) (*Plan, error) {
 	switch r := res.(type) {
-	// Unified MCP server (translate to Copilot-specific)
+	// Universal resource types (translate to Copilot-specific)
 	case *resource.MCPServer:
-		copilotServer := resource.TranslateToCopilotMCPServer(r)
-		if copilotServer == nil {
-			// Server is disabled for Copilot platform
+		translated := resource.TranslateToCopilotMCPServer(r)
+		if translated == nil {
+			slog.Warn("resource skipped: disabled for platform", "resource", r.Name, "type", "mcp_server", "platform", "github-copilot")
 			return &Plan{}, nil
 		}
-		return a.planMCPServer(copilotServer, pkg, pluginDir, projectRoot, ctx)
+		return a.planMCPServer(translated, pkg, pkgDir, projectRoot, ctx)
+	case *resource.Skill:
+		translated := resource.TranslateToCopilotSkill(r)
+		if translated == nil {
+			slog.Warn("resource skipped: disabled for platform", "resource", r.Name, "type", "skill", "platform", "github-copilot")
+			return &Plan{}, nil
+		}
+		return a.planSkill(translated, pkg, pkgDir, projectRoot, ctx)
+	case *resource.Command:
+		translated := resource.TranslateToCopilotPrompt(r)
+		if translated == nil {
+			slog.Warn("resource skipped: disabled for platform", "resource", r.Name, "type", "command", "platform", "github-copilot")
+			return &Plan{}, nil
+		}
+		return a.planPrompt(translated, pkg, pkgDir, projectRoot, ctx)
+	case *resource.Agent:
+		translated := resource.TranslateToCopilotAgent(r)
+		if translated == nil {
+			slog.Warn("resource skipped: disabled for platform", "resource", r.Name, "type", "agent", "platform", "github-copilot")
+			return &Plan{}, nil
+		}
+		return a.planAgent(translated, pkg, pkgDir, projectRoot, ctx)
+	case *resource.Rule:
+		translated := resource.TranslateToCopilotInstruction(r)
+		if translated == nil {
+			slog.Warn("resource skipped: disabled for platform", "resource", r.Name, "type", "rule", "platform", "github-copilot")
+			return &Plan{}, nil
+		}
+		return a.planInstruction(translated, pkg, pkgDir, projectRoot, ctx)
+	case *resource.Rules:
+		translated := resource.TranslateToCopilotInstructions(r)
+		if translated == nil {
+			slog.Warn("resource skipped: disabled for platform", "resource", r.Name, "type", "rules", "platform", "github-copilot")
+			return &Plan{}, nil
+		}
+		return a.planInstructions(translated, pkg, pkgDir, projectRoot, ctx)
+	case *resource.Settings:
+		slog.Warn("resource skipped: not supported by platform", "resource", r.Name, "type", "settings", "platform", "github-copilot")
+		return &Plan{}, nil
 
-	// Merged resources
+	// Platform-specific types (used internally by translators)
 	case *resource.CopilotInstruction:
-		return a.planInstruction(r, pkg, pluginDir, projectRoot, ctx)
+		return a.planInstruction(r, pkg, pkgDir, projectRoot, ctx)
 	case *resource.CopilotMCPServer:
-		return a.planMCPServer(r, pkg, pluginDir, projectRoot, ctx)
-
-	// Standalone resources
+		return a.planMCPServer(r, pkg, pkgDir, projectRoot, ctx)
 	case *resource.CopilotInstructions:
-		return a.planInstructions(r, pkg, pluginDir, projectRoot, ctx)
+		return a.planInstructions(r, pkg, pkgDir, projectRoot, ctx)
 	case *resource.CopilotPrompt:
-		return a.planPrompt(r, pkg, pluginDir, projectRoot, ctx)
+		return a.planPrompt(r, pkg, pkgDir, projectRoot, ctx)
 	case *resource.CopilotAgent:
-		return a.planAgent(r, pkg, pluginDir, projectRoot, ctx)
+		return a.planAgent(r, pkg, pkgDir, projectRoot, ctx)
 	case *resource.CopilotSkill:
-		return a.planSkill(r, pkg, pluginDir, projectRoot, ctx)
+		return a.planSkill(r, pkg, pkgDir, projectRoot, ctx)
 
-	// Universal resources
+	// Universal file/directory resources
 	case *resource.File:
-		return PlanUniversalFile(r, pkg, pluginDir, projectRoot, "github-copilot", ctx)
+		return PlanUniversalFile(r, pkg, pkgDir, projectRoot, "github-copilot", ctx)
 	case *resource.Directory:
 		return PlanUniversalDirectory(r, pkg, ctx)
 
@@ -111,7 +148,7 @@ func (a *CopilotAdapter) GenerateFrontmatter(res resource.Resource, pkg *config.
 // Format: {"servers": {"name": {"command": "...", "args": [...], "env": {...}}}}
 // Note: This method signature accepts ClaudeMCPServer for interface compatibility,
 // but Copilot resources should use planMCPServer directly.
-func (a *CopilotAdapter) MergeMCPConfig(existing map[string]any, pluginName string, servers []*resource.ClaudeMCPServer) map[string]any {
+func (a *CopilotAdapter) MergeMCPConfig(existing map[string]any, pkgName string, servers []*resource.ClaudeMCPServer) map[string]any {
 	// This method is kept for interface compatibility but Copilot uses its own server type
 	// See MergeCopilotMCPConfig for the actual implementation
 	return existing
@@ -120,7 +157,7 @@ func (a *CopilotAdapter) MergeMCPConfig(existing map[string]any, pluginName stri
 // MergeCopilotMCPConfig merges Copilot MCP servers into .vscode/mcp.json format.
 // Format: {"servers": {"name": {"type": "...", "command": "...", "args": [...], "env": {...}}}}
 // When servers declare inputs, they are collected into a top-level "inputs" array.
-func (a *CopilotAdapter) MergeCopilotMCPConfig(existing map[string]any, pluginName string, servers []*resource.CopilotMCPServer) map[string]any {
+func (a *CopilotAdapter) MergeCopilotMCPConfig(existing map[string]any, pkgName string, servers []*resource.CopilotMCPServer) map[string]any {
 	if existing == nil {
 		existing = make(map[string]any)
 	}
@@ -232,8 +269,8 @@ func (a *CopilotAdapter) MergeSettingsConfig(existing map[string]any, settings *
 
 // planInstruction creates an installation plan for a Copilot instruction (singular).
 // Instructions are merged into .github/copilot-instructions.md with markers.
-func (a *CopilotAdapter) planInstruction(inst *resource.CopilotInstruction, pkg *config.PackageConfig, pluginDir, root string, ctx *InstallContext) (*Plan, error) {
-	plan := NewPlan(pkg.Package.Name)
+func (a *CopilotAdapter) planInstruction(inst *resource.CopilotInstruction, pkg *config.PackageConfig, pkgDir, root string, ctx *InstallContext) (*Plan, error) {
+	plan := NewPlan(pkg.Meta.Name)
 
 	// Instructions are merged into .github/copilot-instructions.md via AgentFileContent
 	plan.AgentFileContent = inst.Content
@@ -244,13 +281,13 @@ func (a *CopilotAdapter) planInstruction(inst *resource.CopilotInstruction, pkg 
 
 // planMCPServer creates an installation plan for a Copilot MCP server.
 // MCP servers are merged into .vscode/mcp.json with optional namespacing
-func (a *CopilotAdapter) planMCPServer(server *resource.CopilotMCPServer, pkg *config.PackageConfig, pluginDir, root string, ctx *InstallContext) (*Plan, error) {
-	plan := NewPlan(pkg.Package.Name)
+func (a *CopilotAdapter) planMCPServer(server *resource.CopilotMCPServer, pkg *config.PackageConfig, pkgDir, root string, ctx *InstallContext) (*Plan, error) {
+	plan := NewPlan(pkg.Meta.Name)
 
 	// Apply namespacing to server name if requested
 	serverName := server.Name
 	if ctx != nil && ctx.Namespace {
-		serverName = fmt.Sprintf("%s-%s", pkg.Package.Name, server.Name)
+		serverName = fmt.Sprintf("%s-%s", pkg.Meta.Name, server.Name)
 	}
 
 	// Create a copy of the server with the potentially namespaced name
@@ -258,7 +295,7 @@ func (a *CopilotAdapter) planMCPServer(server *resource.CopilotMCPServer, pkg *c
 	namespacedServer.Name = serverName
 
 	// MCP servers are merged via MCPEntries
-	plan.MCPEntries = a.MergeCopilotMCPConfig(nil, pkg.Package.Name, []*resource.CopilotMCPServer{&namespacedServer})
+	plan.MCPEntries = a.MergeCopilotMCPConfig(nil, pkg.Meta.Name, []*resource.CopilotMCPServer{&namespacedServer})
 
 	// Set Copilot-specific MCP config path and key
 	plan.MCPPath = filepath.Join(".vscode", "mcp.json")
@@ -268,9 +305,9 @@ func (a *CopilotAdapter) planMCPServer(server *resource.CopilotMCPServer, pkg *c
 }
 
 // planInstructions creates an installation plan for Copilot instructions (plural).
-// Instructions files are installed to .github/instructions/{{plugin}-}{name}.instructions.md (namespaced or not)
-func (a *CopilotAdapter) planInstructions(inst *resource.CopilotInstructions, pkg *config.PackageConfig, pluginDir, root string, ctx *InstallContext) (*Plan, error) {
-	plan := NewPlan(pkg.Package.Name)
+// Instructions files are installed to .github/instructions/{{pkg}-}{name}.instructions.md (namespaced or not)
+func (a *CopilotAdapter) planInstructions(inst *resource.CopilotInstructions, pkg *config.PackageConfig, pkgDir, root string, ctx *InstallContext) (*Plan, error) {
+	plan := NewPlan(pkg.Meta.Name)
 
 	// Create instructions directory
 	instructionsDir := filepath.Join(".github", "instructions")
@@ -288,7 +325,7 @@ func (a *CopilotAdapter) planInstructions(inst *resource.CopilotInstructions, pk
 	// Add instructions file with optional namespacing
 	var fileName string
 	if ctx != nil && ctx.Namespace {
-		fileName = fmt.Sprintf("%s-%s.instructions.md", pkg.Package.Name, inst.Name)
+		fileName = fmt.Sprintf("%s-%s.instructions.md", pkg.Meta.Name, inst.Name)
 	} else {
 		fileName = fmt.Sprintf("%s.instructions.md", inst.Name)
 	}
@@ -299,9 +336,9 @@ func (a *CopilotAdapter) planInstructions(inst *resource.CopilotInstructions, pk
 }
 
 // planPrompt creates an installation plan for a Copilot prompt.
-// Prompts are installed to .github/prompts/{{plugin}-}{name}.prompt.md (namespaced or not)
-func (a *CopilotAdapter) planPrompt(prompt *resource.CopilotPrompt, pkg *config.PackageConfig, pluginDir, root string, ctx *InstallContext) (*Plan, error) {
-	plan := NewPlan(pkg.Package.Name)
+// Prompts are installed to .github/prompts/{{pkg}-}{name}.prompt.md (namespaced or not)
+func (a *CopilotAdapter) planPrompt(prompt *resource.CopilotPrompt, pkg *config.PackageConfig, pkgDir, root string, ctx *InstallContext) (*Plan, error) {
+	plan := NewPlan(pkg.Meta.Name)
 
 	// Create prompts directory
 	promptsDir := filepath.Join(".github", "prompts")
@@ -319,7 +356,7 @@ func (a *CopilotAdapter) planPrompt(prompt *resource.CopilotPrompt, pkg *config.
 	// Add prompt file with optional namespacing
 	var fileName string
 	if ctx != nil && ctx.Namespace {
-		fileName = fmt.Sprintf("%s-%s.prompt.md", pkg.Package.Name, prompt.Name)
+		fileName = fmt.Sprintf("%s-%s.prompt.md", pkg.Meta.Name, prompt.Name)
 	} else {
 		fileName = fmt.Sprintf("%s.prompt.md", prompt.Name)
 	}
@@ -330,9 +367,9 @@ func (a *CopilotAdapter) planPrompt(prompt *resource.CopilotPrompt, pkg *config.
 }
 
 // planAgent creates an installation plan for a Copilot agent.
-// Agents are installed to .github/agents/{{plugin}-}{name}.agent.md (namespaced or not)
-func (a *CopilotAdapter) planAgent(agent *resource.CopilotAgent, pkg *config.PackageConfig, pluginDir, root string, ctx *InstallContext) (*Plan, error) {
-	plan := NewPlan(pkg.Package.Name)
+// Agents are installed to .github/agents/{{pkg}-}{name}.agent.md (namespaced or not)
+func (a *CopilotAdapter) planAgent(agent *resource.CopilotAgent, pkg *config.PackageConfig, pkgDir, root string, ctx *InstallContext) (*Plan, error) {
+	plan := NewPlan(pkg.Meta.Name)
 
 	// Create agents directory
 	agentsDir := filepath.Join(".github", "agents")
@@ -350,7 +387,7 @@ func (a *CopilotAdapter) planAgent(agent *resource.CopilotAgent, pkg *config.Pac
 	// Add agent file with optional namespacing
 	var fileName string
 	if ctx != nil && ctx.Namespace {
-		fileName = fmt.Sprintf("%s-%s.agent.md", pkg.Package.Name, agent.Name)
+		fileName = fmt.Sprintf("%s-%s.agent.md", pkg.Meta.Name, agent.Name)
 	} else {
 		fileName = fmt.Sprintf("%s.agent.md", agent.Name)
 	}
@@ -361,14 +398,14 @@ func (a *CopilotAdapter) planAgent(agent *resource.CopilotAgent, pkg *config.Pac
 }
 
 // planSkill creates an installation plan for a Copilot skill.
-// Skills are installed to .github/skills/{{plugin}-}{name}/SKILL.md (namespaced or not)
-func (a *CopilotAdapter) planSkill(skill *resource.CopilotSkill, pkg *config.PackageConfig, pluginDir, root string, ctx *InstallContext) (*Plan, error) {
-	plan := NewPlan(pkg.Package.Name)
+// Skills are installed to .github/skills/{{pkg}-}{name}/SKILL.md (namespaced or not)
+func (a *CopilotAdapter) planSkill(skill *resource.CopilotSkill, pkg *config.PackageConfig, pkgDir, root string, ctx *InstallContext) (*Plan, error) {
+	plan := NewPlan(pkg.Meta.Name)
 
 	// Create skill directory with optional namespacing
 	var skillDirName string
 	if ctx != nil && ctx.Namespace {
-		skillDirName = fmt.Sprintf("%s-%s", pkg.Package.Name, skill.Name)
+		skillDirName = fmt.Sprintf("%s-%s", pkg.Meta.Name, skill.Name)
 	} else {
 		skillDirName = skill.Name
 	}
@@ -389,12 +426,12 @@ func (a *CopilotAdapter) planSkill(skill *resource.CopilotSkill, pkg *config.Pac
 	plan.AddFile(skillFile, content, "")
 
 	// Copy nested files
-	if err := a.planFiles(plan, skill.GetFiles(), pluginDir, skillDir); err != nil {
+	if err := a.planFiles(plan, skill.GetFiles(), pkgDir, skillDir); err != nil {
 		return nil, fmt.Errorf("planning skill files: %w", err)
 	}
 
 	// Handle template files
-	if err := a.planTemplateFiles(plan, skill.GetTemplateFiles(), pkg, pluginDir, skillDir, root); err != nil {
+	if err := a.planTemplateFiles(plan, skill.GetTemplateFiles(), pkg, pkgDir, skillDir, root); err != nil {
 		return nil, fmt.Errorf("planning skill template files: %w", err)
 	}
 
@@ -402,10 +439,10 @@ func (a *CopilotAdapter) planSkill(skill *resource.CopilotSkill, pkg *config.Pac
 }
 
 // planFiles adds file copy operations to the plan.
-func (a *CopilotAdapter) planFiles(plan *Plan, files []resource.FileBlock, pluginDir, destDir string) error {
+func (a *CopilotAdapter) planFiles(plan *Plan, files []resource.FileBlock, pkgDir, destDir string) error {
 	for _, file := range files {
 		// Read source file
-		srcPath := filepath.Join(pluginDir, file.Src)
+		srcPath := filepath.Join(pkgDir, file.Src)
 		content, err := os.ReadFile(srcPath)
 		if err != nil {
 			return fmt.Errorf("reading file %s: %w", file.Src, err)
@@ -424,11 +461,11 @@ func (a *CopilotAdapter) planFiles(plan *Plan, files []resource.FileBlock, plugi
 }
 
 // planTemplateFiles adds template file operations to the plan.
-func (a *CopilotAdapter) planTemplateFiles(plan *Plan, files []resource.TemplateFileBlock, pkg *config.PackageConfig, pluginDir, destDir, projectRoot string) error {
+func (a *CopilotAdapter) planTemplateFiles(plan *Plan, files []resource.TemplateFileBlock, pkg *config.PackageConfig, pkgDir, destDir, projectRoot string) error {
 	// Create template context
-	ctx := template.NewContext(pkg.Package.Name, pkg.Package.Version, projectRoot, "github-copilot")
+	ctx := template.NewContext(pkg.Meta.Name, pkg.Meta.Version, projectRoot, "github-copilot")
 	ctx.WithComponentDir(filepath.Join(projectRoot, destDir))
-	engine := template.NewEngine(pluginDir, ctx)
+	engine := template.NewEngine(pkgDir, ctx)
 
 	for _, file := range files {
 		// Convert file.Vars to map[string]any

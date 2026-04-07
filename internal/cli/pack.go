@@ -12,14 +12,14 @@ import (
 
 var packCmd = &cobra.Command{
 	Use:   "pack [directory]",
-	Short: "Create a distributable tarball from a plugin directory",
-	Long: `Create a distributable tarball from a plugin directory.
+	Short: "Create a distributable tarball from a package directory",
+	Long: `Create a distributable tarball from a package directory.
 
 The directory must contain a valid package.hcl file. The tarball will be
 created with the naming convention {name}-{version}.tar.gz.
 
 The tarball includes a single top-level directory ({name}-{version}/)
-containing all plugin files except excluded patterns like .git,
+containing all package files except excluded patterns like .git,
 node_modules, __pycache__, .env, etc.
 
 Examples:
@@ -27,13 +27,13 @@ Examples:
   dex pack
 
   # Pack a specific directory
-  dex pack /path/to/plugin
+  dex pack /path/to/package
 
   # Pack with custom output path
-  dex pack -o my-plugin.tar.gz
+  dex pack -o my-package.tar.gz
 
   # Pack a specific directory with custom output
-  dex pack /path/to/plugin -o /tmp/my-plugin.tar.gz`,
+  dex pack /path/to/package -o /tmp/my-package.tar.gz`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runPack,
 }
@@ -57,7 +57,7 @@ func runPack(cmd *cobra.Command, args []string) error {
 	cyan := color.New(color.FgCyan).SprintFunc()
 	green := color.New(color.FgGreen).SprintFunc()
 
-	fmt.Printf("%s Packing plugin from %s\n", cyan("→"), dir)
+	fmt.Printf("%s Packing package from %s\n", cyan("→"), dir)
 
 	// Create packer
 	p, err := packer.New(dir)

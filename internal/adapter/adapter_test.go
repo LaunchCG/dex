@@ -66,7 +66,7 @@ func TestClaudeAdapter_PlanSkill(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -75,7 +75,7 @@ func TestClaudeAdapter_PlanSkill(t *testing.T) {
 	plan, err := adapter.PlanInstallation(skill, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: true})
 	require.NoError(t, err)
 	assert.NotNil(t, plan)
-	assert.Equal(t, "my-plugin", plan.PluginName)
+	assert.Equal(t, "my-plugin", plan.PackageName)
 
 	// Should create skill directory
 	assert.Equal(t, []string{".claude/skills/my-plugin-test-skill"}, getDirPaths(plan))
@@ -103,7 +103,7 @@ func TestClaudeAdapter_PlanCommand(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -142,7 +142,7 @@ func TestClaudeAdapter_PlanSubagent(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -181,7 +181,7 @@ func TestClaudeAdapter_PlanRule(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -207,7 +207,7 @@ func TestClaudeAdapter_PlanRules(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -260,7 +260,7 @@ func TestClaudeAdapter_PlanRules_WithFiles(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -306,7 +306,7 @@ func TestClaudeAdapter_PlanSettings(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -333,7 +333,7 @@ func TestClaudeAdapter_PlanMCPServer(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -374,7 +374,7 @@ func TestClaudeAdapter_PlanInstallation_UnsupportedType(t *testing.T) {
 
 	unknown := &mockUnknownResource{name: "unknown"}
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -398,7 +398,7 @@ func TestClaudeAdapter_GenerateFrontmatter_Skill(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -618,7 +618,7 @@ func TestClaudeAdapter_MergeSettingsConfig_Nil(t *testing.T) {
 
 func TestMergePlans(t *testing.T) {
 	plan1 := &Plan{
-		PluginName: "plugin1",
+		PackageName: "plugin1",
 		Directories: []DirectoryCreate{
 			{Path: "dir1", Parents: true},
 			{Path: "dir2", Parents: true},
@@ -636,7 +636,7 @@ func TestMergePlans(t *testing.T) {
 	}
 
 	plan2 := &Plan{
-		PluginName: "plugin1",
+		PackageName: "plugin1",
 		Directories: []DirectoryCreate{
 			{Path: "dir2", Parents: true}, // dir2 is duplicate
 			{Path: "dir3", Parents: true},
@@ -655,7 +655,7 @@ func TestMergePlans(t *testing.T) {
 
 	merged := MergePlans(plan1, plan2)
 
-	assert.Equal(t, "plugin1", merged.PluginName)
+	assert.Equal(t, "plugin1", merged.PackageName)
 
 	// Directories should be deduplicated by path
 	assert.Equal(t, []DirectoryCreate{
@@ -690,7 +690,7 @@ func TestMergePlans_Empty(t *testing.T) {
 	merged := MergePlans()
 
 	assert.NotNil(t, merged)
-	assert.Empty(t, merged.PluginName)
+	assert.Empty(t, merged.PackageName)
 	assert.Empty(t, merged.Directories)
 	assert.Empty(t, merged.Files)
 	assert.Empty(t, merged.MCPEntries)
@@ -700,7 +700,7 @@ func TestMergePlans_Empty(t *testing.T) {
 
 func TestMergePlans_WithNil(t *testing.T) {
 	plan1 := &Plan{
-		PluginName: "plugin1",
+		PackageName: "plugin1",
 		Files: []FileWrite{
 			{Path: "file.md", Content: "content"},
 		},
@@ -708,14 +708,14 @@ func TestMergePlans_WithNil(t *testing.T) {
 
 	merged := MergePlans(plan1, nil)
 
-	assert.Equal(t, "plugin1", merged.PluginName)
+	assert.Equal(t, "plugin1", merged.PackageName)
 	assert.Len(t, merged.Files, 1)
 }
 
 func TestMergePlans_MCPDeepMerge(t *testing.T) {
 	// Test that mcpServers are deep merged, not overwritten
 	plan1 := &Plan{
-		PluginName: "plugin1",
+		PackageName: "plugin1",
 		MCPEntries: map[string]any{
 			"mcpServers": map[string]any{
 				"server1": map[string]any{
@@ -727,7 +727,7 @@ func TestMergePlans_MCPDeepMerge(t *testing.T) {
 	}
 
 	plan2 := &Plan{
-		PluginName: "plugin1",
+		PackageName: "plugin1",
 		MCPEntries: map[string]any{
 			"mcpServers": map[string]any{
 				"server2": map[string]any{
@@ -739,7 +739,7 @@ func TestMergePlans_MCPDeepMerge(t *testing.T) {
 	}
 
 	plan3 := &Plan{
-		PluginName: "plugin1",
+		PackageName: "plugin1",
 		MCPEntries: map[string]any{
 			"mcpServers": map[string]any{
 				"server3": map[string]any{
@@ -775,14 +775,14 @@ func TestMergePlans_MCPDeepMerge(t *testing.T) {
 func TestMergePlans_SettingsArrayMerge(t *testing.T) {
 	// Test that settings arrays are appended, not overwritten
 	plan1 := &Plan{
-		PluginName: "plugin1",
+		PackageName: "plugin1",
 		SettingsEntries: map[string]any{
 			"allow": []string{"Bash(*)", "Read(*)"},
 		},
 	}
 
 	plan2 := &Plan{
-		PluginName: "plugin1",
+		PackageName: "plugin1",
 		SettingsEntries: map[string]any{
 			"allow": []string{"Write(*)"},
 			"deny":  []string{"Delete(*)"},
@@ -802,12 +802,12 @@ func TestMergePlans_SettingsArrayMerge(t *testing.T) {
 func TestMergePlans_MCPWithNilInitialServers(t *testing.T) {
 	// Test merging when first plan has no mcpServers key
 	plan1 := &Plan{
-		PluginName: "plugin1",
-		MCPEntries: map[string]any{}, // No mcpServers key
+		PackageName: "plugin1",
+		MCPEntries:  map[string]any{}, // No mcpServers key
 	}
 
 	plan2 := &Plan{
-		PluginName: "plugin1",
+		PackageName: "plugin1",
 		MCPEntries: map[string]any{
 			"mcpServers": map[string]any{
 				"server1": map[string]any{
@@ -832,7 +832,7 @@ func TestMergePlans_MCPWithNilInitialServers(t *testing.T) {
 func TestNewPlan(t *testing.T) {
 	plan := NewPlan("my-plugin")
 
-	assert.Equal(t, "my-plugin", plan.PluginName)
+	assert.Equal(t, "my-plugin", plan.PackageName)
 	assert.NotNil(t, plan.MCPEntries)
 	assert.NotNil(t, plan.SettingsEntries)
 	assert.Empty(t, plan.Directories)
@@ -916,7 +916,7 @@ func TestClaudeAdapter_PlanSkill_WithFiles(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -949,11 +949,11 @@ func TestClaudeAdapter_PlanSkill_ContentNotTemplated(t *testing.T) {
 	skill := &resource.ClaudeSkill{
 		Name:        "dynamic",
 		Description: "A dynamic skill",
-		Content:     "Plugin: {{ .PluginName }}, JSX: {{ borderColor: dynamic }}",
+		Content:     "Plugin: {{ .PackageName }}, JSX: {{ borderColor: dynamic }}",
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "2.0.0",
 		},
@@ -968,14 +968,14 @@ func TestClaudeAdapter_PlanSkill_ContentNotTemplated(t *testing.T) {
 name: dynamic
 description: A dynamic skill
 ---
-Plugin: {{ .PluginName }}, JSX: {{ borderColor: dynamic }}`
+Plugin: {{ .PackageName }}, JSX: {{ borderColor: dynamic }}`
 	assert.Equal(t, expectedContent, plan.Files[0].Content)
 }
 
 func TestClaudeAdapter_PlanSkill_WithTemplateFiles(t *testing.T) {
 	// Create a temp directory with a template file
 	tmpDir := t.TempDir()
-	templateContent := "Config for {{ .PluginName }} v{{ .PluginVersion }}\nEnv: {{ .environment }}"
+	templateContent := "Config for {{ .PackageName }} v{{ .PackageVersion }}\nEnv: {{ .environment }}"
 	err := os.WriteFile(filepath.Join(tmpDir, "config.yaml.tmpl"), []byte(templateContent), 0644)
 	require.NoError(t, err)
 
@@ -995,7 +995,7 @@ func TestClaudeAdapter_PlanSkill_WithTemplateFiles(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -1028,11 +1028,11 @@ func TestClaudeAdapter_PlanRule_ContentNotTemplated(t *testing.T) {
 	rule := &resource.ClaudeRule{
 		Name:        "dynamic-rule",
 		Description: "A dynamic rule",
-		Content:     "This rule is from {{ .PluginName }} version {{ .PluginVersion }}",
+		Content:     "This rule is from {{ .PackageName }} version {{ .PackageVersion }}",
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "rules-plugin",
 			Version: "3.0.0",
 		},
@@ -1042,7 +1042,7 @@ func TestClaudeAdapter_PlanRule_ContentNotTemplated(t *testing.T) {
 	require.NoError(t, err)
 
 	// Content should be passed through as-is, not templated
-	assert.Equal(t, "This rule is from {{ .PluginName }} version {{ .PluginVersion }}", plan.AgentFileContent)
+	assert.Equal(t, "This rule is from {{ .PackageName }} version {{ .PackageVersion }}", plan.AgentFileContent)
 }
 
 func TestClaudeAdapter_GenerateFrontmatter_Subagent(t *testing.T) {
@@ -1129,7 +1129,7 @@ func TestClaudeAdapter_GenerateFrontmatter_Skill_WithHooks(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -1312,7 +1312,7 @@ func TestClaudeAdapter_PlanSkill_WithHooks(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -1364,7 +1364,7 @@ func TestClaudeAdapter_PlanSubagent_WithHooks(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},

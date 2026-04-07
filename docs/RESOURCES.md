@@ -1,32 +1,24 @@
 # Dex Resources
 
-Dex uses HCL (HashiCorp Configuration Language) to define resources that are installed into AI agent projects. This document covers all available resource types, their options, and examples.
+Dex uses HCL (HashiCorp Configuration Language) to define resources that are installed into AI agent projects. Resources are **universal** — define them once and they translate automatically to the correct format for each platform (Claude Code, GitHub Copilot, Cursor).
 
 ## Table of Contents
 
 - [HCL Functions](#hcl-functions)
 - [Template Variables](#template-variables)
 - [File Blocks](#file-blocks)
-- [Claude Code Resources](#claude-code-resources)
-  - [claude_skill](#claude_skill)
-  - [claude_command](#claude_command)
-  - [claude_subagent](#claude_subagent)
-  - [claude_rule](#claude_rule)
-  - [claude_rules](#claude_rules)
-  - [claude_settings](#claude_settings)
-  - [claude_mcp_server](#claude_mcp_server)
-- [Cursor Resources](#cursor-resources)
-  - [cursor_rule](#cursor_rule)
-  - [cursor_rules](#cursor_rules)
-  - [cursor_command](#cursor_command)
-  - [cursor_mcp_server](#cursor_mcp_server)
-- [GitHub Copilot Resources](#github-copilot-resources)
-  - [copilot_instruction](#copilot_instruction)
-  - [copilot_mcp_server](#copilot_mcp_server)
-  - [copilot_instructions](#copilot_instructions)
-  - [copilot_prompt](#copilot_prompt)
-  - [copilot_agent](#copilot_agent)
-  - [copilot_skill](#copilot_skill)
+- [Universal Resource Types](#universal-resource-types)
+  - [skill](#skill)
+  - [command](#command)
+  - [agent](#agent)
+  - [rule](#rule)
+  - [rules](#rules)
+  - [settings](#settings)
+  - [mcp_server](#mcp_server)
+  - [file](#file-resource)
+  - [directory](#directory)
+- [Platform Override Blocks](#platform-override-blocks)
+- [Platform Support Matrix](#platform-support-matrix)
 - [Package Configuration](#package-configuration)
 - [Project Configuration](#project-configuration)
 
@@ -75,25 +67,10 @@ These variables are available when rendering templates (via `templatefile()` or 
 | Variable | Description |
 |----------|-------------|
 | `{{ .ComponentDir }}` | Absolute path to the installed component directory |
-| `{{ .PluginName }}` | Name of the plugin being installed |
-| `{{ .PluginVersion }}` | Version of the plugin |
+| `{{ .PackageName }}` | Name of the package being installed |
+| `{{ .PackageVersion }}` | Version of the package |
 | `{{ .ProjectRoot }}` | Absolute path to the project root |
 | `{{ .Platform }}` | Target platform (e.g., `claude-code`) |
-
-### Example Template
-
-```markdown
-# Setup
-
-Install dependencies:
-
-```bash
-cd {{ .ComponentDir }}
-pip install -r requirements.txt
-```
-
-This skill is part of {{ .PluginName }} v{{ .PluginVersion }}.
-```
 
 ---
 
@@ -107,7 +84,7 @@ Copies a static file alongside the resource.
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `src` | string | yes | Source path relative to plugin root |
+| `src` | string | yes | Source path relative to package root |
 | `dest` | string | no | Destination filename (defaults to basename of src) |
 | `chmod` | string | no | File permissions (e.g., `"755"`, `"600"`) |
 
@@ -125,1036 +102,359 @@ Renders a template file and copies it alongside the resource.
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `src` | string | yes | Source template path relative to plugin root |
+| `src` | string | yes | Source template path relative to package root |
 | `dest` | string | no | Destination filename (defaults to basename without `.tmpl`) |
 | `chmod` | string | no | File permissions |
 | `vars` | map | no | Additional variables for this template |
 
 ```hcl
 template_file {
-  src   = "scripts/config.py.tmpl"
-  dest  = "config.py"
+  src  = "config/setup.sh.tmpl"
+  dest = "setup.sh"
+  chmod = "755"
   vars = {
-    api_endpoint = "https://api.example.com"
+    project_name = "MyProject"
   }
 }
 ```
 
 ---
 
-## Claude Code Resources
+## Universal Resource Types
 
-The following resources are available for Claude Code projects (`default_platform = "claude-code"`).
+All resources are declared using universal block types. Dex translates them to the correct platform-specific format at install time. If a resource type is not supported by the target platform, it is logged and skipped.
 
-### claude_skill
+### skill
 
-Skills provide specialized knowledge or capabilities to Claude. Each skill is installed to `.claude/skills/{plugin}-{name}/SKILL.md`.
-
-#### Attributes
+Skills provide specialized knowledge or capabilities to the AI assistant. Installed as standalone files in the platform's skills directory.
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `name` | string | yes | Block label identifying this skill |
-| `description` | string | yes | Explains when and how to use this skill |
-| `content` | string | yes | The skill's instructions/knowledge |
-| `argument_hint` | string | no | Hint shown during autocomplete (e.g., `"[filename]"`) |
-| `disable_model_invocation` | bool | no | Prevent Claude from auto-loading; user must invoke manually |
-| `user_invocable` | bool | no | Set to `false` to hide from `/` menu (default: true) |
-| `allowed_tools` | list(string) | no | Tools Claude can use without asking (e.g., `["Read", "Grep"]`) |
-| `model` | string | no | Model to use: `sonnet`, `haiku`, or `opus` |
-| `context` | string | no | Set to `"fork"` to run in isolated subagent |
-| `agent` | string | no | Subagent type when `context = "fork"` (e.g., `"Explore"`, `"Plan"`) |
-| `metadata` | map(string) | no | Additional frontmatter fields |
+| `name` | string | yes | Skill identifier (block label) |
+| `description` | string | yes | When and how to use this skill |
+| `content` | string | yes | Main body/instructions |
+| `file` | block | no | Static files to copy alongside |
+| `template_file` | block | no | Template files to render and copy |
+| `platforms` | list(string) | no | Limit to specific platforms (empty = all) |
+| `claude` | block | no | Claude-specific overrides |
+| `copilot` | block | no | Copilot-specific overrides |
+| `cursor` | block | no | Cursor-specific overrides (disabled = true only) |
 
-#### Nested Blocks
-
-- `file` - Static files to copy alongside the skill
-- `template_file` - Template files to render and copy
-
-#### Examples
-
-**Simple skill with inline content:**
+**Supported platforms:** Claude Code, GitHub Copilot. Cursor does not support skills (skipped with warning).
 
 ```hcl
-claude_skill "code-review" {
-  description = "Performs thorough code reviews focusing on correctness and maintainability"
+skill "python-best-practices" {
+  description = "Python coding standards and best practices"
+  content     = file("skills/python-best-practices.md")
 
-  content = <<-EOT
-    When reviewing code:
-    1. Check for bugs and edge cases
-    2. Evaluate code style and readability
-    3. Look for security vulnerabilities
-    4. Suggest improvements with examples
-  EOT
-}
-```
-
-**Skill with content from file:**
-
-```hcl
-claude_skill "testing" {
-  description = "Helps write comprehensive tests using pytest"
-  content     = file("skills/testing.md")
-}
-```
-
-**Skill with helper files:**
-
-```hcl
-claude_skill "data-validation" {
-  description = "Validates JSON data against schemas"
-  content     = file("skills/data-validation.md")
-
-  file {
-    src = "schemas/user.schema.json"
-  }
-
-  file {
-    src   = "scripts/validate.py"
-    chmod = "755"
-  }
-
-  file {
-    src = "scripts/requirements.txt"
+  claude {
+    allowed_tools = ["Bash", "Read"]
+    model         = "sonnet"
   }
 }
 ```
 
-**Skill with dynamic content:**
+### command
 
-```hcl
-claude_skill "deployment" {
-  description = "Guides deployment to configured environment"
-  content     = templatefile("skills/deployment.md.tmpl", {
-    environment = "production"
-    region      = "us-east-1"
-  })
-}
-```
-
-**Skill with argument hint and tool restrictions:**
-
-```hcl
-claude_skill "file-analyzer" {
-  description   = "Analyzes a specific file for issues and improvements"
-  argument_hint = "[filename]"
-
-  content = <<-EOT
-    Analyze the specified file for:
-    1. Code quality issues
-    2. Performance bottlenecks
-    3. Security vulnerabilities
-    4. Suggestions for improvement
-  EOT
-
-  allowed_tools = ["Read", "Grep", "Glob"]
-  model         = "sonnet"
-}
-```
-
-**Skill hidden from menu (internal use only):**
-
-```hcl
-claude_skill "internal-helper" {
-  description    = "Internal skill used by other skills"
-  user_invocable = false
-
-  content = <<-EOT
-    This skill provides helper functionality for other skills.
-    It is not intended to be invoked directly by users.
-  EOT
-}
-```
-
-**Skill that runs in isolated subagent:**
-
-```hcl
-claude_skill "codebase-explorer" {
-  description = "Explores the codebase to answer architectural questions"
-  context     = "fork"
-  agent       = "Explore"
-
-  content = <<-EOT
-    Explore the codebase to understand:
-    1. Directory structure and organization
-    2. Key components and their relationships
-    3. Data flow and dependencies
-  EOT
-
-  allowed_tools = ["Read", "Glob", "Grep"]
-}
-```
-
-**Skill that prevents auto-loading:**
-
-```hcl
-claude_skill "dangerous-operations" {
-  description              = "Performs potentially destructive operations - use with caution"
-  disable_model_invocation = true
-
-  content = <<-EOT
-    WARNING: This skill can perform destructive operations.
-    Only invoke this skill when explicitly requested by the user.
-
-    Available operations:
-    - Mass file deletion
-    - Database truncation
-    - Cache clearing
-  EOT
-}
-```
-
----
-
-### claude_command
-
-Commands are user-invokable actions accessible via `/{name}` syntax. Each command is installed to `.claude/commands/{plugin}-{name}.md`.
-
-#### Attributes
+Commands can be invoked by users (e.g., `/command-name`). Translates to Claude commands, Copilot prompts, or Cursor commands.
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `name` | string | yes | Command name (invoked as `/{name}`) |
-| `description` | string | yes | Brief description shown to user |
-| `content` | string | yes | Command instructions |
-| `argument_hint` | string | no | Hint for arguments (e.g., `"[environment]"`) |
-| `allowed_tools` | list(string) | no | Tools this command can use |
-| `model` | string | no | Model to use: `sonnet`, `haiku`, or `opus` |
+| `name` | string | yes | Command identifier (block label) |
+| `description` | string | yes | What this command does |
+| `content` | string | yes | Command body/instructions |
+| `file` | block | no | Static files to copy alongside |
+| `template_file` | block | no | Template files to render and copy |
+| `platforms` | list(string) | no | Limit to specific platforms |
+| `claude` | block | no | Claude-specific overrides |
+| `copilot` | block | no | Copilot-specific overrides |
+| `cursor` | block | no | Cursor-specific overrides |
 
-#### Nested Blocks
-
-- `file` - Static files to copy alongside the command
-- `template_file` - Template files to render and copy
-
-#### Examples
-
-**Simple command:**
+**Supported platforms:** Claude Code, GitHub Copilot, Cursor.
 
 ```hcl
-claude_command "test" {
+command "test" {
   description = "Run project tests"
+  content     = file("commands/test.md")
 
-  content = <<-EOT
-    Run the project's test suite:
-    1. Identify the test framework (pytest, jest, go test, etc.)
-    2. Run all tests
-    3. Report results and any failures
-  EOT
-}
-```
+  claude {
+    allowed_tools = ["Bash"]
+  }
 
-**Command with arguments and tool restrictions:**
-
-```hcl
-claude_command "deploy" {
-  description   = "Deploy the application to a specified environment"
-  argument_hint = "[environment]"
-
-  content = <<-EOT
-    Deploy the application to the specified environment:
-    1. Run the test suite first
-    2. Build the application
-    3. Push to container registry
-    4. Update the Kubernetes deployment
-  EOT
-
-  allowed_tools = ["Bash(docker:*)", "Bash(kubectl:*)"]
-  model         = "sonnet"
-}
-```
-
-**Command with helper files:**
-
-```hcl
-claude_command "migrate" {
-  description = "Run database migrations"
-  content     = file("commands/migrate.md")
-
-  file {
-    src   = "scripts/migrate.sh"
-    chmod = "755"
+  copilot {
+    agent = "edit"
+    tools = ["terminal"]
   }
 }
 ```
 
----
+### agent
 
-### claude_subagent
-
-Subagents are specialized agents that can be spawned by Claude for specific tasks. Each subagent is installed to `.claude/agents/{plugin}-{name}.md`.
-
-#### Attributes
+Agents provide specialized agent behaviors. Translates to Claude subagents or Copilot agents.
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `name` | string | yes | Agent identifier |
-| `description` | string | yes | When to use this agent |
+| `name` | string | yes | Agent identifier (block label) |
+| `description` | string | yes | What this agent does |
 | `content` | string | yes | Agent instructions |
-| `model` | string | no | Model: `inherit`, `sonnet`, `haiku`, or `opus` |
-| `color` | string | no | Display color: `blue`, `green`, `yellow`, `red`, `purple` |
-| `tools` | list(string) | no | Allowed tools for this agent |
+| `file` | block | no | Static files to copy alongside |
+| `template_file` | block | no | Template files to render and copy |
+| `platforms` | list(string) | no | Limit to specific platforms |
+| `claude` | block | no | Claude-specific overrides |
+| `copilot` | block | no | Copilot-specific overrides |
+| `cursor` | block | no | Cursor-specific overrides (disabled = true only) |
 
-#### Nested Blocks
-
-- `file` - Static files to copy alongside the subagent
-- `template_file` - Template files to render and copy
-
-#### Examples
-
-**Test runner agent:**
+**Supported platforms:** Claude Code, GitHub Copilot. Cursor does not support agents (skipped with warning).
 
 ```hcl
-claude_subagent "test-runner" {
-  description = "Runs tests and reports results. Use when you need to verify code changes."
-
-  content = <<-EOT
-    You are a test runner agent. Your job is to:
-    1. Identify relevant test files for the changes
-    2. Run tests using the appropriate framework
-    3. Report results clearly, including any failures
-    4. Suggest fixes for failing tests
-  EOT
-
-  model = "haiku"
-  color = "green"
-  tools = ["Bash", "Read", "Glob", "Grep"]
-}
-```
-
-**Code reviewer agent:**
-
-```hcl
-claude_subagent "code-reviewer" {
-  description = "Reviews code for quality, security, and best practices"
+agent "code-reviewer" {
+  description = "Reviews code for quality issues"
   content     = file("agents/code-reviewer.md")
 
-  model = "sonnet"
-  color = "blue"
-  tools = ["Read", "Glob", "Grep"]
+  claude {
+    model = "opus"
+    color = "blue"
+    tools = ["Read", "Grep", "Glob"]
+  }
+
+  copilot {
+    model = "gpt-4"
+    tools = ["terminal"]
+  }
 }
 ```
 
----
+### rule
 
-### claude_rule
-
-Rules are merged into the project's `CLAUDE.md` file. Multiple plugins can contribute rules which are combined together.
-
-#### Attributes
+Rules are merged into the platform's main agent file (CLAUDE.md, copilot-instructions.md, AGENTS.md). Multiple packages can contribute rules that are combined together.
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `name` | string | yes | Rule identifier |
-| `description` | string | yes | Rule description |
-| `content` | string | yes | Rule content |
-| `paths` | list(string) | no | File patterns to scope when this rule applies |
+| `name` | string | yes | Rule identifier (block label) |
+| `description` | string | yes | What this rule provides |
+| `content` | string | yes | Rule text |
+| `file` | block | no | Static files to copy alongside |
+| `template_file` | block | no | Template files to render and copy |
+| `platforms` | list(string) | no | Limit to specific platforms |
+| `claude` | block | no | Claude-specific overrides |
+| `copilot` | block | no | Copilot-specific overrides |
+| `cursor` | block | no | Cursor-specific overrides |
 
-#### Nested Blocks
-
-- `file` - Static files to copy alongside the rule
-- `template_file` - Template files to render and copy
-
-#### Examples
-
-**Global rule:**
+**Supported platforms:** Claude Code, GitHub Copilot, Cursor.
 
 ```hcl
-claude_rule "no-console-log" {
-  description = "Avoid console.log in production code"
-
-  content = <<-EOT
-    Do not use console.log() in production code.
-    Use the project's logging framework instead.
-  EOT
+rule "linting" {
+  description = "Linting standards"
+  content     = "Always run the linter before committing code."
 }
 ```
 
-**Path-scoped rule:**
+### rules
 
-```hcl
-claude_rule "typescript-strict" {
-  description = "TypeScript strict mode requirements"
-
-  content = <<-EOT
-    When writing TypeScript:
-    - Always use explicit types, avoid `any`
-    - Use strict null checks
-    - Prefer interfaces over type aliases for object shapes
-  EOT
-
-  paths = ["src/**/*.ts", "src/**/*.tsx"]
-}
-```
-
----
-
-### claude_rules
-
-A standalone rules file owned by a single plugin. Installed to `.claude/rules/{plugin}-{name}.md`.
-
-#### Attributes
+Standalone rule files owned by a single package. Installed as individual files in the platform's rules directory.
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `name` | string | yes | Rules file identifier |
-| `description` | string | yes | Rules description |
-| `content` | string | yes | Rules content |
-| `paths` | list(string) | no | File patterns to scope when these rules apply |
+| `name` | string | yes | Rules identifier (block label) |
+| `description` | string | yes | What these rules provide |
+| `content` | string | conditional | Rules text (required if no file blocks) |
+| `file` | block | no | Static files to copy alongside |
+| `template_file` | block | no | Template files to render and copy |
+| `platforms` | list(string) | no | Limit to specific platforms |
+| `claude` | block | no | Claude-specific overrides |
+| `copilot` | block | no | Copilot-specific overrides |
+| `cursor` | block | no | Cursor-specific overrides |
 
-#### Nested Blocks
-
-- `file` - Static files to copy alongside the rules
-- `template_file` - Template files to render and copy
-
-#### Examples
+**Supported platforms:** Claude Code, GitHub Copilot, Cursor.
 
 ```hcl
-claude_rules "security" {
-  description = "Security best practices for web applications"
-  content     = file("rules/security.md")
-  paths       = ["**/*.ts", "**/*.js"]
+rules "code-review-standards" {
+  description = "Code review standards and practices"
+  content     = file("rules/code-review.md")
+
+  cursor {
+    globs       = ["*.go", "*.ts"]
+    always_apply = true
+  }
 }
 ```
 
----
+### settings
 
-### claude_settings
-
-Settings are merged into `.claude/settings.json`. Multiple plugins can contribute permissions and environment variables. Project-level settings override plugin settings.
-
-#### Attributes
-
-**Permissions (mergeable):**
+Platform settings (permissions, environment variables, model preferences). Currently only supported by Claude Code.
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `allow` | list(string) | no | Tool patterns to automatically allow |
+| `name` | string | yes | Settings identifier (block label) |
+| `platforms` | list(string) | no | Limit to specific platforms |
+| `allow` | list(string) | no | Tool patterns to auto-approve |
 | `ask` | list(string) | no | Tool patterns requiring confirmation |
 | `deny` | list(string) | no | Tool patterns to block |
-
-**Environment:**
-
-| Attribute | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `env` | map(string) | no | Environment variables to set |
-
-**Global settings (project-level only):**
-
-| Attribute | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `enable_all_project_mcp_servers` | bool | no | Auto-approve project MCP servers |
+| `env` | map(string) | no | Environment variables |
+| `enable_all_project_mcp_servers` | bool | no | Auto-approve all project MCP servers |
 | `enabled_mcp_servers` | list(string) | no | Specific approved MCP servers |
-| `disabled_mcp_servers` | list(string) | no | Rejected MCP servers |
-| `respect_gitignore` | bool | no | Filter suggestions by gitignore |
-| `include_co_authored_by` | bool | no | Include co-author in commits |
-| `model` | string | no | Override default model |
-| `output_style` | string | no | Response style preference |
-| `always_thinking_enabled` | bool | no | Enable extended thinking |
-| `plans_directory` | string | no | Custom plan files location |
+| `disabled_mcp_servers` | list(string) | no | Specific rejected MCP servers |
+| `model` | string | no | Default model override |
 
-#### Examples
-
-**Plugin contributing permissions:**
+**Supported platforms:** Claude Code. Other platforms skip with warning.
 
 ```hcl
-claude_settings "node-tools" {
-
+settings "python" {
   allow = [
-    "Bash(npm:*)",
-    "Bash(npx:*)",
-    "Bash(node:*)",
+    "Bash(python:*)",
+    "Bash(pip:*)",
+    "Bash(pytest:*)",
   ]
 
   env = {
-    NODE_ENV = "development"
-  }
-}
-```
-
-**Project-level settings with global options:**
-
-```hcl
-claude_settings "project" {
-
-  allow = ["Bash(docker:*)"]
-  deny  = ["Bash(rm -rf /)"]
-
-  env = {
-    DEBUG = "true"
+    PYTHONDONTWRITEBYTECODE = "1"
   }
 
   enable_all_project_mcp_servers = true
-  respect_gitignore              = true
-  include_co_authored_by         = true
 }
 ```
 
----
+### mcp_server
 
-### claude_mcp_server
-
-MCP servers provide additional tools and capabilities to Claude. Configurations are merged into `.mcp.json`.
-
-#### Attributes
+MCP (Model Context Protocol) servers provide additional tools and capabilities. Supported across all platforms with platform-specific translation.
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `name` | string | yes | Server identifier |
-| `description` | string | no | Server description |
-| `type` | string | yes | Server type: `command` or `http` |
-| `command` | string | conditional | Command to run (required for `type = "command"` unless `source` is set) |
+| `name` | string | yes | Server identifier (block label) |
+| `description` | string | no | What this server provides |
+| `command` | string | conditional | Executable to run (mutually exclusive with `url`) |
 | `args` | list(string) | no | Command-line arguments |
 | `env` | map(string) | no | Environment variables |
-| `source` | string | conditional | Shortcut for package managers: `npm:`, `uvx:`, `pip:` |
-| `url` | string | conditional | HTTP endpoint (required for `type = "http"`) |
+| `url` | string | conditional | HTTP/SSE endpoint (mutually exclusive with `command`) |
+| `env_file` | string | no | Path to env file |
+| `headers` | map(string) | no | HTTP headers (URL-based servers only) |
+| `input` | block | no | VS Code input prompts for dynamic config |
+| `platforms` | list(string) | no | Limit to specific platforms |
+| `claude` | block | no | Claude-specific overrides |
+| `copilot` | block | no | Copilot-specific overrides |
+| `cursor` | block | no | Cursor-specific overrides |
 
-#### Examples
-
-**Command-based MCP server:**
+**Supported platforms:** Claude Code, GitHub Copilot, Cursor.
 
 ```hcl
-claude_mcp_server "filesystem" {
-  type    = "command"
+mcp_server "database" {
   command = "npx"
-  args    = ["-y", "@anthropic/mcp-filesystem"]
+  args    = ["-y", "@database/mcp-server"]
 
   env = {
-    HOME = env("HOME")
+    DB_HOST = env("DB_HOST", "localhost")
   }
 }
-```
 
-**Using source shortcut:**
-
-```hcl
-claude_mcp_server "postgres" {
-  type   = "command"
-  source = "uvx:mcp-postgres"
-
-  env = {
-    DATABASE_URL = env("DATABASE_URL")
-  }
-}
-```
-
-**HTTP-based MCP server:**
-
-```hcl
-claude_mcp_server "remote-api" {
-  description = "Remote API integration server"
-  type        = "http"
-  url         = "https://mcp.example.com/api"
-}
-```
-
-**MCP server from git repository:**
-
-```hcl
-claude_mcp_server "serena" {
-  type    = "command"
-  command = "uvx"
-  args    = ["--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server"]
-}
-```
-
----
-
-## Cursor Resources
-
-The following resources are available for Cursor projects (`default_platform = "cursor"`).
-
-### cursor_rule
-
-Rules (singular) are merged into the project's `AGENTS.md` file. Multiple plugins can contribute rules which are combined together using marker comments.
-
-#### Attributes
-
-| Attribute | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `name` | string | yes | Block label identifying this rule |
-| `description` | string | yes | Explains what this rule provides |
-| `content` | string | yes | The rule content |
-
-#### Examples
-
-**Global rule:**
-
-```hcl
-cursor_rule "coding-standards" {
-  description = "Project coding standards"
-
-  content = <<-EOT
-    Always follow these coding standards:
-    - Use TypeScript strict mode
-    - Prefer async/await over callbacks
-    - Document all public APIs
-  EOT
-}
-```
-
----
-
-### cursor_rules
-
-A standalone rules file owned by a single plugin. Installed to `.cursor/rules/{plugin}-{name}.mdc`.
-
-#### Attributes
-
-| Attribute | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `name` | string | yes | Rules file identifier |
-| `description` | string | yes | Rules description |
-| `content` | string | yes | Rules content |
-| `globs` | list(string) | no | File patterns for selective application |
-| `always_apply` | bool | no | Whether the rule should always be applied |
-
-#### Nested Blocks
-
-- `file` - Static files to copy alongside the rules
-- `template_file` - Template files to render and copy
-
-#### Examples
-
-**Path-scoped rules:**
-
-```hcl
-cursor_rules "typescript" {
-  description = "TypeScript best practices"
-  globs       = ["**/*.ts", "**/*.tsx"]
-
-  content = <<-EOT
-    When writing TypeScript:
-    - Always use explicit types, avoid `any`
-    - Use strict null checks
-    - Prefer interfaces over type aliases for object shapes
-  EOT
-}
-```
-
-**Always-applied rules:**
-
-```hcl
-cursor_rules "security" {
-  description  = "Security best practices"
-  always_apply = true
-  content      = file("rules/security.md")
-}
-```
-
----
-
-### cursor_command
-
-Commands are user-invokable actions accessible via `/{name}` syntax. Each command is installed to `.cursor/commands/{plugin}-{name}.md`.
-
-#### Attributes
-
-| Attribute | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `name` | string | yes | Command name (invoked as `/{name}`) |
-| `description` | string | yes | Brief description shown to user |
-| `content` | string | yes | Command instructions |
-
-#### Nested Blocks
-
-- `file` - Static files to copy alongside the command
-- `template_file` - Template files to render and copy
-
-#### Examples
-
-**Simple command:**
-
-```hcl
-cursor_command "test" {
-  description = "Run project tests"
-
-  content = <<-EOT
-    Run the project's test suite:
-    1. Identify the test framework (pytest, jest, go test, etc.)
-    2. Run all tests
-    3. Report results and any failures
-  EOT
-}
-```
-
-**Command with helper files:**
-
-```hcl
-cursor_command "migrate" {
-  description = "Run database migrations"
-  content     = file("commands/migrate.md")
-
-  file {
-    src   = "scripts/migrate.sh"
-    chmod = "755"
-  }
-}
-```
-
----
-
-### cursor_mcp_server
-
-MCP servers provide additional tools and capabilities to Cursor. Configurations are merged into `.cursor/mcp.json`.
-
-#### Attributes
-
-| Attribute | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `name` | string | yes | Server identifier |
-| `description` | string | no | Server description |
-| `type` | string | yes | Server type: `stdio`, `http`, or `sse` |
-| `command` | string | conditional | Command to run (required for `type = "stdio"`) |
-| `args` | list(string) | no | Command-line arguments |
-| `env` | map(string) | no | Environment variables |
-| `env_file` | string | no | Path to an env file to load |
-| `url` | string | conditional | HTTP/SSE endpoint (required for `type = "http"` or `type = "sse"`) |
-| `headers` | map(string) | no | HTTP headers for http/sse servers |
-
-#### Examples
-
-**Stdio-based MCP server:**
-
-```hcl
-cursor_mcp_server "filesystem" {
-  type    = "stdio"
-  command = "npx"
-  args    = ["-y", "@anthropic/mcp-filesystem"]
-
-  env = {
-    HOME = env("HOME")
-  }
-}
-```
-
-**HTTP-based MCP server:**
-
-```hcl
-cursor_mcp_server "context7" {
-  description = "Context7 documentation server"
-  type        = "http"
-  url         = "https://mcp.context7.com/mcp"
-}
-```
-
-**SSE-based MCP server:**
-
-```hcl
-cursor_mcp_server "realtime" {
-  type    = "sse"
-  url     = "https://api.example.com/events"
+mcp_server "api-gateway" {
+  url = "https://api.example.com/mcp"
 
   headers = {
     Authorization = "Bearer ${env("API_TOKEN")}"
   }
-}
-```
 
----
-
-## GitHub Copilot Resources
-
-The following resources are available for GitHub Copilot projects (`default_platform = "github-copilot"`).
-
-### copilot_instruction
-
-Instructions (singular) are merged into the project's `.github/copilot-instructions.md` file. Multiple plugins can contribute instructions which are combined together using marker comments.
-
-#### Attributes
-
-| Attribute | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `name` | string | yes | Block label identifying this instruction |
-| `description` | string | yes | Explains what this instruction provides |
-| `content` | string | yes | The instruction content |
-
-#### Nested Blocks
-
-- `file` - Static files to copy alongside the instruction
-- `template_file` - Template files to render and copy
-
-#### Examples
-
-**Global instruction:**
-
-```hcl
-copilot_instruction "coding-standards" {
-  description = "Project coding standards"
-
-  content = <<-EOT
-    Always follow these coding standards:
-    - Use TypeScript strict mode
-    - Prefer async/await over callbacks
-    - Document all public APIs
-  EOT
-}
-```
-
----
-
-### copilot_mcp_server
-
-MCP servers provide additional tools and capabilities to GitHub Copilot. Configurations are merged into `.vscode/mcp.json`.
-
-#### Attributes
-
-| Attribute | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `name` | string | yes | Server identifier |
-| `description` | string | no | Server description |
-| `type` | string | yes | Server type: `stdio`, `http`, or `sse` |
-| `command` | string | conditional | Command to run (required for `type = "stdio"`) |
-| `args` | list(string) | no | Command-line arguments |
-| `env` | map(string) | no | Environment variables |
-| `env_file` | string | no | Path to an env file to load |
-| `url` | string | conditional | HTTP/SSE endpoint (required for `type = "http"` or `type = "sse"`) |
-| `headers` | map(string) | no | HTTP headers for http/sse servers |
-
-#### Examples
-
-**Stdio-based MCP server:**
-
-```hcl
-copilot_mcp_server "filesystem" {
-  type    = "stdio"
-  command = "npx"
-  args    = ["-y", "@anthropic/mcp-filesystem"]
-
-  env = {
-    HOME = env("HOME")
+  claude {
+    disabled = true  # Not needed for Claude
   }
 }
 ```
 
-**HTTP-based MCP server:**
+### file (resource)
 
-```hcl
-copilot_mcp_server "context7" {
-  description = "Context7 documentation server"
-  type        = "http"
-  url         = "https://mcp.context7.com/mcp"
-}
-```
-
----
-
-### copilot_instructions
-
-Standalone instruction files owned by a single plugin. Installed to `.github/instructions/{plugin}-{name}.instructions.md`.
-
-#### Attributes
+Universal file resource — copies a file to the project. Works across all platforms.
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `name` | string | yes | Instructions file identifier |
-| `description` | string | yes | Instructions description |
-| `content` | string | yes | Instructions content |
-| `apply_to` | string | no | Glob pattern for selective application |
+| `name` | string | yes | File identifier (block label) |
+| `path` | string | yes | Destination path relative to project root |
+| `content` | string | conditional | Inline file content |
+| `src` | string | conditional | Source file path relative to package root |
+| `chmod` | string | no | File permissions |
 
-#### Nested Blocks
+### directory
 
-- `file` - Static files to copy alongside the instructions
-- `template_file` - Template files to render and copy
-
-#### Examples
-
-```hcl
-copilot_instructions "typescript" {
-  description = "TypeScript best practices"
-  apply_to    = "**/*.ts"
-
-  content = <<-EOT
-    When writing TypeScript:
-    - Always use explicit types, avoid `any`
-    - Use strict null checks
-    - Prefer interfaces over type aliases for object shapes
-  EOT
-}
-```
-
----
-
-### copilot_prompt
-
-Prompts are user-invokable actions in GitHub Copilot. Each prompt is installed to `.github/prompts/{plugin}-{name}.prompt.md`.
-
-#### Attributes
+Universal directory resource — creates a directory in the project. Works across all platforms.
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `name` | string | yes | Prompt name |
-| `description` | string | yes | Brief description |
-| `content` | string | yes | Prompt instructions |
-| `argument_hint` | string | no | Hint for arguments |
-| `agent` | string | no | Agent mode: `ask`, `edit`, `agent`, or custom |
-| `model` | string | no | Model selection |
-| `tools` | list(string) | no | Tools to enable |
-
-#### Nested Blocks
-
-- `file` - Static files to copy alongside the prompt
-- `template_file` - Template files to render and copy
-
-#### Examples
-
-**Simple prompt:**
-
-```hcl
-copilot_prompt "review" {
-  description = "Review code for issues"
-  agent       = "ask"
-
-  content = <<-EOT
-    Review this code for:
-    1. Bugs and edge cases
-    2. Security vulnerabilities
-    3. Performance issues
-    4. Code style improvements
-  EOT
-}
-```
-
-**Prompt with tools:**
-
-```hcl
-copilot_prompt "refactor" {
-  description = "Refactor code to improve quality"
-  agent       = "edit"
-  model       = "gpt-4o"
-  tools       = ["fetch", "search"]
-
-  content = <<-EOT
-    Refactor the selected code to:
-    1. Improve readability
-    2. Reduce complexity
-    3. Follow best practices
-  EOT
-}
-```
+| `name` | string | yes | Directory identifier (block label) |
+| `path` | string | yes | Directory path relative to project root |
 
 ---
 
-### copilot_agent
+## Platform Override Blocks
 
-Agents are specialized agents that can be used by GitHub Copilot for specific tasks. Each agent is installed to `.github/agents/{plugin}-{name}.agent.md`.
+Every universal resource supports optional platform override blocks (`claude {}`, `copilot {}`, `cursor {}`) for platform-specific customization.
 
-#### Attributes
+### Common Override Fields
 
-| Attribute | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `name` | string | yes | Agent identifier |
-| `description` | string | yes | When to use this agent |
-| `content` | string | yes | Agent instructions |
-| `model` | string | no | Model selection |
-| `tools` | list(string) | no | Available tools for this agent |
-| `handoffs` | list(string) | no | Sequential workflow transitions to other agents |
-| `infer` | bool | no | Enable subagent usage (default: true) |
-| `target` | string | no | Target environment: `vscode` or `github-copilot` |
+All platform overrides support:
 
-#### Nested Blocks
+| Field | Type | Description |
+|-------|------|-------------|
+| `disabled` | bool | Set to `true` to skip this resource on this platform |
+| `content` | string | Override the base content for this platform |
 
-- `file` - Static files to copy alongside the agent
-- `template_file` - Template files to render and copy
+### Claude Code Overrides
 
-#### Examples
+Claude overrides vary by resource type:
 
-**Test runner agent:**
+**skill:**
+`argument_hint`, `disable_model_invocation`, `user_invocable`, `allowed_tools`, `model`, `context`, `agent`, `metadata`, `hooks`
 
-```hcl
-copilot_agent "test-runner" {
-  description = "Runs tests and reports results"
+**command:**
+`argument_hint`, `allowed_tools`, `model`
 
-  content = <<-EOT
-    You are a test runner agent. Your job is to:
-    1. Identify relevant test files for the changes
-    2. Run tests using the appropriate framework
-    3. Report results clearly, including any failures
-    4. Suggest fixes for failing tests
-  EOT
+**agent:**
+`model`, `color`, `tools`, `hooks`
 
-  tools = ["fetch", "search"]
-  target = "vscode"
-}
-```
+**rule / rules:**
+`paths`
 
-**Agent with handoffs:**
+**settings:**
+`allow`, `ask`, `deny`, `env`, `enable_all_project_mcp_servers`, `enabled_mcp_servers`, `disabled_mcp_servers`
 
-```hcl
-copilot_agent "planner" {
-  description = "Creates implementation plans"
+### GitHub Copilot Overrides
 
-  content = <<-EOT
-    Create a detailed implementation plan for the requested feature.
-    Break down the work into small, manageable tasks.
-  EOT
+**command:**
+`argument_hint`, `agent`, `model`, `tools`
 
-  tools    = ["fetch", "search"]
-  handoffs = ["implementer", "reviewer"]
-}
-```
+**agent:**
+`model`, `tools`, `handoffs`, `infer`, `target`
+
+**rules:**
+`apply_to`
+
+### Cursor Overrides
+
+**rules:**
+`globs`, `always_apply`
 
 ---
 
-### copilot_skill
+## Platform Support Matrix
 
-Skills provide specialized knowledge or capabilities to GitHub Copilot. Each skill is installed to `.github/skills/{plugin}-{name}/SKILL.md`.
+| Resource Type | Claude Code | GitHub Copilot | Cursor |
+|---------------|:-----------:|:--------------:|:------:|
+| `skill` | Skill | Skill | -- |
+| `command` | Command | Prompt | Command |
+| `agent` | Subagent | Agent | -- |
+| `rule` | Rule (CLAUDE.md) | Instruction (copilot-instructions.md) | Rule (AGENTS.md) |
+| `rules` | Rules (.claude/rules/) | Instructions (.github/instructions/) | Rules (.cursor/rules/) |
+| `settings` | Settings (.claude/settings.json) | -- | -- |
+| `mcp_server` | MCP Server (.mcp.json) | MCP Server (.vscode/mcp.json) | MCP Server (.cursor/mcp.json) |
+| `file` | File | File | File |
+| `directory` | Directory | Directory | Directory |
 
-#### Attributes
-
-| Attribute | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `name` | string | yes | Skill name (max 64 characters) |
-| `description` | string | yes | When and how to use this skill (max 1024 characters) |
-| `content` | string | yes | The skill's instructions/knowledge |
-
-#### Nested Blocks
-
-- `file` - Static files to copy alongside the skill
-- `template_file` - Template files to render and copy
-
-#### Examples
-
-**Simple skill:**
-
-```hcl
-copilot_skill "testing" {
-  description = "Best practices for writing comprehensive tests"
-
-  content = <<-EOT
-    When writing tests:
-    1. Test both happy paths and edge cases
-    2. Use descriptive test names
-    3. Follow the Arrange-Act-Assert pattern
-    4. Mock external dependencies
-  EOT
-}
-```
-
-**Skill with helper files:**
-
-```hcl
-copilot_skill "data-validation" {
-  description = "Validates JSON data against schemas"
-  content     = file("skills/data-validation.md")
-
-  file {
-    src = "schemas/user.schema.json"
-  }
-
-  file {
-    src   = "scripts/validate.py"
-    chmod = "755"
-  }
-}
-```
+`--` = Not supported. Resource is logged as skipped and produces no output.
 
 ---
 
 ## Package Configuration
 
-A `package.hcl` file defines a plugin's metadata and resources.
+A `package.hcl` file defines a package's metadata and resources.
 
-### Package Block
+### Meta Block
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -1168,7 +468,7 @@ A `package.hcl` file defines a plugin's metadata and resources.
 
 ### Variable Block
 
-Variables allow users to customize plugin behavior at installation time.
+Variables allow users to customize package behavior at installation time.
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -1181,13 +481,12 @@ Variables allow users to customize plugin behavior at installation time.
 ### Complete Example
 
 ```hcl
-package {
+meta {
   name        = "python-tools"
   version     = "1.0.0"
-  description = "Python development tools for Claude Code"
+  description = "Python development tools"
   author      = "example"
   license     = "MIT"
-  platforms   = ["claude-code"]
 }
 
 variable "python_version" {
@@ -1195,23 +494,17 @@ variable "python_version" {
   default     = "3.11"
 }
 
-variable "test_framework" {
-  description = "Test framework (pytest or unittest)"
-  default     = "pytest"
-}
-
-claude_skill "python-best-practices" {
+skill "python-best-practices" {
   description = "Python coding standards and best practices"
   content     = file("skills/python-best-practices.md")
 }
 
-claude_command "test" {
+command "test" {
   description = "Run Python tests"
   content     = file("commands/test.md")
 }
 
-claude_settings "python" {
-
+settings "python" {
   allow = [
     "Bash(python:*)",
     "Bash(pip:*)",
@@ -1223,9 +516,9 @@ claude_settings "python" {
   }
 }
 
-claude_mcp_server "python-lsp" {
-  type    = "command"
-  source  = "pip:python-lsp-server"
+mcp_server "python-lsp" {
+  command = "pip"
+  args    = ["run", "python-lsp-server"]
 }
 ```
 
@@ -1241,6 +534,8 @@ A `dex.hcl` file configures a dex-managed project.
 |-----------|------|----------|-------------|
 | `name` | string | no | Project name (defaults to directory name) |
 | `default_platform` | string | yes | Target AI platform (e.g., `claude-code`) |
+| `agent_instructions` | string | no | Project-level instructions added to agent file |
+| `git_exclude` | bool | no | Auto-update .git/info/exclude |
 
 ### Registry Block
 
@@ -1250,15 +545,27 @@ A `dex.hcl` file configures a dex-managed project.
 | `path` | string | conditional | Local filesystem path (for `file://` registries) |
 | `url` | string | conditional | Remote URL (for `https://` registries) |
 
-### Plugin Block
+### Package Block
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `name` | string | yes | Plugin identifier (block label) |
+| `name` | string | yes | Package identifier (block label) |
 | `source` | string | conditional | Direct source URL (`git+https://`, `file://`) |
 | `version` | string | no | Version constraint |
 | `registry` | string | conditional | Registry name to fetch from |
-| `config` | map(string) | no | Plugin-specific configuration values |
+| `config` | map(string) | no | Package-specific configuration values |
+
+### Profile Block
+
+Profiles define named configuration variants activated with `dex sync --profile <name>`.
+
+| Attribute | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | yes | Profile identifier (block label) |
+| `exclude_defaults` | bool | no | Start clean (no defaults inherited) |
+| `agent_instructions` | string | no | Override project agent instructions |
+
+Profiles support all resource types (`skill`, `command`, `rule`, `rules`, `agent`, `settings`, `mcp_server`), `registry`, and `package` blocks inside them. By default, profile contents are merged additively with defaults (same-name items replaced). With `exclude_defaults = true`, only profile-defined items are used.
 
 ### Complete Example
 
@@ -1266,33 +573,32 @@ A `dex.hcl` file configures a dex-managed project.
 project {
   name             = "my-webapp"
   default_platform = "claude-code"
+  agent_instructions = "This is a web application built with React and Go."
 }
 
 registry "internal" {
-  path = "/path/to/internal-plugins"
+  url = "https://packages.example.com"
 }
 
-registry "community" {
-  url = "https://plugins.example.com"
-}
-
-plugin "python-tools" {
-  registry = "community"
-  version  = "^1.0.0"
-
-  config = {
-    python_version = "3.12"
-    test_framework = "pytest"
-  }
-}
-
-plugin "internal-tools" {
+package "web-tools" {
   registry = "internal"
-  version  = "latest"
+  version  = "^1.0.0"
 }
 
-plugin "custom-plugin" {
-  source  = "git+https://github.com/user/custom-plugin.git"
-  version = "v2.0.0"
+rule "project-standards" {
+  description = "Project coding standards"
+  content     = "Follow the project style guide."
+}
+
+settings "permissions" {
+  enable_all_project_mcp_servers = true
+}
+
+profile "qa" {
+  agent_instructions = "QA environment - focus on testing"
+
+  package "qa-tools" {
+    registry = "internal"
+  }
 }
 ```

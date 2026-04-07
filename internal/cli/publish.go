@@ -11,8 +11,8 @@ import (
 
 var publishCmd = &cobra.Command{
 	Use:   "publish <tarball>",
-	Short: "Publish a plugin tarball to a registry",
-	Long: `Publish a plugin tarball to a registry.
+	Short: "Publish a package tarball to a registry",
+	Long: `Publish a package tarball to a registry.
 
 The tarball must follow the naming convention {name}-{version}.tar.gz.
 The registry URL determines the upload method:
@@ -24,16 +24,16 @@ The registry URL determines the upload method:
 
 Examples:
   # Publish to a local registry
-  dex publish my-plugin-1.0.0.tar.gz -r file:///path/to/registry
+  dex publish my-package-1.0.0.tar.gz -r file:///path/to/registry
 
   # Publish to S3
-  dex publish my-plugin-1.0.0.tar.gz -r s3://my-bucket/registry
+  dex publish my-package-1.0.0.tar.gz -r s3://my-bucket/registry
 
   # Publish to Azure Blob Storage
-  dex publish my-plugin-1.0.0.tar.gz -r az://myaccount/mycontainer/registry
+  dex publish my-package-1.0.0.tar.gz -r az://myaccount/mycontainer/registry
 
   # Get manual instructions for HTTPS registry
-  dex publish my-plugin-1.0.0.tar.gz -r https://example.com/registry`,
+  dex publish my-package-1.0.0.tar.gz -r https://example.com/registry`,
 	Args: cobra.ExactArgs(1),
 	RunE: runPublish,
 }

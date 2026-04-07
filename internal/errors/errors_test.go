@@ -139,18 +139,18 @@ func TestInstallError_Error(t *testing.T) {
 		{
 			name: "with underlying error",
 			err: &InstallError{
-				Plugin: "my-plugin",
-				Phase:  "validate",
-				Err:    errors.New("missing required field"),
+				Package: "my-plugin",
+				Phase:   "validate",
+				Err:     errors.New("missing required field"),
 			},
 			expected: "install error for my-plugin during validate: missing required field",
 		},
 		{
 			name: "without underlying error",
 			err: &InstallError{
-				Plugin: "my-plugin",
-				Phase:  "fetch",
-				Err:    nil,
+				Package: "my-plugin",
+				Phase:   "fetch",
+				Err:     nil,
 			},
 			expected: "install error for my-plugin during fetch",
 		},
@@ -166,9 +166,9 @@ func TestInstallError_Error(t *testing.T) {
 func TestInstallError_Unwrap(t *testing.T) {
 	underlying := errors.New("permission denied")
 	err := &InstallError{
-		Plugin: "my-plugin",
-		Phase:  "install",
-		Err:    underlying,
+		Package: "my-plugin",
+		Phase:   "install",
+		Err:     underlying,
 	}
 
 	assert.Equal(t, underlying, err.Unwrap())
@@ -255,7 +255,7 @@ func TestVersionError_Error(t *testing.T) {
 		{
 			name: "with constraint and available",
 			err: &VersionError{
-				Plugin:     "my-plugin",
+				Package:    "my-plugin",
 				Constraint: "^2.0.0",
 				Available:  []string{"1.0.0", "1.5.0"},
 				Message:    "",
@@ -265,7 +265,7 @@ func TestVersionError_Error(t *testing.T) {
 		{
 			name: "with custom message",
 			err: &VersionError{
-				Plugin:     "my-plugin",
+				Package:    "my-plugin",
 				Constraint: "^2.0.0",
 				Available:  []string{"1.0.0"},
 				Message:    "no compatible version found",
@@ -275,7 +275,7 @@ func TestVersionError_Error(t *testing.T) {
 		{
 			name: "without available versions",
 			err: &VersionError{
-				Plugin:     "my-plugin",
+				Package:    "my-plugin",
 				Constraint: "^2.0.0",
 				Available:  nil,
 				Message:    "",
@@ -285,7 +285,7 @@ func TestVersionError_Error(t *testing.T) {
 		{
 			name: "with empty available list",
 			err: &VersionError{
-				Plugin:     "my-plugin",
+				Package:    "my-plugin",
 				Constraint: "^2.0.0",
 				Available:  []string{},
 				Message:    "no versions available",
@@ -391,7 +391,7 @@ func TestNewInstallError(t *testing.T) {
 	underlying := errors.New("validation failed")
 	err := NewInstallError("my-plugin", "validate", underlying)
 
-	assert.Equal(t, "my-plugin", err.Plugin)
+	assert.Equal(t, "my-plugin", err.Package)
 	assert.Equal(t, "validate", err.Phase)
 	assert.Equal(t, underlying, err.Err)
 }
@@ -414,7 +414,7 @@ func TestNewNotFoundError(t *testing.T) {
 func TestNewVersionError(t *testing.T) {
 	err := NewVersionError("my-plugin", "^2.0.0", []string{"1.0.0", "1.5.0"}, "custom message")
 
-	assert.Equal(t, "my-plugin", err.Plugin)
+	assert.Equal(t, "my-plugin", err.Package)
 	assert.Equal(t, "^2.0.0", err.Constraint)
 	assert.Equal(t, []string{"1.0.0", "1.5.0"}, err.Available)
 	assert.Equal(t, "custom message", err.Message)
@@ -423,7 +423,7 @@ func TestNewVersionError(t *testing.T) {
 func TestNewVersionError_NilAvailable(t *testing.T) {
 	err := NewVersionError("my-plugin", "^2.0.0", nil, "")
 
-	assert.Equal(t, "my-plugin", err.Plugin)
+	assert.Equal(t, "my-plugin", err.Package)
 	assert.Nil(t, err.Available)
 }
 

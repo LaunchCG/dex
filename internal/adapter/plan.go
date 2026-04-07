@@ -41,8 +41,8 @@ type Plan struct {
 	// AgentFilePath overrides the default agent file path (default: "CLAUDE.md")
 	AgentFilePath string
 
-	// PluginName that owns these files (for manifest tracking)
-	PluginName string
+	// PackageName that owns these files (for manifest tracking)
+	PackageName string
 }
 
 // FileWrite represents a file to write during installation.
@@ -58,10 +58,10 @@ type FileWrite struct {
 	Chmod string
 }
 
-// NewPlan creates a new empty installation plan for the given plugin.
-func NewPlan(pluginName string) *Plan {
+// NewPlan creates a new empty installation plan for the given package.
+func NewPlan(pkgName string) *Plan {
 	return &Plan{
-		PluginName:      pluginName,
+		PackageName:     pkgName,
 		MCPEntries:      make(map[string]any),
 		SettingsEntries: make(map[string]any),
 	}
@@ -86,14 +86,14 @@ func (p *Plan) AddFile(path, content, chmod string) {
 }
 
 // MergePlans combines multiple plans into one.
-// This is useful when a plugin has multiple resources to install.
+// This is useful when a package has multiple resources to install.
 func MergePlans(plans ...*Plan) *Plan {
 	if len(plans) == 0 {
 		return NewPlan("")
 	}
 
-	// Use the plugin name from the first plan
-	merged := NewPlan(plans[0].PluginName)
+	// Use the package name from the first plan
+	merged := NewPlan(plans[0].PackageName)
 
 	// Track directories to avoid duplicates
 	dirsSeen := make(map[string]bool)

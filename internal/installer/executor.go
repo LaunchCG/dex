@@ -17,7 +17,7 @@ import (
 // Executor executes installation plans by creating directories, writing files,
 // and tracking resources in the manifest.
 // Shared files (MCP config, settings, agent files) are NOT written by the executor;
-// they are handled by generateSharedFiles() in the installer after all plugins are processed.
+// they are handled by generateSharedFiles() in the installer after all packages are processed.
 type Executor struct {
 	projectRoot string
 	manifest    *manifest.Manifest
@@ -34,11 +34,11 @@ func NewExecutor(projectRoot string, m *manifest.Manifest, force bool) *Executor
 }
 
 // RemoveStaleEntries deletes dedicated files and empty directories that were
-// previously tracked for a plugin but are absent from the new plan.
-// Must be called before Execute so that even plugins whose new plan is empty
+// previously tracked for a package but are absent from the new plan.
+// Must be called before Execute so that even packages whose new plan is empty
 // (no resources match the current platform) have their old files cleaned up.
-func (e *Executor) RemoveStaleEntries(pluginName string, newFilePaths, newDirPaths map[string]bool) error {
-	old := e.manifest.GetPlugin(pluginName)
+func (e *Executor) RemoveStaleEntries(pkgName string, newFilePaths, newDirPaths map[string]bool) error {
+	old := e.manifest.GetPackage(pkgName)
 	if old == nil {
 		return nil
 	}
@@ -71,7 +71,7 @@ func (e *Executor) RemoveStaleEntries(pluginName string, newFilePaths, newDirPat
 // Execute executes an installation plan.
 // It creates directories, writes dedicated files, and tracks all resources in the manifest.
 // Shared files (MCP, settings, agent content) are tracked but NOT written;
-// use generateSharedFiles() to write them after all plugins are processed.
+// use generateSharedFiles() to write them after all packages are processed.
 func (e *Executor) Execute(plan *adapter.Plan, vars map[string]string) error {
 	if plan == nil {
 		return nil
@@ -154,7 +154,7 @@ func (e *Executor) Execute(plan *adapter.Plan, vars map[string]string) error {
 		newMergedFiles = append(newMergedFiles, agentPath)
 	}
 
-	// Replace (not append) all manifest entries for this plugin so stale
+	// Replace (not append) all manifest entries for this package so stale
 	// entries from previous installs on a different platform are cleared.
 	filePaths := make([]string, len(plan.Files))
 	for i, f := range plan.Files {
@@ -164,15 +164,15 @@ func (e *Executor) Execute(plan *adapter.Plan, vars map[string]string) error {
 	for i, d := range plan.Directories {
 		dirPaths[i] = d.Path
 	}
-	e.manifest.ReplaceTracked(plan.PluginName, filePaths, dirPaths)
-	e.manifest.ReplaceMergedFiles(plan.PluginName, newMergedFiles)
-	e.manifest.ReplaceMCPServers(plan.PluginName, newMCPServers)
-	e.manifest.ReplaceSettings(plan.PluginName, newSettingsValues)
+	e.manifest.ReplaceTracked(plan.PackageName, filePaths, dirPaths)
+	e.manifest.ReplaceMergedFiles(plan.PackageName, newMergedFiles)
+	e.manifest.ReplaceMCPServers(plan.PackageName, newMCPServers)
+	e.manifest.ReplaceSettings(plan.PackageName, newSettingsValues)
 	if hasAgentContent {
-		e.manifest.TrackAgentContent(plan.PluginName)
+		e.manifest.TrackAgentContent(plan.PackageName)
 	} else {
-		// Clear agent content flag if this plugin no longer contributes
-		if pm := e.manifest.GetPlugin(plan.PluginName); pm != nil {
+		// Clear agent content flag if this package no longer contributes
+		if pm := e.manifest.GetPackage(plan.PackageName); pm != nil {
 			pm.HasAgentContent = false
 		}
 	}
@@ -223,7 +223,7 @@ func (e *Executor) writeFile(fw adapter.FileWrite, vars map[string]string) error
 			// Force mode - warn but continue
 			fmt.Fprintf(os.Stderr, "warning: overwriting non-managed file %s\n", fw.Path)
 		}
-		// If file is tracked by a plugin (reinstall case), this is OK - proceed to overwrite
+		// If file is tracked by a package (reinstall case), this is OK - proceed to overwrite
 	}
 
 	// Ensure parent directory exists

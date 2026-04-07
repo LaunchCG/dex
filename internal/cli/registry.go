@@ -14,7 +14,7 @@ import (
 var registryCmd = &cobra.Command{
 	Use:   "registry",
 	Short: "Manage registries",
-	Long:  "Commands for managing plugin registries in your dex project.",
+	Long:  "Commands for managing package registries in your dex project.",
 }
 
 var registryAddCmd = &cobra.Command{

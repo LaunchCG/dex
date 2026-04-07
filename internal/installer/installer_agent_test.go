@@ -33,7 +33,7 @@ EOF
 	require.NoError(t, err)
 
 	// Create installer
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	// Install
@@ -55,7 +55,7 @@ Follow the project coding standards.`
 	assert.Equal(t, expected, string(content))
 
 	// Verify tracked in manifest
-	plugin := installer.manifest.GetPlugin("__project__")
+	plugin := installer.manifest.GetPackage("__project__")
 	assert.NotNil(t, plugin)
 	assert.True(t, plugin.HasAgentContent)
 }
@@ -66,13 +66,13 @@ func TestInstaller_ProjectAgentInstructions_WithPlugin(t *testing.T) {
 
 	// Set up a local plugin with a rule
 	pluginDir := t.TempDir()
-	pluginContent := `package {
+	pluginContent := `meta {
   name = "linting-rules"
   version = "1.0.0"
   description = "Linting rules plugin"
 }
 
-claude_rule "eslint" {
+rule "eslint" {
   description = "ESLint rules"
   content = "Always run ESLint before committing."
 }
@@ -91,7 +91,7 @@ This is my project's main context.
 EOF
 }
 
-plugin "linting-rules" {
+package "linting-rules" {
   source = "file:` + pluginDir + `"
 }
 `
@@ -99,7 +99,7 @@ plugin "linting-rules" {
 	require.NoError(t, err)
 
 	// Create installer and install
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	err = installer.InstallAll()
@@ -129,7 +129,7 @@ func TestInstaller_ProjectAgentInstructions_UpdateInstructions(t *testing.T) {
   agent_instructions = "# V1 Instructions"
 }
 
-plugin "my-plugin" {
+package "my-plugin" {
   source = "file:` + pluginDir + `"
 }
 `
@@ -137,7 +137,7 @@ plugin "my-plugin" {
 	require.NoError(t, err)
 
 	// Install v1
-	installer1, err := NewInstaller(projectDir)
+	installer1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = installer1.InstallAll()
 	require.NoError(t, err)
@@ -155,7 +155,7 @@ plugin "my-plugin" {
   agent_instructions = "# V2 Updated Instructions\n\nThis is the new version."
 }
 
-plugin "my-plugin" {
+package "my-plugin" {
   source = "file:` + pluginDir + `"
 }
 `
@@ -163,7 +163,7 @@ plugin "my-plugin" {
 	require.NoError(t, err)
 
 	// Reinstall
-	installer2, err := NewInstaller(projectDir)
+	installer2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = installer2.InstallAll()
 	require.NoError(t, err)
@@ -190,7 +190,7 @@ func TestInstaller_ProjectAgentInstructions_RemoveInstructions(t *testing.T) {
   agent_instructions = "# Project Instructions"
 }
 
-plugin "my-plugin" {
+package "my-plugin" {
   source = "file:` + pluginDir + `"
 }
 `
@@ -198,7 +198,7 @@ plugin "my-plugin" {
 	require.NoError(t, err)
 
 	// Install
-	installer1, err := NewInstaller(projectDir)
+	installer1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = installer1.InstallAll()
 	require.NoError(t, err)
@@ -215,7 +215,7 @@ plugin "my-plugin" {
   default_platform = "claude-code"
 }
 
-plugin "my-plugin" {
+package "my-plugin" {
   source = "file:` + pluginDir + `"
 }
 `
@@ -223,7 +223,7 @@ plugin "my-plugin" {
 	require.NoError(t, err)
 
 	// Reinstall
-	installer2, err := NewInstaller(projectDir)
+	installer2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = installer2.InstallAll()
 	require.NoError(t, err)
@@ -250,7 +250,7 @@ func TestInstaller_ProjectAgentInstructions_Cursor(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create installer and install
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	err = installer.InstallAll()
@@ -282,7 +282,7 @@ func TestInstaller_ProjectAgentInstructions_Copilot(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create installer and install
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	err = installer.InstallAll()
@@ -325,15 +325,15 @@ All plugins must follow these.
 EOF
 }
 
-plugin "plugin-a" {
+package "plugin-a" {
   source = "file:` + plugin1Dir + `"
 }
 
-plugin "plugin-b" {
+package "plugin-b" {
   source = "file:` + plugin2Dir + `"
 }
 
-plugin "plugin-c" {
+package "plugin-c" {
   source = "file:` + plugin3Dir + `"
 }
 `
@@ -341,7 +341,7 @@ plugin "plugin-c" {
 	require.NoError(t, err)
 
 	// Install
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = installer.InstallAll()
 	require.NoError(t, err)
@@ -373,7 +373,7 @@ func TestInstaller_ProjectAgentInstructions_NoInstructionsNoPlugins(t *testing.T
 	require.NoError(t, err)
 
 	// Install
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = installer.InstallAll()
 	require.NoError(t, err)
@@ -399,7 +399,7 @@ func TestInstall_SpecificPlugins_TracksProjectResources(t *testing.T) {
   agent_instructions = "# Project Rules\n\nAlways follow these rules."
 }
 
-plugin "my-plugin" {
+package "my-plugin" {
   source = "file:` + pluginDir + `"
 }
 `
@@ -407,10 +407,10 @@ plugin "my-plugin" {
 	require.NoError(t, err)
 
 	// Install specific plugin (not bare install)
-	installer, err := NewInstaller(projectDir)
+	installer, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
-	_, err = installer.Install([]PluginSpec{
+	_, err = installer.Install([]PackageSpec{
 		{
 			Name:   "my-plugin",
 			Source: "file:" + pluginDir,
@@ -419,13 +419,13 @@ plugin "my-plugin" {
 	require.NoError(t, err)
 
 	// Assert __project__ appears in manifest with exact expected tracking
-	projectPlugin := installer.manifest.GetPlugin("__project__")
+	projectPlugin := installer.manifest.GetPackage("__project__")
 	require.NotNil(t, projectPlugin, "__project__ should be tracked in manifest after Install(specs)")
 	assert.Equal(t, true, projectPlugin.HasAgentContent)
 	assert.Equal(t, []string{"CLAUDE.md"}, projectPlugin.MergedFiles)
 
 	// Assert the plugin is also tracked
-	myPlugin := installer.manifest.GetPlugin("my-plugin")
+	myPlugin := installer.manifest.GetPackage("my-plugin")
 	require.NotNil(t, myPlugin, "my-plugin should be tracked in manifest")
 	assert.Equal(t, true, myPlugin.HasAgentContent)
 	assert.Equal(t, []string{"CLAUDE.md"}, myPlugin.MergedFiles)

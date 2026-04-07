@@ -1,4 +1,4 @@
-// Package manifest tracks files installed by dex plugins.
+// Package manifest tracks files installed by dex packages.
 package manifest
 
 import (
@@ -14,28 +14,28 @@ type Manifest struct {
 	// Version is the manifest format version
 	Version string `json:"version"`
 
-	// Plugins maps plugin names to their tracked resources
-	Plugins map[string]*PluginManifest `json:"plugins"`
+	// Packages maps package names to their tracked resources
+	Packages map[string]*PackageManifest `json:"packages"`
 
 	// path is the file path for saving
 	path string
 }
 
-// PluginManifest tracks resources installed by a single plugin.
-type PluginManifest struct {
-	// Files are relative paths to files installed by this plugin
+// PackageManifest tracks resources installed by a single package.
+type PackageManifest struct {
+	// Files are relative paths to files installed by this package
 	Files []string `json:"files,omitempty"`
 
-	// Directories are relative paths to directories created by this plugin
+	// Directories are relative paths to directories created by this package
 	Directories []string `json:"directories,omitempty"`
 
-	// MCPServers are names of MCP servers contributed by this plugin
+	// MCPServers are names of MCP servers contributed by this package
 	MCPServers []string `json:"mcp_servers,omitempty"`
 
-	// SettingsValues tracks settings values contributed by this plugin (key -> values)
+	// SettingsValues tracks settings values contributed by this package (key -> values)
 	SettingsValues map[string][]string `json:"settings_values,omitempty"`
 
-	// HasAgentContent indicates if this plugin contributed to the agent file
+	// HasAgentContent indicates if this package contributed to the agent file
 	HasAgentContent bool `json:"has_agent_content,omitempty"`
 
 	// MergedFiles are relative paths to merged configuration files (e.g., .mcp.json, .claude/settings.json)
@@ -59,9 +59,9 @@ func Load(projectRoot string) (*Manifest, error) {
 	manifestPath := filepath.Join(dexDir, "manifest.json")
 
 	m := &Manifest{
-		Version: "1.0",
-		Plugins: make(map[string]*PluginManifest),
-		path:    manifestPath,
+		Version:  "1.0",
+		Packages: make(map[string]*PackageManifest),
+		path:     manifestPath,
 	}
 
 	data, err := os.ReadFile(manifestPath)
@@ -77,8 +77,8 @@ func Load(projectRoot string) (*Manifest, error) {
 	}
 
 	m.path = manifestPath
-	if m.Plugins == nil {
-		m.Plugins = make(map[string]*PluginManifest)
+	if m.Packages == nil {
+		m.Packages = make(map[string]*PackageManifest)
 	}
 
 	return m, nil
@@ -100,48 +100,48 @@ func (m *Manifest) Save() error {
 	return os.WriteFile(m.path, data, 0644)
 }
 
-// Track records files and directories for a plugin.
-func (m *Manifest) Track(pluginName string, files, directories []string) {
-	pm := m.getOrCreate(pluginName)
+// Track records files and directories for a package.
+func (m *Manifest) Track(pkgName string, files, directories []string) {
+	pm := m.getOrCreate(pkgName)
 	pm.Files = uniqueStrings(append(pm.Files, files...))
 	pm.Directories = uniqueStrings(append(pm.Directories, directories...))
 }
 
-// ReplaceTracked replaces (not appends) the files and directories for a plugin.
+// ReplaceTracked replaces (not appends) the files and directories for a package.
 // Used during reinstall to remove stale entries from previous installations.
-func (m *Manifest) ReplaceTracked(pluginName string, files, directories []string) {
-	pm := m.getOrCreate(pluginName)
+func (m *Manifest) ReplaceTracked(pkgName string, files, directories []string) {
+	pm := m.getOrCreate(pkgName)
 	pm.Files = uniqueStrings(files)
 	pm.Directories = uniqueStrings(directories)
 }
 
-// ReplaceMergedFiles replaces the merged files list for a plugin.
-func (m *Manifest) ReplaceMergedFiles(pluginName string, mergedFiles []string) {
-	pm := m.getOrCreate(pluginName)
+// ReplaceMergedFiles replaces the merged files list for a package.
+func (m *Manifest) ReplaceMergedFiles(pkgName string, mergedFiles []string) {
+	pm := m.getOrCreate(pkgName)
 	pm.MergedFiles = uniqueStrings(mergedFiles)
 }
 
-// ReplaceMCPServers replaces the MCP servers list for a plugin.
-func (m *Manifest) ReplaceMCPServers(pluginName string, servers []string) {
-	pm := m.getOrCreate(pluginName)
+// ReplaceMCPServers replaces the MCP servers list for a package.
+func (m *Manifest) ReplaceMCPServers(pkgName string, servers []string) {
+	pm := m.getOrCreate(pkgName)
 	pm.MCPServers = uniqueStrings(servers)
 }
 
-// ReplaceSettings replaces (not merges) the settings values for a plugin.
-func (m *Manifest) ReplaceSettings(pluginName string, values map[string][]string) {
-	pm := m.getOrCreate(pluginName)
+// ReplaceSettings replaces (not merges) the settings values for a package.
+func (m *Manifest) ReplaceSettings(pkgName string, values map[string][]string) {
+	pm := m.getOrCreate(pkgName)
 	pm.SettingsValues = values
 }
 
-// TrackMCPServer records an MCP server for a plugin.
-func (m *Manifest) TrackMCPServer(pluginName, serverName string) {
-	pm := m.getOrCreate(pluginName)
+// TrackMCPServer records an MCP server for a package.
+func (m *Manifest) TrackMCPServer(pkgName, serverName string) {
+	pm := m.getOrCreate(pkgName)
 	pm.MCPServers = uniqueStrings(append(pm.MCPServers, serverName))
 }
 
-// TrackSettings records settings values for a plugin.
-func (m *Manifest) TrackSettings(pluginName string, values map[string][]string) {
-	pm := m.getOrCreate(pluginName)
+// TrackSettings records settings values for a package.
+func (m *Manifest) TrackSettings(pkgName string, values map[string][]string) {
+	pm := m.getOrCreate(pkgName)
 	if pm.SettingsValues == nil {
 		pm.SettingsValues = make(map[string][]string)
 	}
@@ -150,21 +150,21 @@ func (m *Manifest) TrackSettings(pluginName string, values map[string][]string) 
 	}
 }
 
-// TrackAgentContent marks that a plugin contributed to the agent file.
-func (m *Manifest) TrackAgentContent(pluginName string) {
-	pm := m.getOrCreate(pluginName)
+// TrackAgentContent marks that a package contributed to the agent file.
+func (m *Manifest) TrackAgentContent(pkgName string) {
+	pm := m.getOrCreate(pkgName)
 	pm.HasAgentContent = true
 }
 
-// TrackMergedFile records a merged configuration file for a plugin.
-func (m *Manifest) TrackMergedFile(pluginName, filePath string) {
-	pm := m.getOrCreate(pluginName)
+// TrackMergedFile records a merged configuration file for a package.
+func (m *Manifest) TrackMergedFile(pkgName, filePath string) {
+	pm := m.getOrCreate(pkgName)
 	pm.MergedFiles = uniqueStrings(append(pm.MergedFiles, filePath))
 }
 
-// Untrack removes a plugin and returns its tracked resources.
-func (m *Manifest) Untrack(pluginName string) *UntrackResult {
-	pm, ok := m.Plugins[pluginName]
+// Untrack removes a package and returns its tracked resources.
+func (m *Manifest) Untrack(pkgName string) *UntrackResult {
+	pm, ok := m.Packages[pkgName]
 	if !ok {
 		return &UntrackResult{}
 	}
@@ -178,65 +178,65 @@ func (m *Manifest) Untrack(pluginName string) *UntrackResult {
 		MergedFiles:     pm.MergedFiles,
 	}
 
-	delete(m.Plugins, pluginName)
+	delete(m.Packages, pkgName)
 	return result
 }
 
-// GetPlugin returns the manifest for a specific plugin.
-func (m *Manifest) GetPlugin(pluginName string) *PluginManifest {
-	return m.Plugins[pluginName]
+// GetPackage returns the manifest for a specific package.
+func (m *Manifest) GetPackage(pkgName string) *PackageManifest {
+	return m.Packages[pkgName]
 }
 
-// GetPluginNames returns all tracked plugin names.
-func (m *Manifest) GetPluginNames() []string {
-	names := make([]string, 0, len(m.Plugins))
-	for name := range m.Plugins {
+// GetPackageNames returns all tracked package names.
+func (m *Manifest) GetPackageNames() []string {
+	names := make([]string, 0, len(m.Packages))
+	for name := range m.Packages {
 		names = append(names, name)
 	}
 	return names
 }
 
-// InstalledPlugins returns all tracked plugin names (alias for GetPluginNames).
-func (m *Manifest) InstalledPlugins() []string {
-	return m.GetPluginNames()
+// InstalledPackages returns all tracked package names (alias for GetPackageNames).
+func (m *Manifest) InstalledPackages() []string {
+	return m.GetPackageNames()
 }
 
-// AllFiles returns all tracked files across all plugins, including merged files.
+// AllFiles returns all tracked files across all packages, including merged files.
 func (m *Manifest) AllFiles() []string {
 	var files []string
-	for _, pm := range m.Plugins {
+	for _, pm := range m.Packages {
 		files = append(files, pm.Files...)
 		files = append(files, pm.MergedFiles...)
 	}
 	return uniqueStrings(files)
 }
 
-// AllDirectories returns all tracked directories across all plugins.
+// AllDirectories returns all tracked directories across all packages.
 func (m *Manifest) AllDirectories() []string {
 	var dirs []string
-	for _, pm := range m.Plugins {
+	for _, pm := range m.Packages {
 		dirs = append(dirs, pm.Directories...)
 	}
 	return uniqueStrings(dirs)
 }
 
-// IsTracked checks if a file path is tracked by any plugin.
-// Returns the plugin name and true if tracked, empty string and false otherwise.
+// IsTracked checks if a file path is tracked by any package.
+// Returns the package name and true if tracked, empty string and false otherwise.
 func (m *Manifest) IsTracked(filePath string) (string, bool) {
-	for pluginName, pm := range m.Plugins {
+	for pkgName, pm := range m.Packages {
 		for _, f := range pm.Files {
 			if f == filePath {
-				return pluginName, true
+				return pkgName, true
 			}
 		}
 	}
 	return "", false
 }
 
-// IsSettingsValueUsedByOthers checks if a settings value is used by plugins other than the specified one.
-func (m *Manifest) IsSettingsValueUsedByOthers(excludePlugin, key, value string) bool {
-	for pluginName, pm := range m.Plugins {
-		if pluginName == excludePlugin {
+// IsSettingsValueUsedByOthers checks if a settings value is used by packages other than the specified one.
+func (m *Manifest) IsSettingsValueUsedByOthers(excludePkg, key, value string) bool {
+	for pkgName, pm := range m.Packages {
+		if pkgName == excludePkg {
 			continue
 		}
 		if pm.SettingsValues != nil {
@@ -250,10 +250,10 @@ func (m *Manifest) IsSettingsValueUsedByOthers(excludePlugin, key, value string)
 	return false
 }
 
-// IsMergedFileUsedByOthers checks if a merged file is used by plugins other than the specified one.
-func (m *Manifest) IsMergedFileUsedByOthers(excludePlugin, filePath string) bool {
-	for pluginName, pm := range m.Plugins {
-		if pluginName == excludePlugin {
+// IsMergedFileUsedByOthers checks if a merged file is used by packages other than the specified one.
+func (m *Manifest) IsMergedFileUsedByOthers(excludePkg, filePath string) bool {
+	for pkgName, pm := range m.Packages {
+		if pkgName == excludePkg {
 			continue
 		}
 		for _, f := range pm.MergedFiles {
@@ -265,12 +265,12 @@ func (m *Manifest) IsMergedFileUsedByOthers(excludePlugin, filePath string) bool
 	return false
 }
 
-// getOrCreate gets or creates a plugin manifest.
-func (m *Manifest) getOrCreate(pluginName string) *PluginManifest {
-	pm, ok := m.Plugins[pluginName]
+// getOrCreate gets or creates a package manifest.
+func (m *Manifest) getOrCreate(pkgName string) *PackageManifest {
+	pm, ok := m.Packages[pkgName]
 	if !ok {
-		pm = &PluginManifest{}
-		m.Plugins[pluginName] = pm
+		pm = &PackageManifest{}
+		m.Packages[pkgName] = pm
 	}
 	return pm
 }

@@ -14,8 +14,8 @@ import (
 
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List installed plugins",
-	Long:  "List all installed plugins with their versions and files.",
+	Short: "List installed packages",
+	Long:  "List all installed packages with their versions and files.",
 	RunE:  runList,
 }
 
@@ -48,22 +48,22 @@ func runList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load lock file: %w", err)
 	}
 
-	// Get installed plugins
-	plugins := mf.InstalledPlugins()
+	// Get installed packages
+	packages := mf.InstalledPackages()
 
-	if len(plugins) == 0 {
-		fmt.Println("No plugins installed.")
+	if len(packages) == 0 {
+		fmt.Println("No packages installed.")
 		return nil
 	}
 
-	// Print plugins
+	// Print packages
 	cyan := color.New(color.FgCyan).SprintFunc()
 	green := color.New(color.FgGreen).SprintFunc()
 	gray := color.New(color.FgHiBlack).SprintFunc()
 
-	fmt.Printf("Installed plugins in %s:\n\n", absPath)
+	fmt.Printf("Installed packages in %s:\n\n", absPath)
 
-	for _, name := range plugins {
+	for _, name := range packages {
 		// Get version from lock file
 		version := "unknown"
 		if locked := lf.Get(name); locked != nil {
@@ -73,14 +73,14 @@ func runList(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  %s %s\n", cyan(name), green("@"+version))
 
 		if showTree {
-			// Show files managed by this plugin
-			pluginManifest := mf.GetPlugin(name)
-			if pluginManifest != nil {
-				for _, file := range pluginManifest.Files {
+			// Show files managed by this package
+			pkgManifest := mf.GetPackage(name)
+			if pkgManifest != nil {
+				for _, file := range pkgManifest.Files {
 					fmt.Printf("    %s %s\n", gray("└──"), file)
 				}
-				if len(pluginManifest.MCPServers) > 0 {
-					for _, server := range pluginManifest.MCPServers {
+				if len(pkgManifest.MCPServers) > 0 {
+					for _, server := range pkgManifest.MCPServers {
 						fmt.Printf("    %s mcp: %s\n", gray("└──"), server)
 					}
 				}
@@ -88,6 +88,6 @@ func runList(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Printf("\n%d plugin(s) installed\n", len(plugins))
+	fmt.Printf("\n%d package(s) installed\n", len(packages))
 	return nil
 }

@@ -29,8 +29,10 @@ func TestMergeMCPServersWithKey_PreservesInputs(t *testing.T) {
 
 	// Servers should be merged
 	servers := result["servers"].(map[string]any)
-	assert.Contains(t, servers, "existing")
-	assert.Contains(t, servers, "new-server")
+	_, hasExisting := servers["existing"]
+	assert.True(t, hasExisting, "existing server should be in merged result")
+	_, hasNew := servers["new-server"]
+	assert.True(t, hasNew, "new-server should be in merged result")
 
 	// Inputs should be merged
 	inputs := result["inputs"].([]any)

@@ -7,7 +7,7 @@ Dex uses HCL (HashiCorp Configuration Language) for configuration files:
 
 ## Project Configuration (dex.hcl)
 
-The `dex.hcl` file defines your project settings, registries, and plugins.
+The `dex.hcl` file defines your project settings, registries, and packages.
 
 ```hcl
 project {
@@ -16,14 +16,14 @@ project {
 }
 
 registry "internal" {
-  path = "/path/to/internal-plugins"
+  path = "/path/to/internal-packages"
 }
 
 registry "community" {
-  url = "https://plugins.example.com"
+  url = "https://packages.example.com"
 }
 
-plugin "python-tools" {
+package "python-tools" {
   registry = "community"
   version  = "^1.0.0"
 
@@ -33,8 +33,8 @@ plugin "python-tools" {
   }
 }
 
-plugin "custom-plugin" {
-  source  = "git+https://github.com/user/custom-plugin.git"
+package "custom-package" {
+  source  = "git+https://github.com/user/custom-package.git"
   version = "v2.0.0"
 }
 ```
@@ -56,7 +56,7 @@ plugin "custom-plugin" {
 
 ### Registry Block
 
-Registries define where to fetch plugins from.
+Registries define where to fetch packages from.
 
 | Attribute | Required | Description |
 |-----------|----------|-------------|
@@ -68,40 +68,40 @@ Registries define where to fetch plugins from.
 
 | Format | Example | Description |
 |--------|---------|-------------|
-| Local | `path = "/path/to/plugins"` | Local filesystem directory |
+| Local | `path = "/path/to/packages"` | Local filesystem directory |
 | HTTPS | `url = "https://registry.example.com"` | Remote HTTP registry |
-| Git | `source = "git+https://github.com/org/repo.git"` | Git repository (in plugin block) |
+| Git | `source = "git+https://github.com/org/repo.git"` | Git repository (in package block) |
 | S3 | `url = "s3://bucket/prefix"` | AWS S3 bucket |
 | Azure | `url = "az://container/prefix"` | Azure Blob Storage |
 
-### Plugin Block
+### Package Block
 
 | Attribute | Required | Description |
 |-----------|----------|-------------|
-| `name` | yes | Plugin identifier (block label) |
+| `name` | yes | Package identifier (block label) |
 | `source` | conditional | Direct source URL |
 | `registry` | conditional | Registry name to fetch from |
 | `version` | no | Version constraint |
-| `config` | no | Plugin configuration values |
+| `config` | no | Package configuration values |
 
-**Plugin source options:**
+**Package source options:**
 
 ```hcl
 # From a named registry
-plugin "my-plugin" {
+package "my-package" {
   registry = "community"
   version  = "^1.0.0"
 }
 
 # From a git repository
-plugin "my-plugin" {
+package "my-package" {
   source  = "git+https://github.com/owner/repo.git"
   version = "v1.0.0"
 }
 
 # From local filesystem
-plugin "my-plugin" {
-  source = "file:///path/to/plugin"
+package "my-package" {
+  source = "file:///path/to/package"
 }
 ```
 
@@ -113,7 +113,7 @@ The lock file ensures deterministic installations by recording exact versions an
 {
   "version": "1.0",
   "platform": "claude-code",
-  "plugins": {
+  "packages": {
     "python-tools": {
       "version": "1.2.0",
       "resolved": "https://registry.example.com/python-tools-1.2.0.tar.gz",
@@ -132,21 +132,21 @@ The lock file ensures deterministic installations by recording exact versions an
 - Ensuring reproducible builds
 
 **Don't commit** when:
-- Developing a plugin locally
+- Developing a package locally
 - Testing different versions
 
 ### Updating Locked Versions
 
-To update all plugins to their latest compatible versions:
+To update all packages to their latest compatible versions:
 
 ```bash
 dex sync
 ```
 
-To update a specific plugin:
+To update a specific package:
 
 ```bash
-dex sync plugin-name@latest
+dex sync package-name@latest
 ```
 
 ## Version Specifiers
@@ -191,4 +191,4 @@ Allows patch-level changes:
 | `dex.lock` | Lock file |
 | `.dex/` | Dex internal directory |
 | `.dex/manifest.json` | Tracks installed files |
-| `.dex/cache/` | Plugin cache (gitignored) |
+| `.dex/cache/` | Package cache (gitignored) |

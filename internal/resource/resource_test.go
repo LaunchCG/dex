@@ -776,49 +776,22 @@ func TestClaudeMCPServer_GetTemplateFiles(t *testing.T) {
 
 func TestNewResource(t *testing.T) {
 	tests := []struct {
-		name     string
 		typeName string
 		wantType Resource
 	}{
-		{
-			name:     "claude_skill",
-			typeName: "claude_skill",
-			wantType: &ClaudeSkill{},
-		},
-		{
-			name:     "claude_command",
-			typeName: "claude_command",
-			wantType: &ClaudeCommand{},
-		},
-		{
-			name:     "claude_subagent",
-			typeName: "claude_subagent",
-			wantType: &ClaudeSubagent{},
-		},
-		{
-			name:     "claude_rule",
-			typeName: "claude_rule",
-			wantType: &ClaudeRule{},
-		},
-		{
-			name:     "claude_rules",
-			typeName: "claude_rules",
-			wantType: &ClaudeRules{},
-		},
-		{
-			name:     "claude_settings",
-			typeName: "claude_settings",
-			wantType: &ClaudeSettings{},
-		},
-		{
-			name:     "claude_mcp_server",
-			typeName: "claude_mcp_server",
-			wantType: &ClaudeMCPServer{},
-		},
+		{"skill", &Skill{}},
+		{"command", &Command{}},
+		{"agent", &Agent{}},
+		{"rule", &Rule{}},
+		{"rules", &Rules{}},
+		{"settings", &Settings{}},
+		{"mcp_server", &MCPServer{}},
+		{"file", &File{}},
+		{"directory", &Directory{}},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.typeName, func(t *testing.T) {
 			res, err := NewResource(tt.typeName)
 			require.NoError(t, err)
 			assert.IsType(t, tt.wantType, res)
@@ -837,27 +810,16 @@ func TestNewResource_Unknown(t *testing.T) {
 func TestRegisteredTypes(t *testing.T) {
 	types := RegisteredTypes()
 
-	// Should return all registered types in sorted order
 	expected := []string{
-		"claude_command",
-		"claude_mcp_server",
-		"claude_rule",
-		"claude_rules",
-		"claude_settings",
-		"claude_skill",
-		"claude_subagent",
-		"copilot_agent",
-		"copilot_instruction",
-		"copilot_instructions",
-		"copilot_mcp_server",
-		"copilot_prompt",
-		"copilot_skill",
-		"cursor_command",
-		"cursor_mcp_server",
-		"cursor_rule",
-		"cursor_rules",
+		"agent",
+		"command",
 		"directory",
 		"file",
+		"mcp_server",
+		"rule",
+		"rules",
+		"settings",
+		"skill",
 	}
 	assert.Equal(t, expected, types)
 }
@@ -867,16 +829,19 @@ func TestIsRegisteredType(t *testing.T) {
 		typeName string
 		want     bool
 	}{
-		{"claude_skill", true},
-		{"claude_command", true},
-		{"claude_subagent", true},
-		{"claude_rule", true},
-		{"claude_rules", true},
-		{"claude_settings", true},
-		{"claude_mcp_server", true},
+		{"skill", true},
+		{"command", true},
+		{"agent", true},
+		{"rule", true},
+		{"rules", true},
+		{"settings", true},
+		{"mcp_server", true},
+		{"file", true},
+		{"directory", true},
+		{"claude_skill", false},
 		{"unknown_type", false},
 		{"", false},
-		{"CLAUDE_SKILL", false}, // case-sensitive
+		{"SKILL", false}, // case-sensitive
 	}
 
 	for _, tt := range tests {

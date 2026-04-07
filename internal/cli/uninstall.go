@@ -14,9 +14,9 @@ import (
 )
 
 var uninstallCmd = &cobra.Command{
-	Use:   "uninstall <plugins...>",
-	Short: "Remove installed plugins",
-	Long:  "Remove installed plugins and their managed files.",
+	Use:   "uninstall <packages...>",
+	Short: "Remove installed packages",
+	Long:  "Remove installed packages and their managed files.",
 	Args:  cobra.MinimumNArgs(1),
 	RunE:  runUninstall,
 }
@@ -35,7 +35,7 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 	projectPath, _ := cmd.Flags().GetString("path")
 
 	// Create installer
-	inst, err := installer.NewInstaller(projectPath)
+	inst, err := installer.NewInstaller(projectPath, "")
 	if err != nil {
 		return fmt.Errorf("failed to initialize installer: %w", err)
 	}
@@ -100,7 +100,7 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Uninstall plugins
+	// Uninstall packages
 	for _, name := range allToUninstall {
 		fmt.Printf("%s Uninstalling %s\n", cyan("→"), name)
 	}
@@ -111,7 +111,7 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 
 	if removeFromConfig {
 		// Intentionally not implemented: uninstall removes files but doesn't modify dex.hcl.
-		// Users can manually edit dex.hcl if they want to remove the plugin permanently.
+		// Users can manually edit dex.hcl if they want to remove the package permanently.
 		fmt.Println(cyan("Note: --remove flag is reserved for future use"))
 	}
 

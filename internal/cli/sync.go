@@ -14,16 +14,16 @@ import (
 )
 
 var syncCmd = &cobra.Command{
-	Use:   "sync [plugins...]",
-	Short: "Synchronize plugins to match config",
-	Long: `Synchronize plugins to match dex.hcl configuration.
+	Use:   "sync [packages...]",
+	Short: "Synchronize packages to match config",
+	Long: `Synchronize packages to match dex.hcl configuration.
 
-Without arguments, syncs all plugins:
-  - Installs plugins in config but not yet installed
-  - Updates plugins that have newer compatible versions
-  - Prunes plugins installed but no longer in config
+Without arguments, syncs all packages:
+  - Installs packages in config but not yet installed
+  - Updates packages that have newer compatible versions
+  - Prunes packages installed but no longer in config
 
-With arguments, installs or updates specific plugins (like install).`,
+With arguments, installs or updates specific packages (like install).`,
 	RunE: runSync,
 }
 
@@ -31,7 +31,7 @@ func init() {
 	rootCmd.AddCommand(syncCmd)
 	syncCmd.Flags().StringP("source", "s", "", "Install from direct source (file://, git+)")
 	syncCmd.Flags().StringP("registry", "r", "", "Registry to use")
-	syncCmd.Flags().Bool("no-save", false, "Don't save to config file (plugins are saved by default)")
+	syncCmd.Flags().Bool("no-save", false, "Don't save to config file (packages are saved by default)")
 	syncCmd.Flags().Bool("no-lock", false, "Don't update lock file")
 	syncCmd.Flags().BoolP("force", "f", false, "Overwrite non-managed files")
 	syncCmd.Flags().StringP("path", "p", ".", "Project directory")
@@ -39,10 +39,11 @@ func init() {
 	syncCmd.Flags().BoolP("dry-run", "n", false, "Show what would change without making changes")
 	syncCmd.Flags().Bool("git-exclude", false, "Update .git/info/exclude to locally hide dex-managed files from git")
 	syncCmd.Flags().StringP("platform", "P", "", "Override the target AI agent platform")
+	syncCmd.Flags().String("profile", "", "Use a named configuration profile")
 }
 
-// parsePluginSpec parses a plugin specification in name@version format.
-func parsePluginSpec(spec string) (name, version string) {
+// parsePackageSpec parses a package specification in name@version format.
+func parsePackageSpec(spec string) (name, version string) {
 	parts := strings.SplitN(spec, "@", 2)
 	name = parts[0]
 	if len(parts) > 1 {
@@ -61,9 +62,10 @@ func runSync(cmd *cobra.Command, args []string) error {
 	namespace, _ := cmd.Flags().GetBool("namespace")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	projectPath, _ := cmd.Flags().GetString("path")
+	profile, _ := cmd.Flags().GetString("profile")
 
 	// Create installer
-	inst, err := installer.NewInstaller(projectPath)
+	inst, err := installer.NewInstaller(projectPath, profile)
 	if err != nil {
 		return fmt.Errorf("failed to initialize installer: %w", err)
 	}
@@ -98,10 +100,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 	if !dryRun {
 		shouldGitExclude := gitExclude
 		if !shouldGitExclude {
-			// Check config setting
-			if cfg, err := config.LoadProject(projectPath); err == nil {
-				shouldGitExclude = cfg.Project.GitExclude
-			}
+			shouldGitExclude = inst.ProjectConfig().Project.GitExclude
 		}
 		if shouldGitExclude {
 			absPath, err := filepath.Abs(projectPath)
@@ -120,19 +119,19 @@ func runSyncExplicit(cmd *cobra.Command, inst *installer.Installer, args []strin
 	green := color.New(color.FgGreen).SprintFunc()
 	cyan := color.New(color.FgCyan).SprintFunc()
 
-	// Parse plugin specs from args
-	var specs []installer.PluginSpec
+	// Parse package specs from args
+	var specs []installer.PackageSpec
 
 	if source != "" && len(args) == 0 {
-		// Direct source install without plugin name
-		specs = append(specs, installer.PluginSpec{
+		// Direct source install without package name
+		specs = append(specs, installer.PackageSpec{
 			Name:   "",
 			Source: source,
 		})
 	} else {
 		for _, arg := range args {
-			name, version := parsePluginSpec(arg)
-			spec := installer.PluginSpec{
+			name, version := parsePackageSpec(arg)
+			spec := installer.PackageSpec{
 				Name:     name,
 				Version:  version,
 				Source:   source,
@@ -160,25 +159,25 @@ func runSyncExplicit(cmd *cobra.Command, inst *installer.Installer, args []strin
 		return err
 	}
 
-	// Save to config by default when installing specific plugins (not "sync all")
+	// Save to config by default when installing specific packages (not "sync all")
 	if !noSave && len(specs) > 0 && len(installed) > 0 {
-		for idx, plugin := range installed {
-			pluginSource := plugin.Source
-			pluginRegistry := plugin.Registry
+		for idx, pkg := range installed {
+			pkgSource := pkg.Source
+			pkgRegistry := pkg.Registry
 
-			if pluginSource == "" && pluginRegistry == "" && idx < len(specs) {
-				pluginSource = specs[idx].Source
-				pluginRegistry = specs[idx].Registry
+			if pkgSource == "" && pkgRegistry == "" && idx < len(specs) {
+				pkgSource = specs[idx].Source
+				pkgRegistry = specs[idx].Registry
 			}
 
-			if pluginSource != "" || pluginRegistry != "" {
-				if err := config.AddPluginToConfig(projectPath, plugin.Name, pluginSource, pluginRegistry, ""); err != nil {
-					fmt.Printf("%s Failed to save plugin %s to config: %v\n", color.YellowString("⚠"), plugin.Name, err)
+			if pkgSource != "" || pkgRegistry != "" {
+				if err := config.AddPackageToConfig(projectPath, pkg.Name, pkgSource, pkgRegistry, ""); err != nil {
+					fmt.Printf("%s Failed to save package %s to config: %v\n", color.YellowString("⚠"), pkg.Name, err)
 				} else {
-					fmt.Printf("  %s Saved %s to dex.hcl\n", green("✓"), plugin.Name)
+					fmt.Printf("  %s Saved %s to dex.hcl\n", green("✓"), pkg.Name)
 				}
 			} else {
-				fmt.Printf("%s Cannot save plugin %s: no source or registry information available\n", color.YellowString("⚠"), plugin.Name)
+				fmt.Printf("%s Cannot save package %s: no source or registry information available\n", color.YellowString("⚠"), pkg.Name)
 			}
 		}
 	}
@@ -195,7 +194,7 @@ func runSyncAll(inst *installer.Installer, dryRun bool) error {
 	if dryRun {
 		fmt.Println(cyan("Checking sync status (dry-run)..."))
 	} else {
-		fmt.Println(cyan("Syncing plugins..."))
+		fmt.Println(cyan("Syncing packages..."))
 	}
 
 	results, err := inst.Sync(dryRun)

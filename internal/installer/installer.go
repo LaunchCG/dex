@@ -1,15 +1,15 @@
-// Package installer handles the installation and uninstallation of dex plugins.
+// Package installer handles the installation and uninstallation of dex packages.
 //
 // The installer orchestrates the complete installation flow:
 //   - Loading project configuration and lock file
-//   - Resolving plugin versions from registries
-//   - Fetching plugin packages
+//   - Resolving package versions from registries
+//   - Fetching package archives
 //   - Planning and executing installations via adapters
 //   - Tracking installed files in the manifest
 //   - Updating the lock file with resolved versions
 //
 // All shared files (CLAUDE.md, .mcp.json, settings.json) are regenerated from
-// scratch after all plugins are processed, using hash comparison to avoid
+// scratch after all packages are processed, using hash comparison to avoid
 // unnecessary writes.
 package installer
 
@@ -32,9 +32,9 @@ import (
 	"github.com/launchcg/dex/pkg/version"
 )
 
-// pluginContribution holds a plugin's shared file contributions for deferred generation.
-type pluginContribution struct {
-	pluginName      string
+// packageContribution holds a package's shared file contributions for deferred generation.
+type packageContribution struct {
+	pkgName         string
 	mcpEntries      map[string]any
 	mcpPath         string
 	mcpKey          string
@@ -44,7 +44,7 @@ type pluginContribution struct {
 	agentFilePath   string
 }
 
-// Installer handles plugin installation for a project.
+// Installer handles package installation for a project.
 type Installer struct {
 	projectRoot string
 	project     *config.ProjectConfig
@@ -55,20 +55,20 @@ type Installer struct {
 	noLock      bool // Don't update lock file
 	namespace   bool // Namespace resources with package name
 
-	// contributions collects shared file contributions from all plugins
+	// contributions collects shared file contributions from all packages
 	// for deferred generation by generateSharedFiles().
-	contributions []pluginContribution
+	contributions []packageContribution
 
-	// removedServers tracks MCP server names from uninstalled plugins,
+	// removedServers tracks MCP server names from uninstalled packages,
 	// so generateMCPConfig knows to remove them from the config file.
 	removedServers map[string]bool
-	// removedSettings tracks settings values from uninstalled plugins.
+	// removedSettings tracks settings values from uninstalled packages.
 	removedSettings map[string]map[string]bool
 }
 
-// PluginSpec specifies a plugin to install.
-type PluginSpec struct {
-	// Name is the plugin name
+// PackageSpec specifies a package to install.
+type PackageSpec struct {
+	// Name is the package name
 	Name string
 
 	// Version is the version constraint (empty = latest, or use lock file)
@@ -80,13 +80,13 @@ type PluginSpec struct {
 	// Registry is the registry name to use
 	Registry string
 
-	// Config provides plugin-specific configuration values
+	// Config provides package-specific configuration values
 	Config map[string]string
 }
 
-// InstalledPlugin contains information about an installed plugin.
-type InstalledPlugin struct {
-	// Name is the plugin name from package.hcl
+// InstalledPackage contains information about an installed package.
+type InstalledPackage struct {
+	// Name is the package name from package.hcl
 	Name string
 
 	// Version is the resolved version
@@ -101,9 +101,10 @@ type InstalledPlugin struct {
 
 // NewInstaller creates a new installer for the given project root.
 // It loads the project configuration, manifest, and lock file.
-func NewInstaller(projectRoot string) (*Installer, error) {
-	// Load project config
-	project, err := config.LoadProject(projectRoot)
+// If profile is non-empty, the named profile is applied to the config before use.
+func NewInstaller(projectRoot string, profile string) (*Installer, error) {
+	// Load project config (with optional profile application)
+	project, err := config.LoadProjectWithProfile(projectRoot, profile)
 	if err != nil {
 		return nil, errors.NewConfigError(
 			filepath.Join(projectRoot, "dex.hcl"),
@@ -164,6 +165,11 @@ func NewInstaller(projectRoot string) (*Installer, error) {
 	}, nil
 }
 
+// ProjectConfig returns the loaded project configuration.
+func (i *Installer) ProjectConfig() *config.ProjectConfig {
+	return i.project
+}
+
 // WithForce sets the force flag to overwrite non-managed files.
 func (i *Installer) WithForce(force bool) *Installer {
 	i.force = force
@@ -216,26 +222,26 @@ func (i *Installer) shouldNamespacePackage(packageName string) bool {
 	return false
 }
 
-// Install installs the specified plugins.
-// If specs is empty, installs all plugins from project config using lock file versions.
-// Returns information about installed plugins for use with --save flag.
-func (i *Installer) Install(specs []PluginSpec) ([]InstalledPlugin, error) {
+// Install installs the specified packages.
+// If specs is empty, installs all packages from project config using lock file versions.
+// Returns information about installed packages for use with --save flag.
+func (i *Installer) Install(specs []PackageSpec) ([]InstalledPackage, error) {
 	if len(specs) == 0 {
 		return nil, i.InstallAll()
 	}
 
 	i.contributions = nil
 
-	var installed []InstalledPlugin
+	var installed []InstalledPackage
 	for _, spec := range specs {
-		info, err := i.installPlugin(spec)
+		info, err := i.installPackage(spec)
 		if err != nil {
 			return nil, err
 		}
 		installed = append(installed, *info)
 	}
 
-	// Collect contributions from remaining locked plugins
+	// Collect contributions from remaining locked packages
 	if err := i.collectAllContributions(); err != nil {
 		return nil, err
 	}
@@ -266,38 +272,38 @@ func (i *Installer) Install(specs []PluginSpec) ([]InstalledPlugin, error) {
 	return installed, nil
 }
 
-// InstallAll installs all plugins from the project config.
+// InstallAll installs all packages from the project config.
 // Uses lock file versions if available, otherwise resolves latest.
 func (i *Installer) InstallAll() error {
-	if len(i.project.Plugins) == 0 && len(i.project.Resources) == 0 && i.project.Project.AgentInstructions == "" {
-		fmt.Println("No plugins, resources, or agent instructions defined in config")
+	if len(i.project.Packages) == 0 && len(i.project.Resources) == 0 && i.project.Project.AgentInstructions == "" {
+		fmt.Println("No packages, resources, or agent instructions defined in config")
 		return nil
 	}
 
 	i.contributions = nil
 
-	var specs []PluginSpec
+	var specs []PackageSpec
 
-	for _, plugin := range i.project.Plugins {
-		spec := PluginSpec{
-			Name:     plugin.Name,
-			Version:  plugin.Version,
-			Source:   plugin.Source,
-			Registry: plugin.Registry,
-			Config:   plugin.Config,
+	for _, pkg := range i.project.Packages {
+		spec := PackageSpec{
+			Name:     pkg.Name,
+			Version:  pkg.Version,
+			Source:   pkg.Source,
+			Registry: pkg.Registry,
+			Config:   pkg.Config,
 		}
 
 		// If locked and no explicit version, use lock file version
-		if locked := i.lock.Get(plugin.Name); locked != nil && plugin.Version == "" {
+		if locked := i.lock.Get(pkg.Name); locked != nil && pkg.Version == "" {
 			spec.Version = locked.Version
 		}
 
 		specs = append(specs, spec)
 	}
 
-	// Call installPlugin directly to avoid recursion through Install
+	// Call installPackage directly to avoid recursion through Install
 	for _, spec := range specs {
-		if _, err := i.installPlugin(spec); err != nil {
+		if _, err := i.installPackage(spec); err != nil {
 			return err
 		}
 	}
@@ -327,10 +333,10 @@ func (i *Installer) InstallAll() error {
 	return nil
 }
 
-// installPlugin installs a single plugin.
+// installPackage installs a single package.
 // It creates directories and writes dedicated files via the executor,
 // and collects shared file contributions for later generation.
-func (i *Installer) installPlugin(spec PluginSpec) (*InstalledPlugin, error) {
+func (i *Installer) installPackage(spec PackageSpec) (*InstalledPackage, error) {
 	// Resolve the registry to use
 	reg, err := i.resolveRegistry(&spec)
 	if err != nil {
@@ -344,56 +350,56 @@ func (i *Installer) installPlugin(spec PluginSpec) (*InstalledPlugin, error) {
 	}
 
 	// Use resolved package name (important when spec.Name is empty for direct sources)
-	pluginName := resolved.Name
-	if pluginName == "" {
-		pluginName = spec.Name
+	pkgName := resolved.Name
+	if pkgName == "" {
+		pkgName = spec.Name
 	}
 
 	// Create temp directory for fetching
 	tempDir, err := os.MkdirTemp("", "dex-install-*")
 	if err != nil {
-		return nil, errors.NewInstallError(pluginName, "fetch", err)
+		return nil, errors.NewInstallError(pkgName, "fetch", err)
 	}
 	defer os.RemoveAll(tempDir)
 
 	// Fetch the package
-	pluginDir, err := reg.FetchPackage(resolved, tempDir)
+	pkgDir, err := reg.FetchPackage(resolved, tempDir)
 	if err != nil {
-		return nil, errors.NewInstallError(pluginName, "fetch", err)
+		return nil, errors.NewInstallError(pkgName, "fetch", err)
 	}
 
 	// Load and validate package config
-	pkgConfig, err := config.LoadPackage(pluginDir)
+	pkgConfig, err := config.LoadPackage(pkgDir)
 	if err != nil {
-		return nil, errors.NewInstallError(pluginName, "parse", err)
+		return nil, errors.NewInstallError(pkgName, "parse", err)
 	}
 
-	// Get the actual plugin name from the package
-	pluginName = pkgConfig.Package.Name
+	// Get the actual package name from the package
+	pkgName = pkgConfig.Meta.Name
 
 	if err := pkgConfig.Validate(); err != nil {
-		return nil, errors.NewInstallError(pluginName, "validate", err)
+		return nil, errors.NewInstallError(pkgName, "validate", err)
 	}
 
 	// Check platform compatibility
-	if len(pkgConfig.Package.Platforms) > 0 {
+	if len(pkgConfig.Meta.Platforms) > 0 {
 		compatible := false
-		for _, platform := range pkgConfig.Package.Platforms {
+		for _, platform := range pkgConfig.Meta.Platforms {
 			if platform == i.project.Project.AgenticPlatform {
 				compatible = true
 				break
 			}
 		}
 		if !compatible {
-			return nil, errors.NewInstallError(pluginName, "validate",
-				fmt.Errorf("plugin %q does not support platform %q",
-					pluginName, i.project.Project.AgenticPlatform))
+			return nil, errors.NewInstallError(pkgName, "validate",
+				fmt.Errorf("package %q does not support platform %q",
+					pkgName, i.project.Project.AgenticPlatform))
 		}
 	}
 
 	// Install dependencies first
 	if len(pkgConfig.Dependencies) > 0 {
-		if err := i.installDependencies(pkgConfig.Dependencies, pluginName); err != nil {
+		if err := i.installDependencies(pkgConfig.Dependencies, pkgName); err != nil {
 			return nil, err
 		}
 	}
@@ -401,15 +407,15 @@ func (i *Installer) installPlugin(spec PluginSpec) (*InstalledPlugin, error) {
 	// Resolve variable values
 	vars, err := i.resolveVariables(pkgConfig, spec.Config)
 	if err != nil {
-		return nil, errors.NewInstallError(pluginName, "configure", err)
+		return nil, errors.NewInstallError(pkgName, "configure", err)
 	}
 
 	// Determine if namespacing should be enabled
-	shouldNamespace := i.shouldNamespacePackage(pluginName)
+	shouldNamespace := i.shouldNamespacePackage(pkgName)
 
 	// Create install context
 	ctx := &adapter.InstallContext{
-		PackageName: pluginName,
+		PackageName: pkgName,
 		Namespace:   shouldNamespace,
 	}
 
@@ -426,21 +432,21 @@ func (i *Installer) installPlugin(spec PluginSpec) (*InstalledPlugin, error) {
 		if res.Platform() != targetPlatform && res.Platform() != "universal" {
 			continue
 		}
-		plan, err := i.adapter.PlanInstallation(res, pkgConfig, pluginDir, i.projectRoot, ctx)
+		plan, err := i.adapter.PlanInstallation(res, pkgConfig, pkgDir, i.projectRoot, ctx)
 		if err != nil {
-			return nil, errors.NewInstallError(pluginName, "plan", err)
+			return nil, errors.NewInstallError(pkgName, "plan", err)
 		}
 		allPlans = append(allPlans, plan)
 	}
 
 	// Merge all plans
 	mergedPlan := adapter.MergePlans(allPlans...)
-	// Always ensure PluginName is set, even when plan is empty (no resources matched platform)
-	mergedPlan.PluginName = pluginName
+	// Always ensure PackageName is set, even when plan is empty (no resources matched platform)
+	mergedPlan.PackageName = pkgName
 
 	// Always clean up stale dedicated files/dirs from a previous install, even if
-	// the new plan is empty (e.g., plugin had claude_skill resources but platform
-	// is now github-copilot — no new files, but old .claude/skills/ must go).
+	// the new plan is empty (e.g., package had skill resources but platform switched
+	// — no new files, but old platform files must go).
 	newFilePaths := make(map[string]bool, len(mergedPlan.Files))
 	for _, f := range mergedPlan.Files {
 		newFilePaths[f.Path] = true
@@ -449,18 +455,18 @@ func (i *Installer) installPlugin(spec PluginSpec) (*InstalledPlugin, error) {
 	for _, d := range mergedPlan.Directories {
 		newDirPaths[d.Path] = true
 	}
-	if err := executor.RemoveStaleEntries(pluginName, newFilePaths, newDirPaths); err != nil {
-		return nil, errors.NewInstallError(pluginName, "install", err)
+	if err := executor.RemoveStaleEntries(pkgName, newFilePaths, newDirPaths); err != nil {
+		return nil, errors.NewInstallError(pkgName, "install", err)
 	}
 
 	// Execute the merged plan (creates dirs, writes dedicated files, tracks in manifest)
 	if err := executor.Execute(mergedPlan, vars); err != nil {
-		return nil, errors.NewInstallError(pluginName, "install", err)
+		return nil, errors.NewInstallError(pkgName, "install", err)
 	}
 
 	// Collect shared file contributions for deferred generation
-	i.contributions = append(i.contributions, pluginContribution{
-		pluginName:      pluginName,
+	i.contributions = append(i.contributions, packageContribution{
+		pkgName:         pkgName,
 		mcpEntries:      mergedPlan.MCPEntries,
 		mcpPath:         mergedPlan.MCPPath,
 		mcpKey:          mergedPlan.MCPKey,
@@ -476,7 +482,7 @@ func (i *Installer) installPlugin(spec PluginSpec) (*InstalledPlugin, error) {
 		for _, dep := range pkgConfig.Dependencies {
 			deps[dep.Name] = dep.Version
 		}
-		i.lock.Set(pluginName, &lockfile.LockedPlugin{
+		i.lock.Set(pkgName, &lockfile.LockedPackage{
 			Version:      resolved.Version,
 			Resolved:     resolved.URL,
 			Integrity:    resolved.Integrity,
@@ -484,44 +490,44 @@ func (i *Installer) installPlugin(spec PluginSpec) (*InstalledPlugin, error) {
 		})
 	}
 
-	fmt.Printf("  ✓ Installed %s@%s\n", pluginName, resolved.Version)
+	fmt.Printf("  ✓ Installed %s@%s\n", pkgName, resolved.Version)
 
-	// Return installed plugin info
-	return &InstalledPlugin{
-		Name:     pluginName,
+	// Return installed package info
+	return &InstalledPackage{
+		Name:     pkgName,
 		Version:  resolved.Version,
 		Source:   spec.Source,
 		Registry: spec.Registry,
 	}, nil
 }
 
-// collectAllContributions reinstalls all locked plugins that haven't already
+// collectAllContributions reinstalls all locked packages that haven't already
 // been installed in the current session to collect their shared file contributions.
-// This ensures generateSharedFiles() has complete data from all plugins.
+// This ensures generateSharedFiles() has complete data from all packages.
 func (i *Installer) collectAllContributions() error {
-	// Build set of plugins already collected
+	// Build set of packages already collected
 	collected := make(map[string]bool)
 	for _, c := range i.contributions {
-		collected[c.pluginName] = true
+		collected[c.pkgName] = true
 	}
 
-	// Re-install remaining locked plugins to collect their contributions
-	for _, plugin := range i.project.Plugins {
-		if collected[plugin.Name] {
+	// Re-install remaining locked packages to collect their contributions
+	for _, pkg := range i.project.Packages {
+		if collected[pkg.Name] {
 			continue
 		}
-		locked := i.lock.Get(plugin.Name)
+		locked := i.lock.Get(pkg.Name)
 		if locked == nil {
 			continue
 		}
-		spec := PluginSpec{
-			Name:     plugin.Name,
+		spec := PackageSpec{
+			Name:     pkg.Name,
 			Version:  locked.Version,
-			Source:   plugin.Source,
-			Registry: plugin.Registry,
-			Config:   plugin.Config,
+			Source:   pkg.Source,
+			Registry: pkg.Registry,
+			Config:   pkg.Config,
 		}
-		if _, err := i.installPlugin(spec); err != nil {
+		if _, err := i.installPackage(spec); err != nil {
 			return err
 		}
 	}
@@ -551,8 +557,8 @@ func (i *Installer) installDependencies(deps []config.DependencyBlock, parentNam
 
 		// If not specified, try to find from project config or use parent's registry
 		if registryName == "" && source == "" {
-			// Check if this dependency is declared in project plugins
-			for _, p := range i.project.Plugins {
+			// Check if this dependency is declared in project packages
+			for _, p := range i.project.Packages {
 				if p.Name == dep.Name {
 					registryName = p.Registry
 					source = p.Source
@@ -569,7 +575,7 @@ func (i *Installer) installDependencies(deps []config.DependencyBlock, parentNam
 		fmt.Printf("  → Installing dependency %s@%s for %s\n", dep.Name, dep.Version, parentName)
 
 		// Install the dependency
-		_, err := i.installPlugin(PluginSpec{
+		_, err := i.installPackage(PackageSpec{
 			Name:     dep.Name,
 			Version:  dep.Version,
 			Source:   source,
@@ -594,21 +600,21 @@ func (i *Installer) installProjectResources() error {
 	// Create a synthetic package config for project-level resources
 	// This is used by adapters that expect package metadata
 	projectPkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "project",
 			Version: "0.0.0",
 		},
 	}
 	if i.project.Project.Name != "" {
-		projectPkg.Package.Name = i.project.Project.Name
+		projectPkg.Meta.Name = i.project.Project.Name
 	}
 
 	// Determine if namespacing should be enabled for project resources
-	shouldNamespace := i.shouldNamespacePackage(projectPkg.Package.Name)
+	shouldNamespace := i.shouldNamespacePackage(projectPkg.Meta.Name)
 
 	// Create install context for project resources
 	ctx := &adapter.InstallContext{
-		PackageName: projectPkg.Package.Name,
+		PackageName: projectPkg.Meta.Name,
 		Namespace:   shouldNamespace,
 	}
 
@@ -646,8 +652,8 @@ func (i *Installer) installProjectResources() error {
 	}
 
 	// Collect shared file contributions
-	i.contributions = append(i.contributions, pluginContribution{
-		pluginName:      mergedPlan.PluginName,
+	i.contributions = append(i.contributions, packageContribution{
+		pkgName:         mergedPlan.PackageName,
 		mcpEntries:      mergedPlan.MCPEntries,
 		mcpPath:         mergedPlan.MCPPath,
 		mcpKey:          mergedPlan.MCPKey,
@@ -662,7 +668,7 @@ func (i *Installer) installProjectResources() error {
 }
 
 // platformSharedPaths returns the default shared file paths for a given platform.
-// These are the paths used when no plugin contribution overrides them.
+// These are the paths used when no package contribution overrides them.
 func platformSharedPaths(platform string) (agentPath, mcpPath, mcpKey, settingsPath string) {
 	agentPath = "CLAUDE.md"
 	mcpPath = ".mcp.json"
@@ -685,7 +691,7 @@ func platformSharedPaths(platform string) (agentPath, mcpPath, mcpKey, settingsP
 }
 
 // platformInstallDirs returns the directories that a platform's adapter installs
-// plugin resources into. Used to sweep empty remnant directories after a platform
+// package resources into. Used to sweep empty remnant directories after a platform
 // switch.
 func platformInstallDirs(platform string) []string {
 	switch platform {
@@ -728,7 +734,7 @@ func removeEmptyDirsUnder(root string) {
 
 // cleanupOldPlatformFiles removes shared files that belong to a different platform.
 // Only the files are deleted — manifest data is left for the executor to replace
-// during plugin reinstallation.
+// during package reinstallation.
 func (i *Installer) cleanupOldPlatformFiles(oldPlatform string) error {
 	oldAgentPath, oldMCPPath, _, oldSettingsPath := platformSharedPaths(oldPlatform)
 	newAgentPath, newMCPPath, _, newSettingsPath := platformSharedPaths(i.project.Project.AgenticPlatform)
@@ -767,7 +773,7 @@ func (i *Installer) cleanupOldPlatformFiles(oldPlatform string) error {
 }
 
 // generateSharedFiles regenerates all shared files (agent file, MCP config, settings)
-// from scratch using collected plugin contributions. Uses hash comparison to avoid
+// from scratch using collected package contributions. Uses hash comparison to avoid
 // unnecessary writes. Non-dex entries in MCP and settings files are preserved.
 func (i *Installer) generateSharedFiles() error {
 	// Always clean up shared files from all other platforms.
@@ -812,7 +818,7 @@ func (i *Installer) generateSharedFiles() error {
 		}
 	}
 
-	// 1. Generate agent file (project instructions + plugin content, no markers)
+	// 1. Generate agent file (project instructions + package content, no markers)
 	if err := i.generateAgentFile(agentPath); err != nil {
 		return err
 	}
@@ -834,7 +840,7 @@ func (i *Installer) generateSharedFiles() error {
 }
 
 // generateAgentFile regenerates the agent file (e.g., CLAUDE.md) from scratch.
-// Content is: project instructions + all plugin agent content (no markers).
+// Content is: project instructions + all package agent content (no markers).
 func (i *Installer) generateAgentFile(agentPath string) error {
 	var content strings.Builder
 
@@ -843,7 +849,7 @@ func (i *Installer) generateAgentFile(agentPath string) error {
 		content.WriteString(strings.TrimSpace(i.project.Project.AgentInstructions))
 	}
 
-	// Plugin contributions
+	// Package contributions
 	for _, c := range i.contributions {
 		if c.agentContent != "" {
 			if content.Len() > 0 {
@@ -877,10 +883,10 @@ func (i *Installer) generateAgentFile(agentPath string) error {
 		i.manifest.TrackAgentContent("__project__")
 		i.manifest.TrackMergedFile("__project__", agentPath)
 	} else {
-		plugin := i.manifest.GetPlugin("__project__")
-		if plugin != nil {
-			plugin.HasAgentContent = false
-			plugin.MergedFiles = removeString(plugin.MergedFiles, agentPath)
+		pkg := i.manifest.GetPackage("__project__")
+		if pkg != nil {
+			pkg.HasAgentContent = false
+			pkg.MergedFiles = removeString(pkg.MergedFiles, agentPath)
 		}
 	}
 
@@ -909,10 +915,10 @@ func (i *Installer) generateMCPConfig(mcpPath, mcpKey string) error {
 
 	// Remove all previously dex-managed servers from existing config.
 	// A server is considered dex-managed if it was tracked in the manifest,
-	// being contributed by current plugins, or was recently uninstalled.
+	// being contributed by current packages, or was recently uninstalled.
 	dexServers := make(map[string]bool)
-	for _, plugin := range i.manifest.Plugins {
-		for _, server := range plugin.MCPServers {
+	for _, pkg := range i.manifest.Packages {
+		for _, server := range pkg.MCPServers {
 			dexServers[server] = true
 		}
 	}
@@ -979,10 +985,10 @@ func (i *Installer) generateMCPConfig(mcpPath, mcpKey string) error {
 func (i *Installer) generateSettingsConfig(settingsPath string) error {
 	fullPath := filepath.Join(i.projectRoot, settingsPath)
 
-	// Collect all dex-managed settings values from manifest and recently removed plugins
+	// Collect all dex-managed settings values from manifest and recently removed packages
 	dexValues := make(map[string]map[string]bool)
-	for _, plugin := range i.manifest.Plugins {
-		for key, vals := range plugin.SettingsValues {
+	for _, pkg := range i.manifest.Packages {
+		for key, vals := range pkg.SettingsValues {
 			if dexValues[key] == nil {
 				dexValues[key] = make(map[string]bool)
 			}
@@ -1058,8 +1064,8 @@ func (i *Installer) generateSettingsConfig(settingsPath string) error {
 	return nil
 }
 
-// resolveRegistry determines which registry to use for fetching a plugin.
-func (i *Installer) resolveRegistry(spec *PluginSpec) (registry.Registry, error) {
+// resolveRegistry determines which registry to use for fetching a package.
+func (i *Installer) resolveRegistry(spec *PackageSpec) (registry.Registry, error) {
 	// If direct source is specified, use it
 	if spec.Source != "" {
 		return registry.NewRegistry(spec.Source, registry.ModePackage)
@@ -1080,15 +1086,15 @@ func (i *Installer) resolveRegistry(spec *PluginSpec) (registry.Registry, error)
 		return nil, fmt.Errorf("registry %q not found in project config", spec.Registry)
 	}
 
-	// Try to find the plugin in project config
-	for _, plugin := range i.project.Plugins {
-		if plugin.Name == spec.Name {
-			if plugin.Source != "" {
-				return registry.NewRegistry(plugin.Source, registry.ModePackage)
+	// Try to find the package in project config
+	for _, pkg := range i.project.Packages {
+		if pkg.Name == spec.Name {
+			if pkg.Source != "" {
+				return registry.NewRegistry(pkg.Source, registry.ModePackage)
 			}
-			if plugin.Registry != "" {
+			if pkg.Registry != "" {
 				// Recursively resolve with registry name
-				spec.Registry = plugin.Registry
+				spec.Registry = pkg.Registry
 				return i.resolveRegistry(spec)
 			}
 		}
@@ -1104,13 +1110,13 @@ func (i *Installer) resolveRegistry(spec *PluginSpec) (registry.Registry, error)
 		return reg, nil
 	}
 
-	return nil, fmt.Errorf("no source or registry specified for plugin %q", spec.Name)
+	return nil, fmt.Errorf("no source or registry specified for package %q", spec.Name)
 }
 
-// searchRegistries searches all configured registries for a plugin by name.
+// searchRegistries searches all configured registries for a package by name.
 // Returns the registry name and registry instance if found in exactly one registry.
 // Returns an error if found in multiple registries (ambiguous) or not found in any.
-func (i *Installer) searchRegistries(pluginName string) (string, registry.Registry, error) {
+func (i *Installer) searchRegistries(pkgName string) (string, registry.Registry, error) {
 	type found struct {
 		name string
 		reg  registry.Registry
@@ -1133,7 +1139,7 @@ func (i *Installer) searchRegistries(pluginName string) (string, registry.Regist
 			continue
 		}
 
-		_, err = reg.GetPackageInfo(pluginName)
+		_, err = reg.GetPackageInfo(pkgName)
 		if err != nil {
 			var notFound *errors.NotFoundError
 			if stderrors.As(err, &notFound) {
@@ -1148,7 +1154,7 @@ func (i *Installer) searchRegistries(pluginName string) (string, registry.Regist
 
 	switch len(matches) {
 	case 0:
-		return "", nil, fmt.Errorf("plugin %q not found in any configured registry", pluginName)
+		return "", nil, fmt.Errorf("package %q not found in any configured registry", pkgName)
 	case 1:
 		return matches[0].name, matches[0].reg, nil
 	default:
@@ -1156,16 +1162,16 @@ func (i *Installer) searchRegistries(pluginName string) (string, registry.Regist
 		for _, m := range matches {
 			names = append(names, m.name)
 		}
-		return "", nil, fmt.Errorf("plugin %q found in multiple registries: %s (use --registry to specify which one)", pluginName, strings.Join(names, ", "))
+		return "", nil, fmt.Errorf("package %q found in multiple registries: %s (use --registry to specify which one)", pkgName, strings.Join(names, ", "))
 	}
 }
 
 // resolveVariables resolves variable values from environment and config.
-func (i *Installer) resolveVariables(pkg *config.PackageConfig, pluginConfig map[string]string) (map[string]string, error) {
+func (i *Installer) resolveVariables(pkg *config.PackageConfig, pkgConfig map[string]string) (map[string]string, error) {
 	vars := make(map[string]string)
 
 	for _, v := range pkg.Variables {
-		value, err := v.ResolveValue(pluginConfig)
+		value, err := v.ResolveValue(pkgConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -1175,15 +1181,15 @@ func (i *Installer) resolveVariables(pkg *config.PackageConfig, pluginConfig map
 	return vars, nil
 }
 
-// Uninstall removes installed plugins.
-// If removeFromConfig is true, also removes the plugin from dex.hcl.
+// Uninstall removes installed packages.
+// If removeFromConfig is true, also removes the package from dex.hcl.
 func (i *Installer) Uninstall(names []string, removeFromConfig bool) error {
-	// Track servers and settings from plugins being uninstalled so
+	// Track servers and settings from packages being uninstalled so
 	// generateSharedFiles knows to remove them from config files.
 	i.removedServers = make(map[string]bool)
 	i.removedSettings = make(map[string]map[string]bool)
 	for _, name := range names {
-		if pm := i.manifest.GetPlugin(name); pm != nil {
+		if pm := i.manifest.GetPackage(name); pm != nil {
 			for _, server := range pm.MCPServers {
 				i.removedServers[server] = true
 			}
@@ -1199,17 +1205,17 @@ func (i *Installer) Uninstall(names []string, removeFromConfig bool) error {
 	}
 
 	for _, name := range names {
-		if err := i.uninstallPlugin(name); err != nil {
+		if err := i.uninstallPackage(name); err != nil {
 			return err
 		}
 		// Remove from lock immediately so collectAllContributions
-		// won't re-install the uninstalled plugin.
+		// won't re-install the uninstalled package.
 		if !i.noLock {
 			i.lock.Remove(name)
 		}
 	}
 
-	// Regenerate shared files from remaining plugins
+	// Regenerate shared files from remaining packages
 	i.contributions = nil
 	if err := i.collectAllContributions(); err != nil {
 		return err
@@ -1236,10 +1242,10 @@ func (i *Installer) Uninstall(names []string, removeFromConfig bool) error {
 	return nil
 }
 
-// uninstallPlugin removes a single plugin's dedicated files and manifest entries.
+// uninstallPackage removes a single package's dedicated files and manifest entries.
 // Shared files (MCP, settings, agent content) are NOT cleaned up here;
 // they are regenerated from scratch by generateSharedFiles().
-func (i *Installer) uninstallPlugin(name string) error {
+func (i *Installer) uninstallPackage(name string) error {
 	// Get files to remove from manifest
 	result := i.manifest.Untrack(name)
 
@@ -1269,13 +1275,13 @@ func (i *Installer) uninstallPlugin(name string) error {
 // FindDependents returns packages that depend on the given package.
 func (i *Installer) FindDependents(name string) []string {
 	var dependents []string
-	for pluginName, locked := range i.lock.Plugins {
-		if pluginName == name {
+	for pkgName, locked := range i.lock.Packages {
+		if pkgName == name {
 			continue
 		}
 		for dep := range locked.Dependencies {
 			if dep == name {
-				dependents = append(dependents, pluginName)
+				dependents = append(dependents, pkgName)
 				break
 			}
 		}
@@ -1293,16 +1299,16 @@ func (i *Installer) FindOrphans(excluding []string) []string {
 		excludeSet[name] = true
 	}
 
-	// Build set of explicitly declared plugins (from project config)
+	// Build set of explicitly declared packages (from project config)
 	explicit := make(map[string]bool)
-	for _, p := range i.project.Plugins {
+	for _, p := range i.project.Packages {
 		explicit[p.Name] = true
 	}
 
 	// Build set of all needed dependencies
 	needed := make(map[string]bool)
-	for pluginName, locked := range i.lock.Plugins {
-		if excludeSet[pluginName] {
+	for pkgName, locked := range i.lock.Packages {
+		if excludeSet[pkgName] {
 			continue
 		}
 		for dep := range locked.Dependencies {
@@ -1312,35 +1318,35 @@ func (i *Installer) FindOrphans(excluding []string) []string {
 
 	// Find installed packages that are not needed and not explicit
 	var orphans []string
-	for pluginName := range i.lock.Plugins {
-		if excludeSet[pluginName] {
+	for pkgName := range i.lock.Packages {
+		if excludeSet[pkgName] {
 			continue
 		}
-		if !needed[pluginName] && !explicit[pluginName] {
-			orphans = append(orphans, pluginName)
+		if !needed[pkgName] && !explicit[pkgName] {
+			orphans = append(orphans, pkgName)
 		}
 	}
 	sort.Strings(orphans)
 	return orphans
 }
 
-// SyncAction describes what action was taken for a plugin during sync.
+// SyncAction describes what action was taken for a package during sync.
 type SyncAction string
 
 const (
-	// SyncInstalled means the plugin was freshly installed.
+	// SyncInstalled means the package was freshly installed.
 	SyncInstalled SyncAction = "installed"
-	// SyncUpdated means the plugin was updated to a newer version.
+	// SyncUpdated means the package was updated to a newer version.
 	SyncUpdated SyncAction = "updated"
-	// SyncUpToDate means the plugin was already at the latest compatible version.
+	// SyncUpToDate means the package was already at the latest compatible version.
 	SyncUpToDate SyncAction = "up_to_date"
-	// SyncPruned means the plugin was removed because it's no longer in config.
+	// SyncPruned means the package was removed because it's no longer in config.
 	SyncPruned SyncAction = "pruned"
 )
 
-// SyncResult contains information about a single plugin's sync outcome.
+// SyncResult contains information about a single package's sync outcome.
 type SyncResult struct {
-	// Name is the plugin name
+	// Name is the package name
 	Name string
 	// Action is what happened during sync
 	Action SyncAction
@@ -1354,7 +1360,7 @@ type SyncResult struct {
 
 // UpdateResult contains information about an update operation.
 type UpdateResult struct {
-	// Name is the plugin name
+	// Name is the package name
 	Name string
 	// OldVersion is the previously installed version
 	OldVersion string
@@ -1366,13 +1372,13 @@ type UpdateResult struct {
 	Reason string
 }
 
-// Update updates specified plugins to newer versions.
-// If names is empty, updates all plugins.
+// Update updates specified packages to newer versions.
+// If names is empty, updates all packages.
 // If dryRun is true, only reports what would be updated without making changes.
 func (i *Installer) Update(names []string, dryRun bool) ([]UpdateResult, error) {
 	// If no names specified, update all locked packages that are in project config
 	if len(names) == 0 {
-		for _, p := range i.project.Plugins {
+		for _, p := range i.project.Packages {
 			if i.lock.Has(p.Name) {
 				names = append(names, p.Name)
 			}
@@ -1384,7 +1390,7 @@ func (i *Installer) Update(names []string, dryRun bool) ([]UpdateResult, error) 
 	var results []UpdateResult
 
 	for _, name := range names {
-		result, err := i.updatePlugin(name, dryRun)
+		result, err := i.updatePackage(name, dryRun)
 		if err != nil {
 			return nil, err
 		}
@@ -1393,7 +1399,7 @@ func (i *Installer) Update(names []string, dryRun bool) ([]UpdateResult, error) 
 
 	// Generate shared files if not dry run
 	if !dryRun {
-		// Collect contributions from non-updated plugins
+		// Collect contributions from non-updated packages
 		if err := i.collectAllContributions(); err != nil {
 			return nil, err
 		}
@@ -1425,21 +1431,21 @@ func (i *Installer) Update(names []string, dryRun bool) ([]UpdateResult, error) 
 	return results, nil
 }
 
-// checkForUpdate checks if a newer version is available for a plugin.
+// checkForUpdate checks if a newer version is available for a package.
 // Returns the best available version string, or empty if already up to date.
-// Also returns the PluginSpec built from project config for use in installation.
-func (i *Installer) checkForUpdate(name string) (bestVersion string, spec PluginSpec, err error) {
+// Also returns the PackageSpec built from project config for use in installation.
+func (i *Installer) checkForUpdate(name string) (bestVersion string, spec PackageSpec, err error) {
 	locked := i.lock.Get(name)
 	if locked == nil {
-		return "", PluginSpec{}, fmt.Errorf("plugin %q not in lock file", name)
+		return "", PackageSpec{}, fmt.Errorf("package %q not in lock file", name)
 	}
 
 	// Get constraint from project config
 	var constraint string
-	for _, p := range i.project.Plugins {
+	for _, p := range i.project.Packages {
 		if p.Name == name {
 			constraint = p.Version
-			spec = PluginSpec{
+			spec = PackageSpec{
 				Name:     p.Name,
 				Version:  p.Version,
 				Source:   p.Source,
@@ -1501,8 +1507,8 @@ func (i *Installer) checkForUpdate(name string) (bestVersion string, spec Plugin
 }
 
 // Sync synchronizes the project to match dex.hcl.
-// For each plugin in config: installs (always, even if up-to-date).
-// For each plugin in lock file but not in config: prunes (uninstalls).
+// For each package in config: installs (always, even if up-to-date).
+// For each package in lock file but not in config: prunes (uninstalls).
 // The version check only affects the reported SyncAction.
 // All shared files are regenerated from scratch after processing.
 // If dryRun is true, only reports what would change without making modifications.
@@ -1511,59 +1517,59 @@ func (i *Installer) Sync(dryRun bool) ([]SyncResult, error) {
 
 	i.contributions = nil
 
-	// Build set of config plugin names
-	configPlugins := make(map[string]bool)
-	for _, p := range i.project.Plugins {
-		configPlugins[p.Name] = true
+	// Build set of config package names
+	configPackages := make(map[string]bool)
+	for _, p := range i.project.Packages {
+		configPackages[p.Name] = true
 	}
 
-	// Process each plugin in config
-	for _, plugin := range i.project.Plugins {
-		locked := i.lock.Get(plugin.Name)
+	// Process each package in config
+	for _, pkg := range i.project.Packages {
+		locked := i.lock.Get(pkg.Name)
 
 		if locked == nil {
 			// Not installed → install
 			if dryRun {
 				// Resolve what version would be installed
-				spec := PluginSpec{
-					Name:     plugin.Name,
-					Version:  plugin.Version,
-					Source:   plugin.Source,
-					Registry: plugin.Registry,
-					Config:   plugin.Config,
+				spec := PackageSpec{
+					Name:     pkg.Name,
+					Version:  pkg.Version,
+					Source:   pkg.Source,
+					Registry: pkg.Registry,
+					Config:   pkg.Config,
 				}
 				reg, err := i.resolveRegistry(&spec)
 				if err != nil {
-					return nil, errors.NewInstallError(plugin.Name, "resolve", err)
+					return nil, errors.NewInstallError(pkg.Name, "resolve", err)
 				}
-				resolved, err := reg.ResolvePackage(plugin.Name, plugin.Version)
+				resolved, err := reg.ResolvePackage(pkg.Name, pkg.Version)
 				if err != nil {
-					return nil, errors.NewInstallError(plugin.Name, "resolve", err)
+					return nil, errors.NewInstallError(pkg.Name, "resolve", err)
 				}
 				results = append(results, SyncResult{
-					Name:       plugin.Name,
+					Name:       pkg.Name,
 					Action:     SyncInstalled,
 					NewVersion: resolved.Version,
 					Reason:     "would install",
 				})
 			} else {
-				spec := PluginSpec{
-					Name:     plugin.Name,
-					Version:  plugin.Version,
-					Source:   plugin.Source,
-					Registry: plugin.Registry,
-					Config:   plugin.Config,
+				spec := PackageSpec{
+					Name:     pkg.Name,
+					Version:  pkg.Version,
+					Source:   pkg.Source,
+					Registry: pkg.Registry,
+					Config:   pkg.Config,
 				}
 				// If locked version exists for version hint, use it
-				if lockedEntry := i.lock.Get(plugin.Name); lockedEntry != nil && plugin.Version == "" {
+				if lockedEntry := i.lock.Get(pkg.Name); lockedEntry != nil && pkg.Version == "" {
 					spec.Version = lockedEntry.Version
 				}
-				info, err := i.installPlugin(spec)
+				info, err := i.installPackage(spec)
 				if err != nil {
 					return nil, err
 				}
 				results = append(results, SyncResult{
-					Name:       plugin.Name,
+					Name:       pkg.Name,
 					Action:     SyncInstalled,
 					NewVersion: info.Version,
 					Reason:     "installed",
@@ -1571,7 +1577,7 @@ func (i *Installer) Sync(dryRun bool) ([]SyncResult, error) {
 			}
 		} else {
 			// Already installed → check for update, but always reinstall
-			bestVersion, spec, err := i.checkForUpdate(plugin.Name)
+			bestVersion, spec, err := i.checkForUpdate(pkg.Name)
 			if err != nil {
 				return nil, err
 			}
@@ -1579,19 +1585,19 @@ func (i *Installer) Sync(dryRun bool) ([]SyncResult, error) {
 			if bestVersion == "" {
 				// Up to date — still reinstall to regenerate files
 				if !dryRun {
-					spec = PluginSpec{
-						Name:     plugin.Name,
+					spec = PackageSpec{
+						Name:     pkg.Name,
 						Version:  locked.Version,
-						Source:   plugin.Source,
-						Registry: plugin.Registry,
-						Config:   plugin.Config,
+						Source:   pkg.Source,
+						Registry: pkg.Registry,
+						Config:   pkg.Config,
 					}
-					if _, err := i.installPlugin(spec); err != nil {
+					if _, err := i.installPackage(spec); err != nil {
 						return nil, err
 					}
 				}
 				results = append(results, SyncResult{
-					Name:       plugin.Name,
+					Name:       pkg.Name,
 					Action:     SyncUpToDate,
 					OldVersion: locked.Version,
 					NewVersion: locked.Version,
@@ -1601,7 +1607,7 @@ func (i *Installer) Sync(dryRun bool) ([]SyncResult, error) {
 				// Update available
 				if dryRun {
 					results = append(results, SyncResult{
-						Name:       plugin.Name,
+						Name:       pkg.Name,
 						Action:     SyncUpdated,
 						OldVersion: locked.Version,
 						NewVersion: bestVersion,
@@ -1609,12 +1615,12 @@ func (i *Installer) Sync(dryRun bool) ([]SyncResult, error) {
 					})
 				} else {
 					spec.Version = bestVersion
-					_, err := i.installPlugin(spec)
+					_, err := i.installPackage(spec)
 					if err != nil {
 						return nil, err
 					}
 					results = append(results, SyncResult{
-						Name:       plugin.Name,
+						Name:       pkg.Name,
 						Action:     SyncUpdated,
 						OldVersion: locked.Version,
 						NewVersion: bestVersion,
@@ -1625,34 +1631,34 @@ func (i *Installer) Sync(dryRun bool) ([]SyncResult, error) {
 		}
 	}
 
-	// Build set of transitive dependencies needed by config plugins.
-	// A dep of any locked plugin must not be pruned even if it isn't directly
+	// Build set of transitive dependencies needed by config packages.
+	// A dep of any locked package must not be pruned even if it isn't directly
 	// listed in dex.hcl (e.g. sdlc-stories pulled in by github-workflows).
 	neededDeps := make(map[string]bool)
-	for _, locked := range i.lock.Plugins {
+	for _, locked := range i.lock.Packages {
 		for dep := range locked.Dependencies {
 			neededDeps[dep] = true
 		}
 	}
 
-	// Prune plugins in lock file but not in config and not needed as a dependency
-	for pluginName := range i.lock.Plugins {
-		if !configPlugins[pluginName] && !neededDeps[pluginName] {
-			lockedVersion := i.lock.Plugins[pluginName].Version
+	// Prune packages in lock file but not in config and not needed as a dependency
+	for pkgName := range i.lock.Packages {
+		if !configPackages[pkgName] && !neededDeps[pkgName] {
+			lockedVersion := i.lock.Packages[pkgName].Version
 			if dryRun {
 				results = append(results, SyncResult{
-					Name:       pluginName,
+					Name:       pkgName,
 					Action:     SyncPruned,
 					OldVersion: lockedVersion,
 					Reason:     "would prune",
 				})
 			} else {
-				if err := i.uninstallPlugin(pluginName); err != nil {
+				if err := i.uninstallPackage(pkgName); err != nil {
 					return nil, err
 				}
-				i.lock.Remove(pluginName)
+				i.lock.Remove(pkgName)
 				results = append(results, SyncResult{
-					Name:       pluginName,
+					Name:       pkgName,
 					Action:     SyncPruned,
 					OldVersion: lockedVersion,
 					Reason:     "pruned",
@@ -1696,8 +1702,8 @@ func (i *Installer) Sync(dryRun bool) ([]SyncResult, error) {
 	return results, nil
 }
 
-// updatePlugin updates a single plugin.
-func (i *Installer) updatePlugin(name string, dryRun bool) (*UpdateResult, error) {
+// updatePackage updates a single package.
+func (i *Installer) updatePackage(name string, dryRun bool) (*UpdateResult, error) {
 	result := &UpdateResult{Name: name}
 
 	// Get current locked version
@@ -1711,11 +1717,11 @@ func (i *Installer) updatePlugin(name string, dryRun bool) (*UpdateResult, error
 
 	// Get constraint from project config
 	var constraint string
-	var spec PluginSpec
-	for _, p := range i.project.Plugins {
+	var spec PackageSpec
+	for _, p := range i.project.Packages {
 		if p.Name == name {
 			constraint = p.Version
-			spec = PluginSpec{
+			spec = PackageSpec{
 				Name:     p.Name,
 				Version:  p.Version,
 				Source:   p.Source,
@@ -1787,7 +1793,7 @@ func (i *Installer) updatePlugin(name string, dryRun bool) (*UpdateResult, error
 
 	// Perform the update by reinstalling with the new version
 	spec.Version = best.String()
-	_, err = i.installPlugin(spec)
+	_, err = i.installPackage(spec)
 	if err != nil {
 		return nil, err
 	}

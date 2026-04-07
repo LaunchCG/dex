@@ -23,12 +23,12 @@ func TestSync_InstallsMissingPlugins(t *testing.T) {
 
 	// Create project config referencing the plugin
 	createTestProject(t, projectDir, `
-plugin "new-plugin" {
+package "new-plugin" {
   source = "file:`+pluginDir+`"
 }
 `)
 
-	inst, err := NewInstaller(projectDir)
+	inst, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	results, err := inst.Sync(false)
@@ -52,7 +52,7 @@ plugin "new-plugin" {
 	var lockData map[string]any
 	err = json.Unmarshal(lockContent, &lockData)
 	require.NoError(t, err)
-	plugins := lockData["plugins"].(map[string]any)
+	plugins := lockData["packages"].(map[string]any)
 	require.Contains(t, plugins, "new-plugin")
 }
 
@@ -76,13 +76,13 @@ registry "local" {
   path = "`+registryDir+`"
 }
 
-plugin "updatable-plugin" {
+package "updatable-plugin" {
   registry = "local"
 }
 `)
 
 	// First install to get v1.1.0 locked
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = inst1.InstallAll()
 	require.NoError(t, err)
@@ -95,7 +95,7 @@ plugin "updatable-plugin" {
 	createTestPlugin(t, pluginDir, "updatable-plugin", "1.2.0", "Updatable plugin v1.2.0")
 
 	// Sync should detect the update
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	results, err := inst2.Sync(false)
@@ -128,19 +128,19 @@ registry "local" {
   path = "`+registryDir+`"
 }
 
-plugin "stable-plugin" {
+package "stable-plugin" {
   registry = "local"
 }
 `)
 
 	// First install
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = inst1.InstallAll()
 	require.NoError(t, err)
 
 	// Sync should show up-to-date
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	results, err := inst2.Sync(false)
@@ -165,30 +165,30 @@ func TestSync_PrunesOrphanedPlugins(t *testing.T) {
 
 	// Create project config with both plugins
 	createTestProject(t, projectDir, `
-plugin "keep-plugin" {
+package "keep-plugin" {
   source = "file:`+pluginADir+`"
 }
 
-plugin "remove-plugin" {
+package "remove-plugin" {
   source = "file:`+pluginBDir+`"
 }
 `)
 
 	// Install both
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = inst1.InstallAll()
 	require.NoError(t, err)
 
 	// Now update config to only have keep-plugin
 	createTestProject(t, projectDir, `
-plugin "keep-plugin" {
+package "keep-plugin" {
   source = "file:`+pluginADir+`"
 }
 `)
 
 	// Sync should prune remove-plugin
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	results, err := inst2.Sync(false)
@@ -219,9 +219,11 @@ plugin "keep-plugin" {
 	var lockData map[string]any
 	err = json.Unmarshal(lockContent, &lockData)
 	require.NoError(t, err)
-	plugins := lockData["plugins"].(map[string]any)
-	assert.NotContains(t, plugins, "remove-plugin")
-	assert.Contains(t, plugins, "keep-plugin")
+	plugins := lockData["packages"].(map[string]any)
+	_, hasRemoved := plugins["remove-plugin"]
+	assert.False(t, hasRemoved, "remove-plugin should not be in lock file")
+	_, hasKept := plugins["keep-plugin"]
+	assert.True(t, hasKept, "keep-plugin should be in lock file")
 }
 
 func TestSync_DryRunReportsWithoutChanges(t *testing.T) {
@@ -233,12 +235,12 @@ func TestSync_DryRunReportsWithoutChanges(t *testing.T) {
 
 	// Create project config
 	createTestProject(t, projectDir, `
-plugin "dry-run-plugin" {
+package "dry-run-plugin" {
   source = "file:`+pluginDir+`"
 }
 `)
 
-	inst, err := NewInstaller(projectDir)
+	inst, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	results, err := inst.Sync(true)
@@ -266,12 +268,12 @@ func TestSync_DryRunPrune(t *testing.T) {
 	createTestPlugin(t, pluginDir, "prune-me", "1.0.0", "Will be pruned")
 
 	createTestProject(t, projectDir, `
-plugin "prune-me" {
+package "prune-me" {
   source = "file:`+pluginDir+`"
 }
 `)
 
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = inst1.InstallAll()
 	require.NoError(t, err)
@@ -280,7 +282,7 @@ plugin "prune-me" {
 	createTestProject(t, projectDir, "")
 
 	// Dry-run sync
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	results, err := inst2.Sync(true)
@@ -297,8 +299,9 @@ plugin "prune-me" {
 	var lockData map[string]any
 	err = json.Unmarshal(lockContent, &lockData)
 	require.NoError(t, err)
-	plugins := lockData["plugins"].(map[string]any)
-	assert.Contains(t, plugins, "prune-me")
+	plugins := lockData["packages"].(map[string]any)
+	_, hasPruneMe := plugins["prune-me"]
+	assert.True(t, hasPruneMe, "prune-me should still be in lock file after dry-run")
 }
 
 func TestSync_MixedInstallUpdatePrune(t *testing.T) {
@@ -327,16 +330,16 @@ registry "local" {
   path = "`+registryDir+`"
 }
 
-plugin "existing-plugin" {
+package "existing-plugin" {
   registry = "local"
 }
 
-plugin "orphan-plugin" {
+package "orphan-plugin" {
   registry = "local"
 }
 `)
 
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = inst1.InstallAll()
 	require.NoError(t, err)
@@ -360,17 +363,17 @@ registry "local" {
   path = "`+registryDir+`"
 }
 
-plugin "existing-plugin" {
+package "existing-plugin" {
   registry = "local"
 }
 
-plugin "new-plugin" {
+package "new-plugin" {
   registry = "local"
 }
 `)
 
 	// Sync
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	results, err := inst2.Sync(false)
@@ -402,10 +405,13 @@ plugin "new-plugin" {
 	var lockData map[string]any
 	err = json.Unmarshal(lockContent, &lockData)
 	require.NoError(t, err)
-	plugins := lockData["plugins"].(map[string]any)
-	assert.Contains(t, plugins, "existing-plugin")
-	assert.Contains(t, plugins, "new-plugin")
-	assert.NotContains(t, plugins, "orphan-plugin")
+	plugins := lockData["packages"].(map[string]any)
+	_, hasExisting := plugins["existing-plugin"]
+	assert.True(t, hasExisting, "existing-plugin should be in lock file")
+	_, hasNew := plugins["new-plugin"]
+	assert.True(t, hasNew, "new-plugin should be in lock file")
+	_, hasOrphan := plugins["orphan-plugin"]
+	assert.False(t, hasOrphan, "orphan-plugin should not be in lock file")
 	assert.Equal(t, "1.1.0", plugins["existing-plugin"].(map[string]any)["version"])
 	assert.Equal(t, "2.0.0", plugins["new-plugin"].(map[string]any)["version"])
 }
@@ -415,7 +421,7 @@ func TestSync_AlwaysReinstallsUpToDatePlugins(t *testing.T) {
 
 	// Set up a local plugin with an MCP server
 	pluginDir := t.TempDir()
-	pluginContent := `package {
+	pluginContent := `meta {
   name = "mcp-plugin"
   version = "1.0.0"
   description = "Plugin with MCP server"
@@ -427,7 +433,7 @@ mcp_server "test-server" {
   args = ["-y", "test-server"]
 }
 
-claude_rule "mcp-plugin-rule" {
+rule "mcp-plugin-rule" {
   description = "Rule from mcp-plugin"
   content = "Follow this rule from mcp-plugin"
 }
@@ -437,13 +443,13 @@ claude_rule "mcp-plugin-rule" {
 
 	// Create project config
 	createTestProject(t, projectDir, `
-plugin "mcp-plugin" {
+package "mcp-plugin" {
   source = "file:`+pluginDir+`"
 }
 `)
 
 	// First install
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = inst1.InstallAll()
 	require.NoError(t, err)
@@ -465,7 +471,7 @@ plugin "mcp-plugin" {
 	require.NoError(t, err)
 
 	// Sync should reinstall the plugin and recreate .mcp.json
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	results, err := inst2.Sync(false)
@@ -483,7 +489,8 @@ plugin "mcp-plugin" {
 	err = json.Unmarshal(mcpData, &mcpConfig)
 	require.NoError(t, err)
 	servers = mcpConfig["mcpServers"].(map[string]any)
-	assert.Contains(t, servers, "test-server", "MCP server should be present after sync recreates .mcp.json")
+	_, hasServer := servers["test-server"]
+	assert.True(t, hasServer, "MCP server should be present after sync recreates .mcp.json")
 }
 
 func TestSync_ReinstallsWhenRegularFilesDeleted(t *testing.T) {
@@ -495,13 +502,13 @@ func TestSync_ReinstallsWhenRegularFilesDeleted(t *testing.T) {
 
 	// Create project config
 	createTestProject(t, projectDir, `
-plugin "file-plugin" {
+package "file-plugin" {
   source = "file:`+pluginDir+`"
 }
 `)
 
 	// First install
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = inst1.InstallAll()
 	require.NoError(t, err)
@@ -510,14 +517,14 @@ plugin "file-plugin" {
 	claudePath := filepath.Join(projectDir, "CLAUDE.md")
 	claudeContent, err := os.ReadFile(claudePath)
 	require.NoError(t, err)
-	assert.Contains(t, string(claudeContent), "Follow this rule from file-plugin")
+	assert.Equal(t, "Follow this rule from file-plugin", string(claudeContent))
 
 	// Delete CLAUDE.md
 	err = os.Remove(claudePath)
 	require.NoError(t, err)
 
 	// Sync should reinstall and recreate CLAUDE.md
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	_, err = inst2.Sync(false)
@@ -527,7 +534,7 @@ plugin "file-plugin" {
 	require.FileExists(t, claudePath, "CLAUDE.md should be recreated by sync")
 	claudeContent, err = os.ReadFile(claudePath)
 	require.NoError(t, err)
-	assert.Contains(t, string(claudeContent), "Follow this rule from file-plugin",
+	assert.Equal(t, "Follow this rule from file-plugin", string(claudeContent),
 		"CLAUDE.md should contain plugin content after sync")
 }
 
@@ -535,7 +542,7 @@ func TestSync_EmptyConfig(t *testing.T) {
 	projectDir := t.TempDir()
 	createTestProject(t, projectDir, "")
 
-	inst, err := NewInstaller(projectDir)
+	inst, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	results, err := inst.Sync(false)
@@ -550,18 +557,18 @@ func TestSync_EmptyConfig(t *testing.T) {
 // createClaudePlugin creates a package.hcl with claude-code-specific resources.
 func createClaudePlugin(t *testing.T, dir, name, version string) {
 	t.Helper()
-	content := `package {
+	content := `meta {
   name = "` + name + `"
   version = "` + version + `"
   description = "Claude-code plugin"
 }
 
-claude_rule "` + name + `-rule" {
+rule "` + name + `-rule" {
   description = "Rule from ` + name + `"
   content = "Follow this rule from ` + name + `"
 }
 
-claude_skill "` + name + `-skill" {
+skill "` + name + `-skill" {
   description = "Skill from ` + name + `"
   content = "This is a skill from ` + name + `"
 }
@@ -573,7 +580,7 @@ claude_skill "` + name + `-skill" {
 // createMCPUniversalPlugin creates a package.hcl with a universal mcp_server.
 func createMCPUniversalPlugin(t *testing.T, dir, name, version string) {
 	t.Helper()
-	content := `package {
+	content := `meta {
   name = "` + name + `"
   version = "` + version + `"
   description = "MCP plugin"
@@ -601,7 +608,7 @@ func TestSync_PlatformSwitch_ClaudeToGithubCopilot_SharedFiles(t *testing.T) {
   default_platform = "` + platform + `"
 }
 
-plugin "mcp-plugin" {
+package "mcp-plugin" {
   source = "file:` + pluginDir + `"
 }
 `
@@ -611,7 +618,7 @@ plugin "mcp-plugin" {
 
 	// Install as claude-code
 	writeConfig("claude-code")
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = inst1.Sync(false)
 	require.NoError(t, err)
@@ -619,7 +626,7 @@ plugin "mcp-plugin" {
 
 	// Switch to github-copilot
 	writeConfig("github-copilot")
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = inst2.Sync(false)
 	require.NoError(t, err)
@@ -637,8 +644,10 @@ plugin "mcp-plugin" {
 	require.NoError(t, err)
 	var mcpConfig map[string]any
 	require.NoError(t, json.Unmarshal(data, &mcpConfig))
-	assert.Contains(t, mcpConfig, "servers", ".vscode/mcp.json must use 'servers' key")
-	assert.NotContains(t, mcpConfig, "mcpServers", ".vscode/mcp.json must not use 'mcpServers' key")
+	_, hasServers := mcpConfig["servers"]
+	assert.True(t, hasServers, ".vscode/mcp.json must use 'servers' key")
+	_, hasMcpServers := mcpConfig["mcpServers"]
+	assert.False(t, hasMcpServers, ".vscode/mcp.json must not use 'mcpServers' key")
 }
 
 func TestSync_PlatformSwitch_ClaudeToGithubCopilot_DedicatedFiles(t *testing.T) {
@@ -653,7 +662,7 @@ func TestSync_PlatformSwitch_ClaudeToGithubCopilot_DedicatedFiles(t *testing.T) 
   default_platform = "` + platform + `"
 }
 
-plugin "my-plugin" {
+package "my-plugin" {
   source = "file:` + pluginDir + `"
 }
 `
@@ -663,7 +672,7 @@ plugin "my-plugin" {
 
 	// Install as claude-code
 	writeConfig("claude-code")
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = inst1.Sync(false)
 	require.NoError(t, err)
@@ -674,7 +683,7 @@ plugin "my-plugin" {
 
 	// Switch to github-copilot — plugin has no copilot resources, plan will be empty
 	writeConfig("github-copilot")
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = inst2.Sync(false)
 	require.NoError(t, err)
@@ -703,7 +712,7 @@ func TestSync_PlatformSwitch_ClaudeToGithubCopilot_AgentInstructions(t *testing.
 
 	// Install as claude-code
 	writeConfig("claude-code")
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = inst1.Sync(false)
 	require.NoError(t, err)
@@ -711,7 +720,7 @@ func TestSync_PlatformSwitch_ClaudeToGithubCopilot_AgentInstructions(t *testing.
 
 	// Switch to github-copilot
 	writeConfig("github-copilot")
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = inst2.Sync(false)
 	require.NoError(t, err)
@@ -723,7 +732,7 @@ func TestSync_PlatformSwitch_ClaudeToGithubCopilot_AgentInstructions(t *testing.
 
 	content, err := os.ReadFile(copilotInstructions)
 	require.NoError(t, err)
-	assert.Contains(t, string(content), "Always follow these rules.")
+	assert.Equal(t, "# Project Rules\n\nAlways follow these rules.", string(content))
 }
 
 func TestSync_PlatformSwitch_IdempotentAfterSwitch(t *testing.T) {
@@ -738,7 +747,7 @@ func TestSync_PlatformSwitch_IdempotentAfterSwitch(t *testing.T) {
   default_platform = "` + platform + `"
 }
 
-plugin "mcp-plugin" {
+package "mcp-plugin" {
   source = "file:` + pluginDir + `"
 }
 `
@@ -748,7 +757,7 @@ plugin "mcp-plugin" {
 
 	// Install on claude-code
 	writeConfig("claude-code")
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = inst1.Sync(false)
 	require.NoError(t, err)
@@ -756,7 +765,7 @@ plugin "mcp-plugin" {
 
 	// Switch to github-copilot
 	writeConfig("github-copilot")
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = inst2.Sync(false)
 	require.NoError(t, err)
@@ -764,7 +773,7 @@ plugin "mcp-plugin" {
 	assert.FileExists(t, filepath.Join(projectDir, ".vscode", "mcp.json"))
 
 	// Sync again — must be idempotent
-	inst3, err := NewInstaller(projectDir)
+	inst3, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = inst3.Sync(false)
 	require.NoError(t, err)
@@ -775,7 +784,7 @@ plugin "mcp-plugin" {
 // createPluginWithFile creates a package.hcl with a universal file resource.
 func createPluginWithFile(t *testing.T, dir, name, version, dest, content string) {
 	t.Helper()
-	hcl := `package {
+	hcl := `meta {
   name = "` + name + `"
   version = "` + version + `"
   description = "Plugin with file resource"
@@ -798,13 +807,13 @@ func TestSync_ClearsManifestWhenFileResourceRemoved(t *testing.T) {
 	createPluginWithFile(t, pluginDir, "file-plugin", "1.0.0", "config/my-file.txt", "hello world")
 
 	createTestProject(t, projectDir, `
-plugin "file-plugin" {
+package "file-plugin" {
   source = "file:`+pluginDir+`"
 }
 `)
 
 	// Install v1
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = inst1.InstallAll()
 	require.NoError(t, err)
@@ -816,10 +825,10 @@ plugin "file-plugin" {
 	mf1, err := loadManifestForTest(projectDir)
 	require.NoError(t, err)
 	require.NotNil(t, mf1["file-plugin"])
-	assert.Contains(t, mf1["file-plugin"], "config/my-file.txt", "file must be tracked in manifest after install")
+	assert.Equal(t, []string{"config/my-file.txt"}, mf1["file-plugin"], "file must be tracked in manifest after install")
 
 	// Update plugin: remove the file resource entirely
-	noResourcePlugin := `package {
+	noResourcePlugin := `meta {
   name = "file-plugin"
   version = "1.0.0"
   description = "Plugin with no resources"
@@ -829,7 +838,7 @@ plugin "file-plugin" {
 	require.NoError(t, err)
 
 	// Sync
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = inst2.Sync(false)
 	require.NoError(t, err)
@@ -841,7 +850,7 @@ plugin "file-plugin" {
 	mf2, err := loadManifestForTest(projectDir)
 	require.NoError(t, err)
 	plugin2 := mf2["file-plugin"]
-	assert.NotContains(t, plugin2, "config/my-file.txt", "stale file path must be cleared from manifest")
+	assert.Empty(t, plugin2, "manifest should have no files for plugin after resource removal")
 }
 
 func TestSync_ClearsManifestWhenFileDestinationChanges(t *testing.T) {
@@ -852,13 +861,13 @@ func TestSync_ClearsManifestWhenFileDestinationChanges(t *testing.T) {
 	createPluginWithFile(t, pluginDir, "dest-plugin", "1.0.0", "config/v1.txt", "version one")
 
 	createTestProject(t, projectDir, `
-plugin "dest-plugin" {
+package "dest-plugin" {
   source = "file:`+pluginDir+`"
 }
 `)
 
 	// Install v1
-	inst1, err := NewInstaller(projectDir)
+	inst1, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	err = inst1.InstallAll()
 	require.NoError(t, err)
@@ -868,13 +877,13 @@ plugin "dest-plugin" {
 
 	mf1, err := loadManifestForTest(projectDir)
 	require.NoError(t, err)
-	assert.Contains(t, mf1["dest-plugin"], "config/v1.txt")
+	assert.Equal(t, []string{"config/v1.txt"}, mf1["dest-plugin"])
 
 	// Update plugin: change dest to "config/v2.txt"
 	createPluginWithFile(t, pluginDir, "dest-plugin", "1.0.0", "config/v2.txt", "version two")
 
 	// Sync
-	inst2, err := NewInstaller(projectDir)
+	inst2, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 	_, err = inst2.Sync(false)
 	require.NoError(t, err)
@@ -890,8 +899,7 @@ plugin "dest-plugin" {
 	mf2, err := loadManifestForTest(projectDir)
 	require.NoError(t, err)
 	plugin2 := mf2["dest-plugin"]
-	assert.Contains(t, plugin2, "config/v2.txt", "new file path must be in manifest")
-	assert.NotContains(t, plugin2, "config/v1.txt", "old file path must be cleared from manifest")
+	assert.Equal(t, []string{"config/v2.txt"}, plugin2, "manifest must have only new file path")
 }
 
 // loadManifestForTest reads the manifest and returns a map of plugin -> []files.
@@ -901,15 +909,15 @@ func loadManifestForTest(projectDir string) (map[string][]string, error) {
 		return nil, err
 	}
 	var raw struct {
-		Plugins map[string]struct {
+		Packages map[string]struct {
 			Files []string `json:"files"`
-		} `json:"plugins"`
+		} `json:"packages"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil, err
 	}
-	result := make(map[string][]string, len(raw.Plugins))
-	for name, pm := range raw.Plugins {
+	result := make(map[string][]string, len(raw.Packages))
+	for name, pm := range raw.Packages {
 		result[name] = pm.Files
 	}
 	return result, nil
@@ -918,7 +926,7 @@ func loadManifestForTest(projectDir string) (map[string][]string, error) {
 // TestSync_TransitiveDependenciesNotPruned reproduces the bug where transitive
 // dependencies installed during Sync are immediately pruned in the same run.
 //
-// Repro: plugin "parent" declares dependency "child". Sync installs parent,
+// Repro: package "parent" declares dependency "child". Sync installs parent,
 // which pulls in child as a transitive dep and writes it to the lock file.
 // The prune pass then sees child in the lock but not in configPlugins (which
 // only contains direct project plugins) and prunes it.
@@ -941,7 +949,7 @@ func TestSync_TransitiveDependenciesNotPruned(t *testing.T) {
 	parentDir := filepath.Join(registryDir, "parent-plugin")
 	require.NoError(t, os.MkdirAll(parentDir, 0755))
 	err := os.WriteFile(filepath.Join(parentDir, "package.hcl"), []byte(`
-package {
+meta {
   name        = "parent-plugin"
   version     = "1.0.0"
   description = "Parent plugin"
@@ -951,7 +959,7 @@ dependency "child-plugin" {
   version = ">=1.0.0"
 }
 
-claude_rule "parent-rule" {
+rule "parent-rule" {
   description = "Rule from parent"
   content     = "Follow this rule from parent-plugin"
 }
@@ -964,12 +972,12 @@ registry "local" {
   path = "`+registryDir+`"
 }
 
-plugin "parent-plugin" {
+package "parent-plugin" {
   registry = "local"
 }
 `)
 
-	inst, err := NewInstaller(projectDir)
+	inst, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
 	results, err := inst.Sync(false)
@@ -991,7 +999,245 @@ plugin "parent-plugin" {
 	require.NoError(t, err)
 	var lockData map[string]any
 	require.NoError(t, json.Unmarshal(lockContent, &lockData))
-	plugins := lockData["plugins"].(map[string]any)
-	assert.Contains(t, plugins, "child-plugin",
-		"child-plugin (transitive dep) must remain in lock file after sync")
+	plugins := lockData["packages"].(map[string]any)
+	_, hasChild := plugins["child-plugin"]
+	assert.True(t, hasChild, "child-plugin (transitive dep) must remain in lock file after sync")
+}
+
+// =============================================================================
+// Profile Sync Tests
+// =============================================================================
+
+func TestSync_ProfileAddsPlugins(t *testing.T) {
+	projectDir := t.TempDir()
+
+	// Create two test plugins
+	defaultPluginDir := t.TempDir()
+	createTestPlugin(t, defaultPluginDir, "default-plugin", "1.0.0", "Default plugin")
+
+	profilePluginDir := t.TempDir()
+	createTestPlugin(t, profilePluginDir, "profile-plugin", "1.0.0", "Profile plugin")
+
+	// Project config with a default plugin and a profile that adds another
+	hcl := `
+package "default-plugin" {
+  source = "file:` + defaultPluginDir + `"
+}
+
+profile "qa" {
+  package "profile-plugin" {
+    source = "file:` + profilePluginDir + `"
+  }
+}
+`
+	createTestProject(t, projectDir, hcl)
+
+	// Sync with profile — should install both default + profile plugin
+	inst, err := NewInstaller(projectDir, "qa")
+	require.NoError(t, err)
+
+	results, err := inst.Sync(false)
+	require.NoError(t, err)
+	require.Len(t, results, 2)
+
+	names := make(map[string]bool)
+	for _, r := range results {
+		names[r.Name] = true
+		assert.Equal(t, SyncInstalled, r.Action)
+	}
+	assert.True(t, names["default-plugin"], "default plugin should be installed")
+	assert.True(t, names["profile-plugin"], "profile plugin should be installed")
+
+	// Verify CLAUDE.md has content from both plugins
+	claudeContent, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
+	require.NoError(t, err)
+	assert.Equal(t, "Follow this rule from default-plugin\n\nFollow this rule from profile-plugin", string(claudeContent))
+}
+
+func TestSync_DefaultIgnoresProfiles(t *testing.T) {
+	projectDir := t.TempDir()
+
+	defaultPluginDir := t.TempDir()
+	createTestPlugin(t, defaultPluginDir, "default-plugin", "1.0.0", "Default plugin")
+
+	profilePluginDir := t.TempDir()
+	createTestPlugin(t, profilePluginDir, "profile-plugin", "1.0.0", "Profile plugin")
+
+	hcl := `
+package "default-plugin" {
+  source = "file:` + defaultPluginDir + `"
+}
+
+profile "qa" {
+  package "profile-plugin" {
+    source = "file:` + profilePluginDir + `"
+  }
+}
+`
+	createTestProject(t, projectDir, hcl)
+
+	// Sync without profile — should only install default plugin
+	inst, err := NewInstaller(projectDir, "")
+	require.NoError(t, err)
+
+	results, err := inst.Sync(false)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Equal(t, "default-plugin", results[0].Name)
+	assert.Equal(t, SyncInstalled, results[0].Action)
+
+	// Verify CLAUDE.md only has default content
+	claudeContent, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
+	require.NoError(t, err)
+	assert.Equal(t, "Follow this rule from default-plugin", string(claudeContent))
+}
+
+func TestSync_ProfileExcludeDefaultsPrunesDefaultPlugins(t *testing.T) {
+	projectDir := t.TempDir()
+
+	defaultPluginDir := t.TempDir()
+	createTestPlugin(t, defaultPluginDir, "default-plugin", "1.0.0", "Default plugin")
+
+	profilePluginDir := t.TempDir()
+	createTestPlugin(t, profilePluginDir, "profile-plugin", "1.0.0", "Profile plugin")
+
+	hcl := `
+package "default-plugin" {
+  source = "file:` + defaultPluginDir + `"
+}
+
+profile "clean" {
+  exclude_defaults = true
+
+  package "profile-plugin" {
+    source = "file:` + profilePluginDir + `"
+  }
+}
+`
+	createTestProject(t, projectDir, hcl)
+
+	// Sync with exclude_defaults — only profile plugin
+	inst, err := NewInstaller(projectDir, "clean")
+	require.NoError(t, err)
+
+	results, err := inst.Sync(false)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Equal(t, "profile-plugin", results[0].Name)
+	assert.Equal(t, SyncInstalled, results[0].Action)
+
+	// Verify CLAUDE.md only has profile content
+	claudeContent, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
+	require.NoError(t, err)
+	assert.Equal(t, "Follow this rule from profile-plugin", string(claudeContent))
+}
+
+func TestSync_ProfileReplacesDefaultThenRevert(t *testing.T) {
+	projectDir := t.TempDir()
+
+	pluginDir := t.TempDir()
+	createTestPlugin(t, pluginDir, "shared-plugin", "1.0.0", "Shared plugin")
+
+	profilePluginDir := t.TempDir()
+	createTestPlugin(t, profilePluginDir, "extra-plugin", "1.0.0", "Extra plugin")
+
+	hcl := `
+package "shared-plugin" {
+  source = "file:` + pluginDir + `"
+}
+
+profile "qa" {
+  package "extra-plugin" {
+    source = "file:` + profilePluginDir + `"
+  }
+}
+`
+	createTestProject(t, projectDir, hcl)
+
+	// Step 1: Sync with profile
+	inst1, err := NewInstaller(projectDir, "qa")
+	require.NoError(t, err)
+
+	results1, err := inst1.Sync(false)
+	require.NoError(t, err)
+
+	names1 := make(map[string]bool)
+	for _, r := range results1 {
+		names1[r.Name] = true
+	}
+	assert.True(t, names1["shared-plugin"])
+	assert.True(t, names1["extra-plugin"])
+
+	// Step 2: Sync back to default — extra-plugin should be pruned
+	inst2, err := NewInstaller(projectDir, "")
+	require.NoError(t, err)
+
+	results2, err := inst2.Sync(false)
+	require.NoError(t, err)
+
+	var pruned []string
+	var upToDate []string
+	for _, r := range results2 {
+		switch r.Action {
+		case SyncPruned:
+			pruned = append(pruned, r.Name)
+		case SyncUpToDate:
+			upToDate = append(upToDate, r.Name)
+		}
+	}
+	assert.Equal(t, []string{"shared-plugin"}, upToDate, "default plugin should remain")
+	assert.Equal(t, []string{"extra-plugin"}, pruned, "profile plugin should be pruned on revert")
+
+	// Verify CLAUDE.md no longer has extra-plugin content
+	claudeContent, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
+	require.NoError(t, err)
+	assert.Equal(t, "Follow this rule from shared-plugin", string(claudeContent))
+}
+
+func TestSync_ProfileNotFoundErrors(t *testing.T) {
+	projectDir := t.TempDir()
+	createTestProject(t, projectDir, `
+profile "qa" {}
+`)
+
+	_, err := NewInstaller(projectDir, "bogus")
+	require.Error(t, err)
+	assert.Equal(t, `config error at `+filepath.Join(projectDir, "dex.hcl")+`: failed to load project config: profile "bogus" not found; available profiles: qa`, err.Error())
+}
+
+func TestSync_ProfileAgentInstructions(t *testing.T) {
+	projectDir := t.TempDir()
+
+	pluginDir := t.TempDir()
+	createTestPlugin(t, pluginDir, "test-plugin", "1.0.0", "Test plugin")
+
+	// Write full dex.hcl with project-level agent_instructions and a profile that overrides them
+	content := `project {
+  name = "test-project"
+  default_platform = "claude-code"
+  agent_instructions = "Default instructions"
+}
+
+package "test-plugin" {
+  source = "file:` + pluginDir + `"
+}
+
+profile "qa" {
+  agent_instructions = "QA-specific instructions"
+}
+`
+	err := os.WriteFile(filepath.Join(projectDir, "dex.hcl"), []byte(content), 0644)
+	require.NoError(t, err)
+
+	// Sync with profile
+	inst, err := NewInstaller(projectDir, "qa")
+	require.NoError(t, err)
+
+	_, err = inst.Sync(false)
+	require.NoError(t, err)
+
+	// Verify CLAUDE.md starts with profile's agent instructions
+	claudeContent, err := os.ReadFile(filepath.Join(projectDir, "CLAUDE.md"))
+	require.NoError(t, err)
+	assert.Equal(t, "QA-specific instructions\n\nFollow this rule from test-plugin", string(claudeContent))
 }

@@ -1,4 +1,4 @@
-// Package packer provides functionality for creating distributable plugin tarballs.
+// Package packer provides functionality for creating distributable package tarballs.
 package packer
 
 import (
@@ -46,7 +46,7 @@ type PackResult struct {
 	Version string
 }
 
-// Packer handles creating distributable tarballs from plugin directories.
+// Packer handles creating distributable tarballs from package directories.
 type Packer struct {
 	dir       string
 	pkgConfig *config.PackageConfig
@@ -98,11 +98,11 @@ func (p *Packer) WithExcludes(excludes []string) *Packer {
 	return p
 }
 
-// Pack creates a tarball from the plugin directory.
+// Pack creates a tarball from the package directory.
 // If output is empty, it defaults to {name}-{version}.tar.gz in the current directory.
 func (p *Packer) Pack(output string) (*PackResult, error) {
-	name := p.pkgConfig.Package.Name
-	version := p.pkgConfig.Package.Version
+	name := p.pkgConfig.Meta.Name
+	version := p.pkgConfig.Meta.Version
 
 	// Default output filename
 	if output == "" {
@@ -302,10 +302,10 @@ func (p *Packer) shouldExclude(relPath string, isDir bool) bool {
 
 // Name returns the package name.
 func (p *Packer) Name() string {
-	return p.pkgConfig.Package.Name
+	return p.pkgConfig.Meta.Name
 }
 
 // Version returns the package version.
 func (p *Packer) Version() string {
-	return p.pkgConfig.Package.Version
+	return p.pkgConfig.Meta.Version
 }

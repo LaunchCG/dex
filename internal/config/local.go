@@ -14,69 +14,57 @@ import (
 // It mirrors ProjectConfig but without the required project {} block.
 // Files are loaded from ~/.dex/local.hcl and ~/.dex/projects/<name>/project.hcl.
 type LocalConfig struct {
-	// Registries defines additional plugin registry sources
+	// Registries defines additional package registry sources
 	Registries []RegistryBlock `hcl:"registry,block"`
 
-	// Plugins defines additional plugin dependencies
-	Plugins []PluginBlock `hcl:"plugin,block"`
+	// Packages defines additional package dependencies
+	Packages []PackageBlock `hcl:"package,block"`
 
-	// Claude resources
-	Skills     []resource.ClaudeSkill     `hcl:"claude_skill,block"`
-	Commands   []resource.ClaudeCommand   `hcl:"claude_command,block"`
-	Subagents  []resource.ClaudeSubagent  `hcl:"claude_subagent,block"`
-	Rules      []resource.ClaudeRule      `hcl:"claude_rule,block"`
-	RulesFiles []resource.ClaudeRules     `hcl:"claude_rules,block"`
-	Settings   []resource.ClaudeSettings  `hcl:"claude_settings,block"`
-	MCPServers []resource.ClaudeMCPServer `hcl:"claude_mcp_server,block"`
-
-	// Universal MCP servers
-	UniversalMCPServers []resource.MCPServer `hcl:"mcp_server,block"`
-
-	// GitHub Copilot resources
-	CopilotInstruction  []resource.CopilotInstruction  `hcl:"copilot_instruction,block"`
-	CopilotMCPServers   []resource.CopilotMCPServer    `hcl:"copilot_mcp_server,block"`
-	CopilotInstructions []resource.CopilotInstructions `hcl:"copilot_instructions,block"`
-	CopilotPrompts      []resource.CopilotPrompt       `hcl:"copilot_prompt,block"`
-	CopilotAgents       []resource.CopilotAgent        `hcl:"copilot_agent,block"`
-	CopilotSkills       []resource.CopilotSkill        `hcl:"copilot_skill,block"`
-
-	// Cursor resources
-	CursorRules_     []resource.CursorRule      `hcl:"cursor_rule,block"`
-	CursorMCPServers []resource.CursorMCPServer `hcl:"cursor_mcp_server,block"`
-	CursorRules      []resource.CursorRules     `hcl:"cursor_rules,block"`
-	CursorCommands   []resource.CursorCommand   `hcl:"cursor_command,block"`
+	// Universal resource types
+	Skills     []resource.Skill     `hcl:"skill,block"`
+	Commands   []resource.Command   `hcl:"command,block"`
+	Agents     []resource.Agent     `hcl:"agent,block"`
+	Rules      []resource.Rule      `hcl:"rule,block"`
+	RulesFiles []resource.Rules     `hcl:"rules,block"`
+	Settings   []resource.Settings  `hcl:"settings,block"`
+	MCPServers []resource.MCPServer `hcl:"mcp_server,block"`
 
 	// Variables defines user-configurable variables
 	Variables    []ProjectVariableBlock
 	ResolvedVars map[string]string
 }
 
+// toResourceSet extracts the resource fields into a ResourceSet.
+func (l *LocalConfig) toResourceSet() ResourceSet {
+	return ResourceSet{
+		Skills: l.Skills, Commands: l.Commands, Agents: l.Agents,
+		Rules: l.Rules, RulesFiles: l.RulesFiles, Settings: l.Settings,
+		MCPServers: l.MCPServers,
+	}
+}
+
+// applyResourceSet writes the ResourceSet fields back into LocalConfig.
+func (l *LocalConfig) applyResourceSet(r *ResourceSet) {
+	l.Skills = r.Skills
+	l.Commands = r.Commands
+	l.Agents = r.Agents
+	l.Rules = r.Rules
+	l.RulesFiles = r.RulesFiles
+	l.Settings = r.Settings
+	l.MCPServers = r.MCPServers
+}
+
 // merge appends all slices from src into dst.
-// This is the single source of truth for LocalConfig field merging.
-// When adding a new field here, also update ProjectConfig.toLocalConfig and
-// ProjectConfig.applyLocalConfig in project.go. Run TestMergeLocal_AllResourceFields
-// to verify all fields are wired correctly.
+// Resource fields are handled via ResourceSet.appendFrom. When adding a new resource
+// type, update ResourceSet and its methods in project.go, then add toResourceSet/
+// applyResourceSet mappings. Run TestMergeLocal_AllResourceFields to verify.
 func (dst *LocalConfig) merge(src *LocalConfig) {
 	dst.Registries = append(dst.Registries, src.Registries...)
-	dst.Plugins = append(dst.Plugins, src.Plugins...)
-	dst.Skills = append(dst.Skills, src.Skills...)
-	dst.Commands = append(dst.Commands, src.Commands...)
-	dst.Subagents = append(dst.Subagents, src.Subagents...)
-	dst.Rules = append(dst.Rules, src.Rules...)
-	dst.RulesFiles = append(dst.RulesFiles, src.RulesFiles...)
-	dst.Settings = append(dst.Settings, src.Settings...)
-	dst.MCPServers = append(dst.MCPServers, src.MCPServers...)
-	dst.UniversalMCPServers = append(dst.UniversalMCPServers, src.UniversalMCPServers...)
-	dst.CopilotInstruction = append(dst.CopilotInstruction, src.CopilotInstruction...)
-	dst.CopilotMCPServers = append(dst.CopilotMCPServers, src.CopilotMCPServers...)
-	dst.CopilotInstructions = append(dst.CopilotInstructions, src.CopilotInstructions...)
-	dst.CopilotPrompts = append(dst.CopilotPrompts, src.CopilotPrompts...)
-	dst.CopilotAgents = append(dst.CopilotAgents, src.CopilotAgents...)
-	dst.CopilotSkills = append(dst.CopilotSkills, src.CopilotSkills...)
-	dst.CursorRules_ = append(dst.CursorRules_, src.CursorRules_...)
-	dst.CursorMCPServers = append(dst.CursorMCPServers, src.CursorMCPServers...)
-	dst.CursorRules = append(dst.CursorRules, src.CursorRules...)
-	dst.CursorCommands = append(dst.CursorCommands, src.CursorCommands...)
+	dst.Packages = append(dst.Packages, src.Packages...)
+	dstRS := dst.toResourceSet()
+	srcRS := src.toResourceSet()
+	dstRS.appendFrom(&srcRS)
+	dst.applyResourceSet(&dstRS)
 	dst.Variables = append(dst.Variables, src.Variables...)
 
 	// Var precedence within a LocalConfig merge: last writer wins.
