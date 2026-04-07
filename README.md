@@ -4,20 +4,23 @@ Dex is a universal package manager for AI coding agents. It provides a standardi
 
 ## Platform Support
 
-| Resource Type | Claude Code | Cursor | GitHub Copilot |
-|---------------|:-----------:|:------:|:--------------:|
-| Skills | `claude_skill` | - | `copilot_skill` |
-| Commands | `claude_command` | `cursor_command` | - |
-| Prompts | - | - | `copilot_prompt` |
-| Agents | `claude_subagent` | - | `copilot_agent` |
-| Rules (merged) | `claude_rule` | `cursor_rule` | `copilot_instruction` |
-| Rules (standalone) | `claude_rules` | `cursor_rules` | `copilot_instructions` |
-| Settings | `claude_settings` | - | - |
-| MCP Servers | `claude_mcp_server` | `cursor_mcp_server` | `copilot_mcp_server` |
+Resources are defined once using universal types and automatically translate to platform-specific formats:
+
+| Resource Type | Claude Code | GitHub Copilot | Cursor |
+|---------------|:-----------:|:--------------:|:------:|
+| `skill` | Skill | Skill | — |
+| `command` | Command | Prompt | Command |
+| `agent` | Subagent | Agent | — |
+| `rule` (merged) | Rule → CLAUDE.md | Instruction → copilot-instructions.md | Rule → AGENTS.md |
+| `rules` (standalone) | .claude/rules/ | .github/instructions/ | .cursor/rules/ |
+| `settings` | .claude/settings.json | — | — |
+| `mcp_server` | .mcp.json | .vscode/mcp.json | .cursor/mcp.json |
+
+Unsupported resource types are automatically skipped with a log warning — no errors, no configuration needed.
 
 ## Installation
 
-### Quick Install (Latest: v0.1.0)
+### Quick Install
 
 **macOS / Linux:**
 
@@ -29,16 +32,6 @@ curl -fsSL https://dexartifactsproduction.z13.web.core.windows.net/install.sh | 
 
 ```powershell
 irm https://dexartifactsproduction.z13.web.core.windows.net/install.ps1 | iex
-```
-
-**Install a specific version:**
-
-```bash
-# macOS / Linux
-curl -fsSL https://dexartifactsproduction.z13.web.core.windows.net/install.sh | bash -s -- --version 0.1.0
-
-# Windows (PowerShell)
-& ([scriptblock]::Create((irm https://dexartifactsproduction.z13.web.core.windows.net/install.ps1))) -Version 0.1.0
 ```
 
 The binary installs to `~/.bin/dex`. Make sure `~/.bin` is in your `PATH`.
@@ -58,94 +51,87 @@ make install
 # Initialize a project for a specific AI agent
 dex init --platform claude-code
 
-# Install a plugin from GitHub
-dex sync git+https://github.com/owner/my-plugin.git
+# Install a package from GitHub
+dex sync git+https://github.com/owner/my-package.git
 
 # Install from a local directory (for development)
-dex sync file:///path/to/my-plugin
+dex sync file:///path/to/my-package
 
-# List installed plugins
+# List installed packages
 dex list
 
-# Uninstall a plugin
-dex uninstall my-plugin
+# Uninstall a package
+dex uninstall my-package
 ```
 
 ## Package Format (package.hcl)
 
-Plugins are defined using HCL (HashiCorp Configuration Language). This format enables content sharing across platforms using `file()` and platform-specific variations using `templatefile()`.
-
-### Multi-Platform Example
-
-This example shows a code review plugin that targets both Claude Code and GitHub Copilot, demonstrating content de-duplication:
+Packages are defined using HCL (HashiCorp Configuration Language). Define resources once — they work across all supported platforms automatically.
 
 ```hcl
-package {
+meta {
   name        = "code-review-tools"
   version     = "1.0.0"
   description = "Code review capabilities for AI coding agents"
-  platforms   = ["claude-code", "github-copilot"]
 }
 
-# Shared content via file() - written once, used by both platforms
-claude_skill "code-review" {
-  name        = "code-review"
+# One skill definition works on Claude Code and GitHub Copilot.
+# Cursor doesn't support skills — automatically skipped.
+skill "code-review" {
   description = "Thorough code review capability"
-  content     = file("content/code-review.md")  # Shared!
+  content     = file("content/code-review.md")
 }
 
-copilot_skill "code-review" {
-  name        = "code-review"
-  description = "Thorough code review capability"
-  content     = file("content/code-review.md")  # Same shared content!
-}
-
-# Platform-specific variations via templatefile()
-claude_command "review" {
-  name        = "review"
+# One command definition works everywhere.
+# Translates to: Claude command, Copilot prompt, Cursor command.
+command "review" {
   description = "Run code review on specified files"
-  content     = templatefile("commands/review.md.tmpl", {
-    tool_name = "Read"
-  })
+  content     = file("commands/review.md")
+
+  # Platform-specific overrides where needed
+  claude {
+    allowed_tools = ["Read", "Grep"]
+  }
+
+  copilot {
+    agent = "edit"
+    tools = ["terminal"]
+  }
 }
 
-copilot_prompt "review" {
-  name        = "review"
-  description = "Run code review on specified files"
-  content     = templatefile("commands/review.md.tmpl", {
-    tool_name = "fetch"
-  })
+agent "code-reviewer" {
+  description = "Specialized code review agent"
+  content     = file("agents/code-reviewer.md")
+}
+
+rule "review-standards" {
+  description = "Code review standards"
+  content     = "All PRs must be reviewed before merging."
+}
+
+settings "permissions" {
+  claude {
+    enable_all_project_mcp_servers = true
+  }
 }
 ```
 
 ### Directory Structure
 
 ```
-my-plugin/
-├── package.hcl           # Plugin manifest
+my-package/
+├── package.hcl           # Package manifest
 ├── content/
 │   └── code-review.md    # Shared skill content
-└── commands/
-    └── review.md.tmpl    # Template with platform variables
-```
-
-### Template Example (commands/review.md.tmpl)
-
-```markdown
-# Code Review
-
-Use the {{ .tool_name }} tool to examine the specified files.
-
-Review for:
-1. Bugs and edge cases
-2. Security vulnerabilities
-3. Performance issues
-4. Code style improvements
+├── commands/
+│   └── review.md         # Command content
+└── agents/
+    └── code-reviewer.md  # Agent content
 ```
 
 ## Project Configuration (dex.hcl)
 
-Configure which plugins are installed in your project:
+Configure which packages are installed in your project:
 
 ```hcl
 project {
@@ -153,11 +139,11 @@ project {
   default_platform = "claude-code"
 }
 
-plugin "code-review-tools" {
+package "code-review-tools" {
   source = "git+https://github.com/owner/code-review-tools.git"
 }
 
-plugin "python-tools" {
+package "python-tools" {
   source = "git+https://github.com/owner/python-tools.git"
   config = {
     python_version = "3.12"
@@ -165,6 +151,28 @@ plugin "python-tools" {
 }
 ```
 
+### Profiles
+
+Switch between different configurations:
+
+```hcl
+profile "qa" {
+  agent_instructions = "QA environment — focus on testing"
+
+  package "qa-tools" {
+    source = "git+https://github.com/owner/qa-tools.git"
+  }
+}
+```
+
+```bash
+dex sync              # Default configuration
+dex sync --profile qa # QA configuration
+```
+
 ## Documentation
 
-See [docs/resources.md](docs/resources.md) for the complete reference on all resource types, HCL functions, and configuration options.
+- [Resources Reference](docs/RESOURCES.md) — All resource types, platform overrides, and examples
+- [Configuration](docs/configuration.md) — Project and lock file configuration
+- [Package Development](docs/packages.md) — Creating and publishing packages
+- [CLI Reference](docs/cli-reference.md) — All commands and options
