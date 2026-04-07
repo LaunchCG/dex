@@ -44,7 +44,7 @@ type AzureRegistry struct {
 // NewAzureRegistry creates a registry from an Azure Blob Storage URL.
 //
 // URL format: az://account/container/path/to/registry/
-// Direct tarball: az://account/container/path/to/plugin-1.0.0.tar.gz
+// Direct tarball: az://account/container/path/to/package-1.0.0.tar.gz
 //
 // Authentication uses Azure SDK default credential chain.
 func NewAzureRegistry(url string, mode SourceMode) (*AzureRegistry, error) {

@@ -37,8 +37,8 @@ type ResolvedDep struct {
 	Constraint string
 }
 
-// PluginSpec specifies a plugin to install (mirrors installer.PluginSpec for decoupling).
-type PluginSpec struct {
+// PackageSpec specifies a package to install (mirrors installer.PackageSpec for decoupling).
+type PackageSpec struct {
 	Name     string
 	Version  string
 	Source   string
@@ -56,12 +56,12 @@ func NewResolver(project *config.ProjectConfig, lock *lockfile.LockFile) *Resolv
 
 // Resolve performs dependency resolution for the given specs.
 // It builds a dependency graph, detects conflicts, and returns the install order.
-func (r *Resolver) Resolve(specs []PluginSpec) (*Resolution, error) {
+func (r *Resolver) Resolve(specs []PackageSpec) (*Resolution, error) {
 	graph := NewDepGraph()
 	resolved := make(map[string]*ResolvedDep)
 
 	// Process each spec and its transitive dependencies
-	var queue []PluginSpec
+	var queue []PackageSpec
 	queue = append(queue, specs...)
 	visited := make(map[string]bool)
 
@@ -99,7 +99,7 @@ func (r *Resolver) Resolve(specs []PluginSpec) (*Resolution, error) {
 		for _, pkgDep := range pkgDeps {
 			graph.AddDependency(spec.Name, pkgDep.Name, pkgDep.Version)
 			if !visited[pkgDep.Name] {
-				queue = append(queue, PluginSpec{
+				queue = append(queue, PackageSpec{
 					Name:     pkgDep.Name,
 					Version:  pkgDep.Version,
 					Source:   pkgDep.Source,
@@ -129,7 +129,7 @@ func (r *Resolver) Resolve(specs []PluginSpec) (*Resolution, error) {
 }
 
 // resolvePackage resolves a package to a specific version.
-func (r *Resolver) resolvePackage(spec PluginSpec) (*ResolvedDep, error) {
+func (r *Resolver) resolvePackage(spec PackageSpec) (*ResolvedDep, error) {
 	// Check if already locked and no explicit version specified
 	if spec.Version == "" {
 		if locked := r.lock.Get(spec.Name); locked != nil {
@@ -142,11 +142,11 @@ func (r *Resolver) resolvePackage(spec PluginSpec) (*ResolvedDep, error) {
 		}
 	}
 
-	// Find in project plugins for registry/source info
-	var pluginCfg *config.PluginBlock
-	for i := range r.project.Plugins {
-		if r.project.Plugins[i].Name == spec.Name {
-			pluginCfg = &r.project.Plugins[i]
+	// Find in project packages for registry/source info
+	var pkgCfg *config.PackageBlock
+	for i := range r.project.Packages {
+		if r.project.Packages[i].Name == spec.Name {
+			pkgCfg = &r.project.Packages[i]
 			break
 		}
 	}
@@ -154,12 +154,12 @@ func (r *Resolver) resolvePackage(spec PluginSpec) (*ResolvedDep, error) {
 	// Determine source/registry
 	source := spec.Source
 	registryName := spec.Registry
-	if pluginCfg != nil {
+	if pkgCfg != nil {
 		if source == "" {
-			source = pluginCfg.Source
+			source = pkgCfg.Source
 		}
 		if registryName == "" {
-			registryName = pluginCfg.Registry
+			registryName = pkgCfg.Registry
 		}
 	}
 
@@ -171,8 +171,8 @@ func (r *Resolver) resolvePackage(spec PluginSpec) (*ResolvedDep, error) {
 
 	// Resolve version
 	versionConstraint := spec.Version
-	if versionConstraint == "" && pluginCfg != nil {
-		versionConstraint = pluginCfg.Version
+	if versionConstraint == "" && pkgCfg != nil {
+		versionConstraint = pkgCfg.Version
 	}
 	if versionConstraint == "" {
 		versionConstraint = "latest"
@@ -323,18 +323,18 @@ func (r *Resolver) detectConflicts(graph *DepGraph, resolved map[string]*Resolve
 func (r *Resolver) ResolveForUpdate(names []string) (*Resolution, error) {
 	// If no names specified, update all locked packages
 	if len(names) == 0 {
-		for name := range r.lock.Plugins {
+		for name := range r.lock.Packages {
 			names = append(names, name)
 		}
 	}
 
 	// Build specs from names, using constraints from project config
-	var specs []PluginSpec
+	var specs []PackageSpec
 	for _, name := range names {
-		spec := PluginSpec{Name: name}
+		spec := PackageSpec{Name: name}
 
 		// Get constraint from project config
-		for _, p := range r.project.Plugins {
+		for _, p := range r.project.Packages {
 			if p.Name == name {
 				spec.Version = p.Version
 				spec.Source = p.Source
@@ -348,7 +348,7 @@ func (r *Resolver) ResolveForUpdate(names []string) (*Resolution, error) {
 
 	// Create a temporary lock to ignore current versions
 	oldLock := r.lock
-	r.lock = &lockfile.LockFile{Plugins: make(map[string]*lockfile.LockedPlugin)}
+	r.lock = &lockfile.LockFile{Packages: make(map[string]*lockfile.LockedPackage)}
 	defer func() { r.lock = oldLock }()
 
 	return r.Resolve(specs)

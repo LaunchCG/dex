@@ -3,21 +3,21 @@ package resource
 import "fmt"
 
 // =============================================================================
-// MERGED RESOURCES (multiple plugins contribute to same file)
+// MERGED RESOURCES (multiple packages contribute to same file)
 // =============================================================================
 
 // CursorRule (singular) represents a rule merged into AGENTS.md file.
-// Similar to ClaudeRule which merges into CLAUDE.md, multiple plugins can contribute
+// Similar to ClaudeRule which merges into CLAUDE.md, multiple packages can contribute
 // rules which are combined together using marker-based sections.
 type CursorRule struct {
 	// Name is the block label identifying this rule
-	Name string `hcl:"name,label"`
+	Name string
 
 	// Description explains what this rule provides
-	Description string `hcl:"description,attr"`
+	Description string
 
 	// Content is the rule text to merge
-	Content string `hcl:"content,optional"`
+	Content string
 }
 
 // ResourceType returns the HCL block type for Cursor rules (singular).
@@ -68,31 +68,31 @@ func (r *CursorRule) Validate() error {
 // MCP servers provide additional tools and capabilities to Cursor.
 type CursorMCPServer struct {
 	// Name is the unique identifier for this MCP server
-	Name string `hcl:"name,label"`
+	Name string
 
 	// Description explains what this MCP server provides
-	Description string `hcl:"description,optional"`
+	Description string
 
 	// Type specifies the server type: "stdio", "http", or "sse"
-	Type string `hcl:"type,attr"`
+	Type string
 
 	// Command is the executable to run (required for type="stdio")
-	Command string `hcl:"command,optional"`
+	Command string
 
 	// Args are the command-line arguments for the command
-	Args []string `hcl:"args,optional"`
+	Args []string
 
 	// Env contains environment variables for the server
-	Env map[string]string `hcl:"env,optional"`
+	Env map[string]string
 
 	// EnvFile is the path to an env file to load
-	EnvFile string `hcl:"env_file,optional"`
+	EnvFile string
 
 	// URL is the HTTP/SSE endpoint (required for type="http" or type="sse")
-	URL string `hcl:"url,optional"`
+	URL string
 
 	// Headers contains HTTP headers for http/sse type servers
-	Headers map[string]string `hcl:"headers,optional"`
+	Headers map[string]string
 }
 
 // ResourceType returns the HCL block type for Cursor MCP servers.
@@ -159,25 +159,25 @@ func (m *CursorMCPServer) Validate() error {
 // this creates standalone files in .cursor/rules/.
 type CursorRules struct {
 	// Name is the block label identifying this rules file
-	Name string `hcl:"name,label"`
+	Name string
 
 	// Description explains what these rules provide
-	Description string `hcl:"description,attr"`
+	Description string
 
 	// Content is the rules text
-	Content string `hcl:"content,optional"`
+	Content string
 
 	// Globs are optional file patterns for selective application
-	Globs []string `hcl:"globs,optional"`
+	Globs []string
 
 	// AlwaysApply indicates whether the rule should always be applied
-	AlwaysApply *bool `hcl:"always_apply,optional"`
+	AlwaysApply *bool
 
 	// Files lists static files to copy alongside the rules
-	Files []FileBlock `hcl:"file,block"`
+	Files []FileBlock
 
 	// TemplateFiles lists template files to render and copy
-	TemplateFiles []TemplateFileBlock `hcl:"template_file,block"`
+	TemplateFiles []TemplateFileBlock
 }
 
 // ResourceType returns the HCL block type for Cursor rules (plural).
@@ -225,23 +225,23 @@ func (r *CursorRules) Validate() error {
 }
 
 // CursorCommand represents a command for Cursor.
-// Commands are installed to .cursor/commands/{plugin}-{name}.md
+// Commands are installed to .cursor/commands/{package}-{name}.md
 // and can be invoked with the / prefix in chat.
 type CursorCommand struct {
 	// Name is the block label identifying this command
-	Name string `hcl:"name,label"`
+	Name string
 
 	// Description explains what this command does
-	Description string `hcl:"description,attr"`
+	Description string
 
 	// Content is the command body
-	Content string `hcl:"content,optional"`
+	Content string
 
 	// Files lists static files to copy alongside the command
-	Files []FileBlock `hcl:"file,block"`
+	Files []FileBlock
 
 	// TemplateFiles lists template files to render and copy
-	TemplateFiles []TemplateFileBlock `hcl:"template_file,block"`
+	TemplateFiles []TemplateFileBlock
 }
 
 // ResourceType returns the HCL block type for Cursor commands.

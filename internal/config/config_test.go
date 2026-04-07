@@ -23,7 +23,7 @@ registry "local" {
   path = "/path/to/registry"
 }
 
-plugin "my-plugin" {
+package "my-plugin" {
   registry = "local"
   version = "1.0.0"
 }
@@ -39,10 +39,10 @@ plugin "my-plugin" {
 	assert.Len(t, config.Registries, 1)
 	assert.Equal(t, "local", config.Registries[0].Name)
 	assert.Equal(t, "/path/to/registry", config.Registries[0].Path)
-	assert.Len(t, config.Plugins, 1)
-	assert.Equal(t, "my-plugin", config.Plugins[0].Name)
-	assert.Equal(t, "local", config.Plugins[0].Registry)
-	assert.Equal(t, "1.0.0", config.Plugins[0].Version)
+	assert.Len(t, config.Packages, 1)
+	assert.Equal(t, "my-plugin", config.Packages[0].Name)
+	assert.Equal(t, "local", config.Packages[0].Registry)
+	assert.Equal(t, "1.0.0", config.Packages[0].Version)
 }
 
 func TestLoadProject_NotFound(t *testing.T) {
@@ -105,8 +105,8 @@ func TestProjectConfig_Validate(t *testing.T) {
 		Registries: []RegistryBlock{
 			{Name: "local", Path: "/path/to/registry"},
 		},
-		Plugins: []PluginBlock{
-			{Name: "plugin1", Registry: "local", Version: "1.0.0"},
+		Packages: []PackageBlock{
+			{Name: "pkg1", Registry: "local", Version: "1.0.0"},
 		},
 	}
 
@@ -155,13 +155,13 @@ func TestProjectConfig_Validate_DuplicateRegistry(t *testing.T) {
 	assert.EqualError(t, err, "duplicate registry name: local")
 }
 
-func TestProjectConfig_Validate_DuplicatePlugin(t *testing.T) {
+func TestProjectConfig_Validate_DuplicatePackage(t *testing.T) {
 	config := &ProjectConfig{
 		Project: ProjectBlock{
 			Name:            "test-project",
 			AgenticPlatform: "claude-code",
 		},
-		Plugins: []PluginBlock{
+		Packages: []PackageBlock{
 			{Name: "my-plugin", Source: "file:///path1"},
 			{Name: "my-plugin", Source: "file:///path2"}, // Duplicate name
 		},
@@ -169,7 +169,7 @@ func TestProjectConfig_Validate_DuplicatePlugin(t *testing.T) {
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.EqualError(t, err, "duplicate plugin name: my-plugin")
+	assert.EqualError(t, err, "duplicate package name: my-plugin")
 }
 
 func TestProjectConfig_Validate_RegistryMissingPathOrURL(t *testing.T) {
@@ -204,22 +204,22 @@ func TestProjectConfig_Validate_RegistryBothPathAndURL(t *testing.T) {
 	assert.EqualError(t, err, `registry "both-registry" cannot have both path and url`)
 }
 
-func TestProjectConfig_Validate_PluginWithoutSourceOrRegistry(t *testing.T) {
+func TestProjectConfig_Validate_PackageWithoutSourceOrRegistry(t *testing.T) {
 	config := &ProjectConfig{
 		Project: ProjectBlock{
 			Name:            "test-project",
 			AgenticPlatform: "claude-code",
 		},
-		Plugins: []PluginBlock{
+		Packages: []PackageBlock{
 			{Name: "auto-search-plugin"}, // No source or registry - will be resolved via auto-search at install time
 		},
 	}
 
 	err := config.Validate()
-	require.NoError(t, err) // Plugins without source/registry are valid - dex will auto-search registries
+	require.NoError(t, err) // Packages without source/registry are valid - dex will auto-search registries
 }
 
-func TestProjectConfig_Validate_PluginBothSourceAndRegistry(t *testing.T) {
+func TestProjectConfig_Validate_PackageBothSourceAndRegistry(t *testing.T) {
 	config := &ProjectConfig{
 		Project: ProjectBlock{
 			Name:            "test-project",
@@ -228,30 +228,30 @@ func TestProjectConfig_Validate_PluginBothSourceAndRegistry(t *testing.T) {
 		Registries: []RegistryBlock{
 			{Name: "local", Path: "/path"},
 		},
-		Plugins: []PluginBlock{
+		Packages: []PackageBlock{
 			{Name: "confused-plugin", Source: "file:///path", Registry: "local"}, // Has both
 		},
 	}
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.EqualError(t, err, `plugin "confused-plugin" cannot have both source and registry`)
+	assert.EqualError(t, err, `package "confused-plugin" cannot have both source and registry`)
 }
 
-func TestProjectConfig_Validate_PluginUnknownRegistry(t *testing.T) {
+func TestProjectConfig_Validate_PackageUnknownRegistry(t *testing.T) {
 	config := &ProjectConfig{
 		Project: ProjectBlock{
 			Name:            "test-project",
 			AgenticPlatform: "claude-code",
 		},
-		Plugins: []PluginBlock{
+		Packages: []PackageBlock{
 			{Name: "my-plugin", Registry: "nonexistent"}, // Registry doesn't exist
 		},
 	}
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.EqualError(t, err, `plugin "my-plugin" references unknown registry: nonexistent`)
+	assert.EqualError(t, err, `package "my-plugin" references unknown registry: nonexistent`)
 }
 
 func TestLoadPackage_NotFound(t *testing.T) {
@@ -268,7 +268,7 @@ func TestLoadPackage_NotFound(t *testing.T) {
 func TestLoadPackage_InvalidHCL(t *testing.T) {
 	tmpDir := t.TempDir()
 	hclContent := `
-package {
+meta {
   name = "test
   // Invalid string
 }
@@ -285,7 +285,7 @@ package {
 
 func TestPackageConfig_Validate(t *testing.T) {
 	config := &PackageConfig{
-		Package: PackageBlock{
+		Meta: MetaBlock{
 			Name:    "test-package",
 			Version: "1.0.0",
 		},
@@ -297,31 +297,31 @@ func TestPackageConfig_Validate(t *testing.T) {
 
 func TestPackageConfig_Validate_MissingName(t *testing.T) {
 	config := &PackageConfig{
-		Package: PackageBlock{
+		Meta: MetaBlock{
 			Version: "1.0.0",
 		},
 	}
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.EqualError(t, err, "package.name is required")
+	assert.EqualError(t, err, "meta.name is required")
 }
 
 func TestPackageConfig_Validate_MissingVersion(t *testing.T) {
 	config := &PackageConfig{
-		Package: PackageBlock{
+		Meta: MetaBlock{
 			Name: "test-package",
 		},
 	}
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.EqualError(t, err, "package.version is required")
+	assert.EqualError(t, err, "meta.version is required")
 }
 
 func TestPackageConfig_Validate_DuplicateVariable(t *testing.T) {
 	config := &PackageConfig{
-		Package: PackageBlock{
+		Meta: MetaBlock{
 			Name:    "test-package",
 			Version: "1.0.0",
 		},
@@ -338,7 +338,7 @@ func TestPackageConfig_Validate_DuplicateVariable(t *testing.T) {
 
 func TestPackageConfig_Validate_RequiredWithDefault(t *testing.T) {
 	config := &PackageConfig{
-		Package: PackageBlock{
+		Meta: MetaBlock{
 			Name:    "test-package",
 			Version: "1.0.0",
 		},
@@ -611,25 +611,25 @@ func TestProjectConfig_Validate_RegistryEmptyName(t *testing.T) {
 	assert.EqualError(t, err, "registry name is required")
 }
 
-func TestProjectConfig_Validate_PluginEmptyName(t *testing.T) {
+func TestProjectConfig_Validate_PackageEmptyName(t *testing.T) {
 	config := &ProjectConfig{
 		Project: ProjectBlock{
 			Name:            "test-project",
 			AgenticPlatform: "claude-code",
 		},
-		Plugins: []PluginBlock{
+		Packages: []PackageBlock{
 			{Source: "file:///path"}, // Missing name
 		},
 	}
 
 	err := config.Validate()
 	require.Error(t, err)
-	assert.EqualError(t, err, "plugin name is required")
+	assert.EqualError(t, err, "package name is required")
 }
 
 func TestPackageConfig_Validate_VariableEmptyName(t *testing.T) {
 	config := &PackageConfig{
-		Package: PackageBlock{
+		Meta: MetaBlock{
 			Name:    "test-package",
 			Version: "1.0.0",
 		},
@@ -646,7 +646,7 @@ func TestPackageConfig_Validate_VariableEmptyName(t *testing.T) {
 func TestPackageBlock_OptionalFields(t *testing.T) {
 	// Test PackageBlock struct directly instead of parsing HCL
 	pkg := &PackageConfig{
-		Package: PackageBlock{
+		Meta: MetaBlock{
 			Name:       "test-package",
 			Version:    "1.0.0",
 			Platforms:  []string{"claude-code", "cursor"},
@@ -654,15 +654,15 @@ func TestPackageBlock_OptionalFields(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, []string{"claude-code", "cursor"}, pkg.Package.Platforms)
-	assert.Equal(t, "https://github.com/example/repo", pkg.Package.Repository)
+	assert.Equal(t, []string{"claude-code", "cursor"}, pkg.Meta.Platforms)
+	assert.Equal(t, "https://github.com/example/repo", pkg.Meta.Repository)
 
 	// Validation should pass
 	err := pkg.Validate()
 	assert.NoError(t, err)
 }
 
-func TestProjectConfig_WithPluginConfig(t *testing.T) {
+func TestProjectConfig_WithPackageConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 	hclContent := `
 project {
@@ -670,8 +670,8 @@ project {
   default_platform = "claude-code"
 }
 
-plugin "my-plugin" {
-  source = "file:///path/to/plugin"
+package "my-plugin" {
+  source = "file:///path/to/pkg"
   config = {
     api_key = "secret"
     endpoint = "https://api.example.com"
@@ -683,9 +683,9 @@ plugin "my-plugin" {
 
 	config, err := LoadProject(tmpDir)
 	require.NoError(t, err)
-	assert.Len(t, config.Plugins, 1)
-	assert.Equal(t, "secret", config.Plugins[0].Config["api_key"])
-	assert.Equal(t, "https://api.example.com", config.Plugins[0].Config["endpoint"])
+	assert.Len(t, config.Packages, 1)
+	assert.Equal(t, "secret", config.Packages[0].Config["api_key"])
+	assert.Equal(t, "https://api.example.com", config.Packages[0].Config["endpoint"])
 }
 
 func TestNewPackageEvalContext_FileFunction(t *testing.T) {
@@ -875,8 +875,8 @@ project {
   default_platform = "claude-code"
 }
 
-plugin "test-plugin" {
-  source = "file:///path/to/plugin"
+package "test-plugin" {
+  source = "file:///path/to/pkg"
   config = {
     org = var.ORG_NAME
     key = var.API_KEY
@@ -900,10 +900,10 @@ plugin "test-plugin" {
 	assert.Equal(t, "my-org", config.ResolvedVars["ORG_NAME"])
 	assert.Equal(t, "default-key", config.ResolvedVars["API_KEY"])
 
-	// Check plugin config uses interpolated values
-	assert.Len(t, config.Plugins, 1)
-	assert.Equal(t, "my-org", config.Plugins[0].Config["org"])
-	assert.Equal(t, "default-key", config.Plugins[0].Config["key"])
+	// Check package config uses interpolated values
+	assert.Len(t, config.Packages, 1)
+	assert.Equal(t, "my-org", config.Packages[0].Config["org"])
+	assert.Equal(t, "default-key", config.Packages[0].Config["key"])
 }
 
 func TestLoadProject_VariableFromEnv(t *testing.T) {
@@ -924,8 +924,8 @@ project {
   default_platform = "claude-code"
 }
 
-plugin "test-plugin" {
-  source = "file:///path/to/plugin"
+package "test-plugin" {
+  source = "file:///path/to/pkg"
   config = {
     value = var.MY_VAR
   }
@@ -939,7 +939,7 @@ plugin "test-plugin" {
 
 	// Environment variable should take precedence over default
 	assert.Equal(t, "env-value", config.ResolvedVars["MY_VAR"])
-	assert.Equal(t, "env-value", config.Plugins[0].Config["value"])
+	assert.Equal(t, "env-value", config.Packages[0].Config["value"])
 }
 
 func TestLoadProject_RequiredVariableWithEnv(t *testing.T) {
@@ -1061,8 +1061,8 @@ project {
   default_platform = "claude-code"
 }
 
-plugin "test-plugin" {
-  source = "file:///path/to/plugin"
+package "test-plugin" {
+  source = "file:///path/to/pkg"
   config = {
     value = var.OPTIONAL_VAR
   }
@@ -1076,7 +1076,7 @@ plugin "test-plugin" {
 
 	// Optional variable with no value should be empty string
 	assert.Equal(t, "", config.ResolvedVars["OPTIONAL_VAR"])
-	assert.Equal(t, "", config.Plugins[0].Config["value"])
+	assert.Equal(t, "", config.Packages[0].Config["value"])
 }
 
 func TestNewProjectEvalContext(t *testing.T) {
@@ -1133,7 +1133,7 @@ project {
   default_platform = "claude-code"
 }
 
-plugin "azure-devops" {
+package "azure-devops" {
   source = "file:///tmp/azure-devops"
   config = {
     org       = var.ORG_NAME
@@ -1172,13 +1172,13 @@ plugin "azure-devops" {
 	assert.Equal(t, "secret-pat-from-env", config.ResolvedVars["PAT"], "PAT should resolve from env var")
 	assert.Equal(t, "", config.ResolvedVars["EMPTY_VAR"], "EMPTY_VAR should be empty string")
 
-	// Verify plugin config was interpolated correctly
-	assert.Len(t, config.Plugins, 1)
-	plugin := config.Plugins[0]
-	assert.Equal(t, "azure-devops", plugin.Name)
-	assert.Equal(t, "my-default-org", plugin.Config["org"], "Plugin org should be interpolated from var.ORG_NAME")
-	assert.Equal(t, "secret-pat-from-env", plugin.Config["pat"], "Plugin pat should be interpolated from var.PAT")
-	assert.Equal(t, "", plugin.Config["empty_val"], "Plugin empty_val should be empty string")
+	// Verify package config was interpolated correctly
+	assert.Len(t, config.Packages, 1)
+	pkg := config.Packages[0]
+	assert.Equal(t, "azure-devops", pkg.Name)
+	assert.Equal(t, "my-default-org", pkg.Config["org"], "Package org should be interpolated from var.ORG_NAME")
+	assert.Equal(t, "secret-pat-from-env", pkg.Config["pat"], "Package pat should be interpolated from var.PAT")
+	assert.Equal(t, "", pkg.Config["empty_val"], "Package empty_val should be empty string")
 
 	// Verify validation passes
 	err = config.Validate()
@@ -1202,8 +1202,7 @@ project {
   default_platform = "claude-code"
 }
 
-claude_mcp_server "test-server" {
-  type    = "command"
+mcp_server "test-server" {
   command = var.MCP_COMMAND
   args    = ["--arg", var.MCP_ARG]
 }
@@ -1409,8 +1408,7 @@ project {
   default_platform = "claude-code"
 }
 
-claude_mcp_server "env-server" {
-  type    = "command"
+mcp_server "env-server" {
   command = "node"
   args    = [var.SERVER_ARG]
 }
@@ -1432,7 +1430,7 @@ claude_mcp_server "env-server" {
 func TestLoadPackage_WithDependencies(t *testing.T) {
 	tmpDir := t.TempDir()
 	hclContent := `
-package {
+meta {
   name    = "my-plugin"
   version = "1.0.0"
 }
@@ -1483,7 +1481,7 @@ dependency "external" {
 func TestLoadPackage_NoDependencies(t *testing.T) {
 	tmpDir := t.TempDir()
 	hclContent := `
-package {
+meta {
   name    = "simple-plugin"
   version = "1.0.0"
 }
@@ -1502,7 +1500,7 @@ func TestLoadPackage_DependenciesFromPkgHCL(t *testing.T) {
 
 	// Main package.hcl
 	mainHCL := `
-package {
+meta {
   name    = "main-plugin"
   version = "1.0.0"
 }
@@ -1539,7 +1537,7 @@ dependency "extra" {
 	assert.True(t, depNames["extra"])
 }
 
-func TestAddPluginToConfig_WithRegistry(t *testing.T) {
+func TestAddPackageToConfig_WithRegistry(t *testing.T) {
 	tmpDir := t.TempDir()
 	initialContent := `project {
   name             = "test-project"
@@ -1553,7 +1551,7 @@ registry "my-registry" {
 	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(initialContent), 0644)
 	require.NoError(t, err)
 
-	err = AddPluginToConfig(tmpDir, "my-plugin", "", "my-registry", "1.0.0")
+	err = AddPackageToConfig(tmpDir, "my-plugin", "", "my-registry", "1.0.0")
 	require.NoError(t, err)
 
 	content, err := os.ReadFile(filepath.Join(tmpDir, "dex.hcl"))
@@ -1567,7 +1565,7 @@ registry "my-registry" {
   url = "https://example.com/registry"
 }
 
-plugin "my-plugin" {
+package "my-plugin" {
   registry = "my-registry"
   version  = "1.0.0"
 }
@@ -1575,7 +1573,7 @@ plugin "my-plugin" {
 	assert.Equal(t, expected, string(content))
 }
 
-func TestAddPluginToConfig_WithRegistryNoVersion(t *testing.T) {
+func TestAddPackageToConfig_WithRegistryNoVersion(t *testing.T) {
 	tmpDir := t.TempDir()
 	initialContent := `project {
   name             = "test-project"
@@ -1589,7 +1587,7 @@ registry "my-registry" {
 	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(initialContent), 0644)
 	require.NoError(t, err)
 
-	err = AddPluginToConfig(tmpDir, "my-plugin", "", "my-registry", "")
+	err = AddPackageToConfig(tmpDir, "my-plugin", "", "my-registry", "")
 	require.NoError(t, err)
 
 	content, err := os.ReadFile(filepath.Join(tmpDir, "dex.hcl"))
@@ -1603,14 +1601,14 @@ registry "my-registry" {
   url = "https://example.com/registry"
 }
 
-plugin "my-plugin" {
+package "my-plugin" {
   registry = "my-registry"
 }
 `
 	assert.Equal(t, expected, string(content))
 }
 
-func TestAddPluginToConfig_WithSource(t *testing.T) {
+func TestAddPackageToConfig_WithSource(t *testing.T) {
 	tmpDir := t.TempDir()
 	initialContent := `project {
   name             = "test-project"
@@ -1620,7 +1618,7 @@ func TestAddPluginToConfig_WithSource(t *testing.T) {
 	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(initialContent), 0644)
 	require.NoError(t, err)
 
-	err = AddPluginToConfig(tmpDir, "my-plugin", "git+https://example.com/plugin.git", "", "2.0.0")
+	err = AddPackageToConfig(tmpDir, "my-plugin", "git+https://example.com/plugin.git", "", "2.0.0")
 	require.NoError(t, err)
 
 	content, err := os.ReadFile(filepath.Join(tmpDir, "dex.hcl"))
@@ -1630,7 +1628,7 @@ func TestAddPluginToConfig_WithSource(t *testing.T) {
   default_platform = "claude-code"
 }
 
-plugin "my-plugin" {
+package "my-plugin" {
   source  = "git+https://example.com/plugin.git"
   version = "2.0.0"
 }
@@ -1638,7 +1636,7 @@ plugin "my-plugin" {
 	assert.Equal(t, expected, string(content))
 }
 
-func TestAddPluginToConfig_ErrorNoSourceOrRegistry(t *testing.T) {
+func TestAddPackageToConfig_ErrorNoSourceOrRegistry(t *testing.T) {
 	tmpDir := t.TempDir()
 	initialContent := `project {
   name             = "test-project"
@@ -1648,7 +1646,7 @@ func TestAddPluginToConfig_ErrorNoSourceOrRegistry(t *testing.T) {
 	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(initialContent), 0644)
 	require.NoError(t, err)
 
-	err = AddPluginToConfig(tmpDir, "my-plugin", "", "", "1.0.0")
+	err = AddPackageToConfig(tmpDir, "my-plugin", "", "", "1.0.0")
 	require.Error(t, err)
-	assert.EqualError(t, err, `either source or registry must be specified for plugin "my-plugin"`)
+	assert.EqualError(t, err, `either source or registry must be specified for package "my-plugin"`)
 }

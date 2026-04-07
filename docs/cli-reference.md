@@ -22,10 +22,10 @@ Complete reference for Dex command-line commands.
 
 ```bash
 # Show detailed installation progress
-dex -v install my-plugin
+dex -v install my-package
 
 # Full debug output
-dex -vv install my-plugin
+dex -vv install my-package
 ```
 
 ## Commands
@@ -68,29 +68,29 @@ dex init --path /path/to/project
 
 ### dex sync
 
-Synchronize plugins to match dex.hcl configuration.
+Synchronize packages to match dex.hcl configuration.
 
-Without arguments, syncs all plugins: installs missing, updates outdated, and prunes orphaned plugins. With arguments, installs or updates specific plugins.
+Without arguments, syncs all packages: installs missing, updates outdated, and prunes orphaned packages. With arguments, installs or updates specific packages.
 
 ```bash
-dex sync [PLUGINS...] [OPTIONS]
+dex sync [PACKAGES...] [OPTIONS]
 ```
 
 **Arguments:**
 
 | Argument | Description |
 |----------|-------------|
-| `PLUGINS` | Optional plugin names/specs (e.g., `plugin@^1.0.0`) |
+| `PACKAGES` | Optional package names/specs (e.g., `package@^1.0.0`) |
 
 **Version specifiers:**
 
 | Format | Example | Description |
 |--------|---------|-------------|
-| Exact | `plugin@1.2.0` | Exact version |
-| Caret | `plugin@^1.0.0` | Compatible with 1.x.x |
-| Tilde | `plugin@~1.2.0` | Compatible with 1.2.x |
-| Range | `plugin@>=1.0.0` | 1.0.0 or higher |
-| Latest | `plugin` | Latest version |
+| Exact | `package@1.2.0` | Exact version |
+| Caret | `package@^1.0.0` | Compatible with 1.x.x |
+| Tilde | `package@~1.2.0` | Compatible with 1.2.x |
+| Range | `package@>=1.0.0` | 1.0.0 or higher |
+| Latest | `package` | Latest version |
 
 **Options:**
 
@@ -98,7 +98,7 @@ dex sync [PLUGINS...] [OPTIONS]
 |--------|-------|-------------|---------|
 | `--source` | `-s` | Direct source path (file://) | - |
 | `--registry` | `-r` | Registry to use (overrides default) | - |
-| `--no-save` | - | Don't save to config file (plugins are saved by default) | `false` |
+| `--no-save` | - | Don't save to config file (packages are saved by default) | `false` |
 | `--no-lock` | - | Don't update lock file | `false` |
 | `--force` | `-f` | Overwrite existing files even if not managed by dex | `false` |
 | `--path` | `-p` | Project directory | Current directory |
@@ -113,32 +113,32 @@ By default, Dex will refuse to overwrite files that exist but aren't tracked in 
 **Examples:**
 
 ```bash
-# Sync all plugins (install missing, update outdated, prune orphaned)
+# Sync all packages (install missing, update outdated, prune orphaned)
 dex sync
 
 # Preview what sync would do
 dex sync --dry-run
 
-# Install a specific plugin
-dex sync my-plugin
+# Install a specific package
+dex sync my-package
 
 # Install with version specifier
-dex sync my-plugin@^1.0.0
+dex sync my-package@^1.0.0
 
 # Install from a specific registry
-dex sync my-plugin --registry file:./my-registry
+dex sync my-package --registry file:./my-registry
 
 # Install from local source
-dex sync --source file:./local-plugin
+dex sync --source file:./local-package
 
 # Install without saving to dex.hcl
-dex sync my-plugin --no-save
+dex sync my-package --no-save
 
 # Install without updating lock file
 dex sync --no-lock
 
 # Force overwrite existing files
-dex sync my-plugin --force
+dex sync my-package --force
 ```
 
 **Exit Codes:**
@@ -150,7 +150,7 @@ dex sync my-plugin --force
 
 ### dex list
 
-List installed plugins.
+List installed packages.
 
 ```bash
 dex list [OPTIONS]
@@ -166,7 +166,7 @@ dex list [OPTIONS]
 **Examples:**
 
 ```bash
-# List all plugins
+# List all packages
 dex list
 
 # Show dependency tree
@@ -181,17 +181,17 @@ dex list --tree
 
 ### dex uninstall
 
-Uninstall plugins from the project.
+Uninstall packages from the project.
 
 ```bash
-dex uninstall PLUGINS... [OPTIONS]
+dex uninstall PACKAGES... [OPTIONS]
 ```
 
 **Arguments:**
 
 | Argument | Description |
 |----------|-------------|
-| `PLUGINS` | Plugin names to uninstall (required) |
+| `PACKAGES` | Package names to uninstall (required) |
 
 **Options:**
 
@@ -205,23 +205,23 @@ dex uninstall PLUGINS... [OPTIONS]
 Without `--remove`:
 - Deletes installed files tracked in the manifest
 - Cleans up MCP servers
-- Keeps the plugin in dex.hcl (can reinstall with `dex sync`)
+- Keeps the package in dex.hcl (can reinstall with `dex sync`)
 
 With `--remove`:
 - Does all of the above
-- Also removes the plugin from dex.hcl
+- Also removes the package from dex.hcl
 
 **Examples:**
 
 ```bash
-# Uninstall a plugin (keep in dex.hcl for later reinstall)
-dex uninstall my-plugin
+# Uninstall a package (keep in dex.hcl for later reinstall)
+dex uninstall my-package
 
 # Uninstall and remove from dex.hcl
-dex uninstall my-plugin --remove
+dex uninstall my-package --remove
 
-# Uninstall multiple plugins
-dex uninstall plugin-a plugin-b --remove
+# Uninstall multiple packages
+dex uninstall package-a package-b --remove
 ```
 
 **Exit Codes:**
@@ -232,17 +232,17 @@ dex uninstall plugin-a plugin-b --remove
 
 ### dex info
 
-Show information about an installed plugin.
+Show information about an installed package.
 
 ```bash
-dex info PLUGIN [OPTIONS]
+dex info PACKAGE [OPTIONS]
 ```
 
 **Arguments:**
 
 | Argument | Description |
 |----------|-------------|
-| `PLUGIN` | Plugin name (required) |
+| `PACKAGE` | Package name (required) |
 
 **Options:**
 
@@ -253,8 +253,8 @@ dex info PLUGIN [OPTIONS]
 **Examples:**
 
 ```bash
-# Show plugin info
-dex info my-plugin
+# Show package info
+dex info my-package
 ```
 
 **Output includes:**
@@ -267,7 +267,7 @@ dex info my-plugin
 **Exit Codes:**
 
 - `0` - Success
-- `1` - Plugin not found
+- `1` - Package not found
 
 ---
 
@@ -297,14 +297,14 @@ dex 0.1.0
 Show files managed by Dex.
 
 ```bash
-dex manifest [PLUGIN] [OPTIONS]
+dex manifest [PACKAGE] [OPTIONS]
 ```
 
 **Arguments:**
 
 | Argument | Description |
 |----------|-------------|
-| `PLUGIN` | Optional plugin name to filter by |
+| `PACKAGE` | Optional package name to filter by |
 
 **Options:**
 
@@ -318,8 +318,8 @@ dex manifest [PLUGIN] [OPTIONS]
 # Show all managed files
 dex manifest
 
-# Show files for a specific plugin
-dex manifest my-plugin
+# Show files for a specific package
+dex manifest my-package
 ```
 
 **Exit Codes:**

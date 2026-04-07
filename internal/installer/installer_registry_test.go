@@ -31,13 +31,13 @@ func createTestProject(t *testing.T, dir string, plugins string) {
 // createTestPlugin creates a minimal package.hcl for a test plugin
 func createTestPlugin(t *testing.T, dir, name, version, description string) {
 	t.Helper()
-	content := `package {
+	content := `meta {
   name = "` + name + `"
   version = "` + version + `"
   description = "` + description + `"
 }
 
-claude_rule "` + name + `-rule" {
+rule "` + name + `-rule" {
   description = "Rule from ` + name + `"
   content = "Follow this rule from ` + name + `"
 }
@@ -82,7 +82,7 @@ func TestInstaller_LocalRegistry_DirectSource(t *testing.T) {
 
 	// Create project config with direct source
 	createTestProject(t, projectDir, `
-plugin "my-test-plugin" {
+package "my-test-plugin" {
   source = "file:`+pluginDir+`"
 }
 `)
@@ -109,7 +109,7 @@ plugin "my-test-plugin" {
 	require.NoError(t, err)
 	assert.Equal(t, "1.0", lockData["version"])
 	assert.Equal(t, "claude-code", lockData["agent"])
-	plugins := lockData["plugins"].(map[string]any)
+	plugins := lockData["packages"].(map[string]any)
 	require.Contains(t, plugins, "my-test-plugin")
 	pluginEntry := plugins["my-test-plugin"].(map[string]any)
 	assert.Equal(t, "1.0.0", pluginEntry["version"])
@@ -149,12 +149,12 @@ registry "local" {
   path = "`+registryDir+`"
 }
 
-plugin "plugin-a" {
+package "plugin-a" {
   registry = "local"
   version = "^2.0.0"
 }
 
-plugin "plugin-b" {
+package "plugin-b" {
   registry = "local"
 }
 `)
@@ -179,7 +179,7 @@ plugin "plugin-b" {
 	var lockData map[string]any
 	err = json.Unmarshal(lockContent, &lockData)
 	require.NoError(t, err)
-	plugins := lockData["plugins"].(map[string]any)
+	plugins := lockData["packages"].(map[string]any)
 	require.Contains(t, plugins, "plugin-a")
 	require.Contains(t, plugins, "plugin-b")
 	pluginA := plugins["plugin-a"].(map[string]any)
@@ -210,7 +210,7 @@ registry "local" {
   path = "`+registryDir+`"
 }
 
-plugin "versioned-plugin" {
+package "versioned-plugin" {
   registry = "local"
   version = "^1.0.0"
 }
@@ -230,7 +230,7 @@ plugin "versioned-plugin" {
 	var lockData map[string]any
 	err = json.Unmarshal(lockContent, &lockData)
 	require.NoError(t, err)
-	plugins := lockData["plugins"].(map[string]any)
+	plugins := lockData["packages"].(map[string]any)
 	pluginEntry := plugins["versioned-plugin"].(map[string]any)
 	assert.Equal(t, "1.2.0", pluginEntry["version"])
 }
@@ -245,7 +245,7 @@ func TestInstaller_LocalRegistry_Reinstall(t *testing.T) {
 
 	// Create project config
 	createTestProject(t, projectDir, `
-plugin "reinstall-plugin" {
+package "reinstall-plugin" {
   source = "file:`+pluginDir+`"
 }
 `)
@@ -263,13 +263,13 @@ plugin "reinstall-plugin" {
 	assert.Equal(t, expectedCLAUDE1, string(claudeContent1))
 
 	// Update the plugin content
-	updatedContent := `package {
+	updatedContent := `meta {
   name = "reinstall-plugin"
   version = "1.0.0"
   description = "Updated reinstall test plugin"
 }
 
-claude_rule "reinstall-plugin-rule" {
+rule "reinstall-plugin-rule" {
   description = "Updated rule"
   content = "This is the updated rule content"
 }
@@ -296,7 +296,7 @@ func TestInstaller_LocalRegistry_WithVariables(t *testing.T) {
 
 	// Set up a local plugin with variables
 	pluginDir := t.TempDir()
-	pluginContent := `package {
+	pluginContent := `meta {
   name = "var-plugin"
   version = "1.0.0"
   description = "Plugin with variables"
@@ -307,7 +307,7 @@ variable "custom_value" {
   default = "default-value"
 }
 
-claude_rule "var-rule" {
+rule "var-rule" {
   description = "Rule with variable"
   content = "Static content for var test"
 }
@@ -317,7 +317,7 @@ claude_rule "var-rule" {
 
 	// Create project config with variable override
 	createTestProject(t, projectDir, `
-plugin "var-plugin" {
+package "var-plugin" {
   source = "file:`+pluginDir+`"
   config = {
     custom_value = "overridden-value"
@@ -346,14 +346,13 @@ func TestInstaller_LocalRegistry_WithMCPServer(t *testing.T) {
 
 	// Set up a local plugin with MCP server
 	pluginDir := t.TempDir()
-	pluginContent := `package {
+	pluginContent := `meta {
   name = "mcp-plugin"
   version = "1.0.0"
   description = "Plugin with MCP server"
 }
 
-claude_mcp_server "test-mcp" {
-  type = "command"
+mcp_server "test-mcp" {
   command = "npx"
   args = ["-y", "test-mcp-server"]
 }
@@ -363,7 +362,7 @@ claude_mcp_server "test-mcp" {
 
 	// Create project config
 	createTestProject(t, projectDir, `
-plugin "mcp-plugin" {
+package "mcp-plugin" {
   source = "file:`+pluginDir+`"
 }
 `)
@@ -397,14 +396,16 @@ func TestInstaller_LocalRegistry_WithSettings(t *testing.T) {
 
 	// Set up a local plugin with settings
 	pluginDir := t.TempDir()
-	pluginContent := `package {
+	pluginContent := `meta {
   name = "settings-plugin"
   version = "1.0.0"
   description = "Plugin with settings"
 }
 
-claude_settings "test-settings" {
-  allow = ["Bash(npm:*)"]
+settings "test-settings" {
+  claude {
+    allow = ["Bash(npm:*)"]
+  }
 }
 `
 	err := os.WriteFile(filepath.Join(pluginDir, "package.hcl"), []byte(pluginContent), 0644)
@@ -412,7 +413,7 @@ claude_settings "test-settings" {
 
 	// Create project config
 	createTestProject(t, projectDir, `
-plugin "settings-plugin" {
+package "settings-plugin" {
   source = "file:`+pluginDir+`"
 }
 `)
@@ -444,13 +445,13 @@ func TestInstaller_LocalRegistry_WithSkill(t *testing.T) {
 
 	// Set up a local plugin with a skill
 	pluginDir := t.TempDir()
-	pluginContent := `package {
+	pluginContent := `meta {
   name = "skill-plugin"
   version = "1.0.0"
   description = "Plugin with skill"
 }
 
-claude_skill "my-skill" {
+skill "my-skill" {
   description = "A test skill"
   content = <<EOF
 You are a helpful assistant that specializes in this skill.
@@ -467,7 +468,7 @@ EOF
 
 	// Create project config
 	createTestProject(t, projectDir, `
-plugin "skill-plugin" {
+package "skill-plugin" {
   source = "file:`+pluginDir+`"
 }
 `)
@@ -496,13 +497,13 @@ func TestInstaller_LocalRegistry_WithCommand(t *testing.T) {
 
 	// Set up a local plugin with a command
 	pluginDir := t.TempDir()
-	pluginContent := `package {
+	pluginContent := `meta {
   name = "command-plugin"
   version = "1.0.0"
   description = "Plugin with command"
 }
 
-claude_command "my-command" {
+command "my-command" {
   description = "A test command"
   content = <<EOF
 Execute this command to do something useful.
@@ -518,7 +519,7 @@ EOF
 
 	// Create project config
 	createTestProject(t, projectDir, `
-plugin "command-plugin" {
+package "command-plugin" {
   source = "file:`+pluginDir+`"
 }
 `)
@@ -554,11 +555,11 @@ func TestInstaller_LocalRegistry_MultiplePlugins(t *testing.T) {
 
 	// Create project config with multiple plugins
 	createTestProject(t, projectDir, `
-plugin "plugin-one" {
+package "plugin-one" {
   source = "file:`+plugin1Dir+`"
 }
 
-plugin "plugin-two" {
+package "plugin-two" {
   source = "file:`+plugin2Dir+`"
 }
 `)
@@ -583,7 +584,7 @@ plugin "plugin-two" {
 	var lockData map[string]any
 	err = json.Unmarshal(lockContent, &lockData)
 	require.NoError(t, err)
-	plugins := lockData["plugins"].(map[string]any)
+	plugins := lockData["packages"].(map[string]any)
 	require.Contains(t, plugins, "plugin-one")
 	require.Contains(t, plugins, "plugin-two")
 	assert.Equal(t, "1.0.0", plugins["plugin-one"].(map[string]any)["version"])
@@ -600,7 +601,7 @@ func TestInstaller_LocalRegistry_InvalidSource(t *testing.T) {
 
 	// Create project config with invalid source
 	createTestProject(t, projectDir, `
-plugin "invalid-plugin" {
+package "invalid-plugin" {
   source = "file:/nonexistent/path/that/does/not/exist"
 }
 `)
@@ -623,7 +624,7 @@ func TestInstaller_LocalRegistry_MissingPackageHCL(t *testing.T) {
 
 	// Create project config pointing to empty directory
 	createTestProject(t, projectDir, `
-plugin "empty-plugin" {
+package "empty-plugin" {
   source = "file:`+emptyPluginDir+`"
 }
 `)
@@ -659,7 +660,7 @@ registry "local" {
   path = "`+registryDir+`"
 }
 
-plugin "strict-plugin" {
+package "strict-plugin" {
   registry = "local"
   version = "^3.0.0"
 }
@@ -700,7 +701,7 @@ registry "local" {
   path = "`+registryDir+`"
 }
 
-plugin "lock-test-plugin" {
+package "lock-test-plugin" {
   registry = "local"
 }
 `)
@@ -717,7 +718,7 @@ plugin "lock-test-plugin" {
 	var lockData1 map[string]any
 	err = json.Unmarshal(lockContent1, &lockData1)
 	require.NoError(t, err)
-	plugins1 := lockData1["plugins"].(map[string]any)
+	plugins1 := lockData1["packages"].(map[string]any)
 	assert.Equal(t, "1.2.0", plugins1["lock-test-plugin"].(map[string]any)["version"])
 
 	// Simulate adding a new version to registry
@@ -737,7 +738,7 @@ plugin "lock-test-plugin" {
 	var lockData2 map[string]any
 	err = json.Unmarshal(lockContent2, &lockData2)
 	require.NoError(t, err)
-	plugins2 := lockData2["plugins"].(map[string]any)
+	plugins2 := lockData2["packages"].(map[string]any)
 	assert.Equal(t, "1.2.0", plugins2["lock-test-plugin"].(map[string]any)["version"])
 }
 
@@ -751,7 +752,7 @@ func TestInstaller_LocalRegistry_NoLockOption(t *testing.T) {
 
 	// Create project config
 	createTestProject(t, projectDir, `
-plugin "no-lock-plugin" {
+package "no-lock-plugin" {
   source = "file:`+pluginDir+`"
 }
 `)
@@ -775,7 +776,7 @@ plugin "no-lock-plugin" {
 		var lockData map[string]any
 		readErr = json.Unmarshal(lockContent, &lockData)
 		require.NoError(t, readErr)
-		plugins := lockData["plugins"].(map[string]any)
+		plugins := lockData["packages"].(map[string]any)
 		assert.Equal(t, map[string]any{}, plugins, "Lock file should have no plugins when --no-lock is used")
 	} else {
 		// Lock file doesn't exist, which is also valid for --no-lock
@@ -809,7 +810,7 @@ registry "local" {
   path = "`+registryDir+`"
 }
 
-plugin "save-test-plugin" {
+package "save-test-plugin" {
   registry = "local"
 }
 `)
@@ -818,14 +819,14 @@ plugin "save-test-plugin" {
 	inst, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
-	installed, err := inst.Install([]PluginSpec{{
+	installed, err := inst.Install([]PackageSpec{{
 		Name:     "save-test-plugin",
 		Registry: "local",
 	}})
 	require.NoError(t, err)
 	require.Len(t, installed, 1)
 
-	// Verify InstalledPlugin.Registry is set
+	// Verify InstalledPackage.Registry is set
 	assert.Equal(t, "local", installed[0].Registry)
 	assert.Equal(t, "save-test-plugin", installed[0].Name)
 	assert.Equal(t, "1.0.0", installed[0].Version)
@@ -841,7 +842,7 @@ func TestInstaller_SaveFlag_SourceInstall(t *testing.T) {
 
 	// Create project config
 	createTestProject(t, projectDir, `
-plugin "source-save-plugin" {
+package "source-save-plugin" {
   source = "file:`+pluginDir+`"
 }
 `)
@@ -850,14 +851,14 @@ plugin "source-save-plugin" {
 	inst, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
-	installed, err := inst.Install([]PluginSpec{{
+	installed, err := inst.Install([]PackageSpec{{
 		Name:   "source-save-plugin",
 		Source: "file:" + pluginDir,
 	}})
 	require.NoError(t, err)
 	require.Len(t, installed, 1)
 
-	// Verify InstalledPlugin.Source is set
+	// Verify InstalledPackage.Source is set
 	assert.Equal(t, "file:"+pluginDir, installed[0].Source)
 	assert.Equal(t, "source-save-plugin", installed[0].Name)
 }
@@ -904,7 +905,7 @@ registry "second" {
 	inst, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
-	installed, err := inst.Install([]PluginSpec{{
+	installed, err := inst.Install([]PackageSpec{{
 		Name: "target-plugin",
 	}})
 	require.NoError(t, err)
@@ -936,11 +937,11 @@ registry "local" {
 	inst, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
-	_, err = inst.Install([]PluginSpec{{
+	_, err = inst.Install([]PackageSpec{{
 		Name: "nonexistent-plugin",
 	}})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "nonexistent-plugin")
+	assert.Equal(t, `install error for nonexistent-plugin during resolve: package "nonexistent-plugin" not found in any configured registry`, err.Error())
 }
 
 func TestInstaller_AutoSearchRegistries_Ambiguous(t *testing.T) {
@@ -981,12 +982,11 @@ registry "second" {
 	inst, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
-	_, err = inst.Install([]PluginSpec{{
+	_, err = inst.Install([]PackageSpec{{
 		Name: "ambiguous-plugin",
 	}})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "multiple registries")
-	assert.Contains(t, err.Error(), "--registry")
+	assert.Equal(t, `install error for ambiguous-plugin during resolve: package "ambiguous-plugin" found in multiple registries: first, second (use --registry to specify which one)`, err.Error())
 }
 
 func TestInstaller_AutoSearchRegistries_NoRegistries(t *testing.T) {
@@ -999,11 +999,11 @@ func TestInstaller_AutoSearchRegistries_NoRegistries(t *testing.T) {
 	inst, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
-	_, err = inst.Install([]PluginSpec{{
+	_, err = inst.Install([]PackageSpec{{
 		Name: "some-plugin",
 	}})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no source or registry specified")
+	assert.Equal(t, `install error for some-plugin during resolve: no source or registry specified for package "some-plugin"`, err.Error())
 }
 
 func TestInstaller_AutoSearchAndSave(t *testing.T) {
@@ -1031,13 +1031,13 @@ registry "my-reg" {
 	inst, err := NewInstaller(projectDir, "")
 	require.NoError(t, err)
 
-	installed, err := inst.Install([]PluginSpec{{
+	installed, err := inst.Install([]PackageSpec{{
 		Name: "auto-save-plugin",
 	}})
 	require.NoError(t, err)
 	require.Len(t, installed, 1)
 
-	// Verify InstalledPlugin carries the discovered registry name
+	// Verify InstalledPackage carries the discovered registry name
 	assert.Equal(t, "auto-save-plugin", installed[0].Name)
 	assert.Equal(t, "1.0.0", installed[0].Version)
 	assert.Equal(t, "my-reg", installed[0].Registry)

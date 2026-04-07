@@ -45,7 +45,7 @@ func TestCopilotAdapter_PlanInstruction(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -55,7 +55,7 @@ func TestCopilotAdapter_PlanInstruction(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, plan)
 
-	assert.Equal(t, "my-plugin", plan.PluginName)
+	assert.Equal(t, "my-plugin", plan.PackageName)
 	assert.Equal(t, "Always use TypeScript strict mode.", plan.AgentFileContent)
 	assert.Equal(t, filepath.Join(".github", "copilot-instructions.md"), plan.AgentFilePath)
 	assert.Empty(t, plan.Files)
@@ -74,7 +74,7 @@ func TestCopilotAdapter_PlanMCPServer_Stdio(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -111,7 +111,7 @@ func TestCopilotAdapter_PlanMCPServer_HTTP(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -143,7 +143,7 @@ func TestCopilotAdapter_PlanMCPServer_SSE(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -176,7 +176,7 @@ func TestCopilotAdapter_PlanMCPServer_EnvFile(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -209,7 +209,7 @@ func TestCopilotAdapter_PlanInstructions(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -242,7 +242,7 @@ func TestCopilotAdapter_PlanInstructions_NoApplyTo(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -273,7 +273,7 @@ func TestCopilotAdapter_PlanPrompt(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -310,7 +310,7 @@ func TestCopilotAdapter_PlanPrompt_Minimal(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -343,7 +343,7 @@ func TestCopilotAdapter_PlanAgent(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -383,7 +383,7 @@ func TestCopilotAdapter_PlanAgent_Minimal(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -410,7 +410,7 @@ func TestCopilotAdapter_PlanSkill(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -419,7 +419,7 @@ func TestCopilotAdapter_PlanSkill(t *testing.T) {
 	plan, err := adapter.PlanInstallation(skill, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: true})
 	require.NoError(t, err)
 	require.NotNil(t, plan)
-	assert.Equal(t, "my-plugin", plan.PluginName)
+	assert.Equal(t, "my-plugin", plan.PackageName)
 
 	assert.Equal(t, []string{filepath.Join(".github", "skills", "my-plugin-testing")}, getDirPaths(plan))
 	require.Len(t, plan.Files, 1)
@@ -455,7 +455,7 @@ func TestCopilotAdapter_PlanSkill_WithFiles(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -498,7 +498,7 @@ func TestCopilotAdapter_PlanInstallation_UnsupportedType(t *testing.T) {
 
 	unknown := &mockUnknownResource{name: "unknown"}
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -769,7 +769,7 @@ func TestCopilotAdapter_PlanMCPServer_WithInputs(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -825,7 +825,7 @@ func TestCopilotAdapter_PlanMCPServer_WithInputs_DefaultAndPassword(t *testing.T
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -970,7 +970,7 @@ func TestCopilotAdapter_MergeCopilotMCPConfig_NoInputs(t *testing.T) {
 
 func TestMergePlans_WithCopilotInputs(t *testing.T) {
 	plan1 := &Plan{
-		PluginName: "plugin1",
+		PackageName: "plugin1",
 		MCPEntries: map[string]any{
 			"servers": map[string]any{
 				"server1": map[string]any{"type": "stdio", "command": "cmd1"},
@@ -985,7 +985,7 @@ func TestMergePlans_WithCopilotInputs(t *testing.T) {
 	}
 
 	plan2 := &Plan{
-		PluginName: "plugin1",
+		PackageName: "plugin1",
 		MCPEntries: map[string]any{
 			"servers": map[string]any{
 				"server2": map[string]any{"type": "stdio", "command": "cmd2"},
@@ -1004,8 +1004,10 @@ func TestMergePlans_WithCopilotInputs(t *testing.T) {
 
 	// Servers should be merged
 	servers := merged.MCPEntries["servers"].(map[string]any)
-	assert.Contains(t, servers, "server1")
-	assert.Contains(t, servers, "server2")
+	_, hasS1 := servers["server1"]
+	assert.True(t, hasS1, "server1 should be in merged MCP entries")
+	_, hasS2 := servers["server2"]
+	assert.True(t, hasS2, "server2 should be in merged MCP entries")
 
 	// Inputs should be merged with deduplication (plan2's "input1" replaces plan1's)
 	inputs := merged.MCPEntries["inputs"].([]any)
@@ -1017,7 +1019,7 @@ func TestMergePlans_WithCopilotInputs(t *testing.T) {
 
 func TestMergePlans_WithCopilotPaths(t *testing.T) {
 	plan1 := &Plan{
-		PluginName: "plugin1",
+		PackageName: "plugin1",
 		Directories: []DirectoryCreate{
 			{Path: ".github/instructions", Parents: true},
 		},
@@ -1028,7 +1030,7 @@ func TestMergePlans_WithCopilotPaths(t *testing.T) {
 	}
 
 	plan2 := &Plan{
-		PluginName: "plugin1",
+		PackageName: "plugin1",
 		MCPEntries: map[string]any{
 			"servers": map[string]any{
 				"server1": map[string]any{
@@ -1044,7 +1046,7 @@ func TestMergePlans_WithCopilotPaths(t *testing.T) {
 
 	merged := MergePlans(plan1, plan2)
 
-	assert.Equal(t, "plugin1", merged.PluginName)
+	assert.Equal(t, "plugin1", merged.PackageName)
 	assert.Equal(t, ".github/copilot-instructions.md", merged.AgentFilePath)
 	assert.Equal(t, ".vscode/mcp.json", merged.MCPPath)
 	assert.Equal(t, "servers", merged.MCPKey)

@@ -9,11 +9,11 @@ import (
 func TestContext_NewContext(t *testing.T) {
 	ctx := NewContext("my-plugin", "1.0.0", "/project", "claude-code")
 
-	if ctx.PluginName != "my-plugin" {
-		t.Errorf("PluginName = %q, want %q", ctx.PluginName, "my-plugin")
+	if ctx.PackageName != "my-plugin" {
+		t.Errorf("PackageName = %q, want %q", ctx.PackageName, "my-plugin")
 	}
-	if ctx.PluginVersion != "1.0.0" {
-		t.Errorf("PluginVersion = %q, want %q", ctx.PluginVersion, "1.0.0")
+	if ctx.PackageVersion != "1.0.0" {
+		t.Errorf("PackageVersion = %q, want %q", ctx.PackageVersion, "1.0.0")
 	}
 	if ctx.ProjectRoot != "/project" {
 		t.Errorf("ProjectRoot = %q, want %q", ctx.ProjectRoot, "/project")
@@ -30,7 +30,7 @@ func TestContext_NewContext(t *testing.T) {
 }
 
 func TestContext_WithComponentDir(t *testing.T) {
-	ctx := NewContext("plugin", "1.0.0", "/project", "claude-code")
+	ctx := NewContext("test-pkg", "1.0.0", "/project", "claude-code")
 	ctx.WithComponentDir("/project/.claude/skills/plugin-test")
 
 	if ctx.ComponentDir != "/project/.claude/skills/plugin-test" {
@@ -47,13 +47,13 @@ func TestContext_ToMap(t *testing.T) {
 	m := ctx.ToMap()
 
 	tests := map[string]any{
-		"PluginName":    "my-plugin",
-		"PluginVersion": "2.0.0",
-		"ProjectRoot":   "/proj",
-		"Platform":      "claude-code",
-		"ComponentDir":  "/proj/.claude/skills/test",
-		"customVar":     "customValue",
-		"extraVar":      "extraValue",
+		"PackageName":    "my-plugin",
+		"PackageVersion": "2.0.0",
+		"ProjectRoot":    "/proj",
+		"Platform":       "claude-code",
+		"ComponentDir":   "/proj/.claude/skills/test",
+		"customVar":      "customValue",
+		"extraVar":       "extraValue",
 	}
 
 	for key, want := range tests {
@@ -69,7 +69,7 @@ func TestContext_ToMap(t *testing.T) {
 }
 
 func TestContext_Clone(t *testing.T) {
-	ctx := NewContext("plugin", "1.0.0", "/project", "claude-code")
+	ctx := NewContext("test-pkg", "1.0.0", "/project", "claude-code")
 	ctx.Variables["var1"] = "val1"
 	ctx.ExtraVars["extra1"] = "extraval1"
 
@@ -92,24 +92,24 @@ func TestEngine_Render(t *testing.T) {
 	ctx := NewContext("my-plugin", "1.0.0", "/project", "claude-code")
 	engine := NewEngine("/tmp", ctx)
 
-	result, err := engine.Render("Plugin: {{ .PluginName }}, Version: {{ .PluginVersion }}")
+	result, err := engine.Render("Package: {{ .PackageName }}, Version: {{ .PackageVersion }}")
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
 
-	expected := "Plugin: my-plugin, Version: 1.0.0"
+	expected := "Package: my-plugin, Version: 1.0.0"
 	if result != expected {
 		t.Errorf("Render() = %q, want %q", result, expected)
 	}
 }
 
 func TestEngine_Render_AllBuiltinVars(t *testing.T) {
-	ctx := NewContext("test-plugin", "2.5.0", "/home/user/project", "claude-code")
+	ctx := NewContext("test-pkg", "2.5.0", "/home/user/project", "claude-code")
 	ctx.WithComponentDir("/home/user/project/.claude/skills/test")
 	engine := NewEngine("/tmp", ctx)
 
-	template := `Plugin: {{ .PluginName }}
-Version: {{ .PluginVersion }}
+	template := `Package: {{ .PackageName }}
+Version: {{ .PackageVersion }}
 Project: {{ .ProjectRoot }}
 Platform: {{ .Platform }}
 Component: {{ .ComponentDir }}`
@@ -119,7 +119,7 @@ Component: {{ .ComponentDir }}`
 		t.Fatalf("Render() error = %v", err)
 	}
 
-	expected := `Plugin: test-plugin
+	expected := `Package: test-pkg
 Version: 2.5.0
 Project: /home/user/project
 Platform: claude-code
@@ -131,7 +131,7 @@ Component: /home/user/project/.claude/skills/test`
 }
 
 func TestEngine_Render_UserVariables(t *testing.T) {
-	ctx := NewContext("plugin", "1.0.0", "/project", "claude-code")
+	ctx := NewContext("test-pkg", "1.0.0", "/project", "claude-code")
 	ctx.Variables["apiUrl"] = "https://api.example.com"
 	ctx.Variables["timeout"] = "30"
 	engine := NewEngine("/tmp", ctx)
@@ -148,7 +148,7 @@ func TestEngine_Render_UserVariables(t *testing.T) {
 }
 
 func TestEngine_Render_InvalidTemplate(t *testing.T) {
-	ctx := NewContext("plugin", "1.0.0", "/project", "claude-code")
+	ctx := NewContext("test-pkg", "1.0.0", "/project", "claude-code")
 	engine := NewEngine("/tmp", ctx)
 
 	_, err := engine.Render("{{ .Invalid")
@@ -159,11 +159,11 @@ func TestEngine_Render_InvalidTemplate(t *testing.T) {
 
 func TestEngine_RenderFile(t *testing.T) {
 	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, "test.tmpl"), []byte("Hello {{ .PluginName }}"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "test.tmpl"), []byte("Hello {{ .PackageName }}"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	ctx := NewContext("test-plugin", "1.0.0", "/project", "claude-code")
+	ctx := NewContext("test-pkg", "1.0.0", "/project", "claude-code")
 	engine := NewEngine(tmpDir, ctx)
 
 	result, err := engine.RenderFile("test.tmpl")
@@ -171,14 +171,14 @@ func TestEngine_RenderFile(t *testing.T) {
 		t.Fatalf("RenderFile() error = %v", err)
 	}
 
-	expected := "Hello test-plugin"
+	expected := "Hello test-pkg"
 	if result != expected {
 		t.Errorf("RenderFile() = %q, want %q", result, expected)
 	}
 }
 
 func TestEngine_RenderFile_NotFound(t *testing.T) {
-	ctx := NewContext("plugin", "1.0.0", "/project", "claude-code")
+	ctx := NewContext("test-pkg", "1.0.0", "/project", "claude-code")
 	engine := NewEngine(t.TempDir(), ctx)
 
 	_, err := engine.RenderFile("nonexistent.tmpl")
@@ -189,7 +189,7 @@ func TestEngine_RenderFile_NotFound(t *testing.T) {
 
 func TestEngine_RenderFileWithVars(t *testing.T) {
 	tmpDir := t.TempDir()
-	content := "Plugin: {{ .PluginName }}, Env: {{ .environment }}, Region: {{ .region }}"
+	content := "Package: {{ .PackageName }}, Env: {{ .environment }}, Region: {{ .region }}"
 	if err := os.WriteFile(filepath.Join(tmpDir, "config.tmpl"), []byte(content), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -207,14 +207,14 @@ func TestEngine_RenderFileWithVars(t *testing.T) {
 		t.Fatalf("RenderFileWithVars() error = %v", err)
 	}
 
-	expected := "Plugin: my-plugin, Env: production, Region: us-east-1"
+	expected := "Package: my-plugin, Env: production, Region: us-east-1"
 	if result != expected {
 		t.Errorf("RenderFileWithVars() = %q, want %q", result, expected)
 	}
 }
 
 func TestEngine_RenderWithVars(t *testing.T) {
-	ctx := NewContext("plugin", "1.0.0", "/project", "claude-code")
+	ctx := NewContext("test-pkg", "1.0.0", "/project", "claude-code")
 	engine := NewEngine(t.TempDir(), ctx)
 
 	vars := map[string]any{
@@ -238,7 +238,7 @@ func TestEngine_FileFunction(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx := NewContext("plugin", "1.0.0", "/project", "claude-code")
+	ctx := NewContext("test-pkg", "1.0.0", "/project", "claude-code")
 	engine := NewEngine(tmpDir, ctx)
 
 	result, err := engine.Render(`Content: {{ file "include.txt" }}`)
@@ -253,7 +253,7 @@ func TestEngine_FileFunction(t *testing.T) {
 }
 
 func TestEngine_FileFunction_NotFound(t *testing.T) {
-	ctx := NewContext("plugin", "1.0.0", "/project", "claude-code")
+	ctx := NewContext("test-pkg", "1.0.0", "/project", "claude-code")
 	engine := NewEngine(t.TempDir(), ctx)
 
 	_, err := engine.Render(`{{ file "nonexistent.txt" }}`)
@@ -266,7 +266,7 @@ func TestEngine_EnvFunction(t *testing.T) {
 	os.Setenv("TEST_TEMPLATE_VAR", "test_value")
 	defer os.Unsetenv("TEST_TEMPLATE_VAR")
 
-	ctx := NewContext("plugin", "1.0.0", "/project", "claude-code")
+	ctx := NewContext("test-pkg", "1.0.0", "/project", "claude-code")
 	engine := NewEngine(t.TempDir(), ctx)
 
 	result, err := engine.Render(`Value: {{ env "TEST_TEMPLATE_VAR" }}`)
@@ -284,7 +284,7 @@ func TestEngine_EnvFunction_WithDefault(t *testing.T) {
 	// Ensure the variable is not set
 	os.Unsetenv("NONEXISTENT_VAR_FOR_TEST")
 
-	ctx := NewContext("plugin", "1.0.0", "/project", "claude-code")
+	ctx := NewContext("test-pkg", "1.0.0", "/project", "claude-code")
 	engine := NewEngine(t.TempDir(), ctx)
 
 	result, err := engine.Render(`Value: {{ env "NONEXISTENT_VAR_FOR_TEST" "default_value" }}`)
@@ -299,7 +299,7 @@ func TestEngine_EnvFunction_WithDefault(t *testing.T) {
 }
 
 func TestEngine_DictFunction(t *testing.T) {
-	ctx := NewContext("plugin", "1.0.0", "/project", "claude-code")
+	ctx := NewContext("test-pkg", "1.0.0", "/project", "claude-code")
 	engine := NewEngine(t.TempDir(), ctx)
 
 	result, err := engine.Render(`{{ $m := dict "name" "Alice" "age" 30 }}Name: {{ $m.name }}, Age: {{ $m.age }}`)
@@ -314,7 +314,7 @@ func TestEngine_DictFunction(t *testing.T) {
 }
 
 func TestEngine_DictFunction_Empty(t *testing.T) {
-	ctx := NewContext("plugin", "1.0.0", "/project", "claude-code")
+	ctx := NewContext("test-pkg", "1.0.0", "/project", "claude-code")
 	engine := NewEngine(t.TempDir(), ctx)
 
 	result, err := engine.Render(`{{ $m := dict }}{{ len $m }}`)
@@ -328,7 +328,7 @@ func TestEngine_DictFunction_Empty(t *testing.T) {
 }
 
 func TestEngine_DictFunction_OddArgs(t *testing.T) {
-	ctx := NewContext("plugin", "1.0.0", "/project", "claude-code")
+	ctx := NewContext("test-pkg", "1.0.0", "/project", "claude-code")
 	engine := NewEngine(t.TempDir(), ctx)
 
 	// Odd number of args - last value is ignored
@@ -365,7 +365,7 @@ func TestEngine_TemplatefileWithDict(t *testing.T) {
 
 func TestEngine_TemplatefileWithContextVars(t *testing.T) {
 	tmpDir := t.TempDir()
-	nested := "Plugin: {{ .PluginName }}, Custom: {{ .customVar }}"
+	nested := "Package: {{ .PackageName }}, Custom: {{ .customVar }}"
 	if err := os.WriteFile(filepath.Join(tmpDir, "nested.tmpl"), []byte(nested), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -378,7 +378,7 @@ func TestEngine_TemplatefileWithContextVars(t *testing.T) {
 		t.Fatalf("Render() error = %v", err)
 	}
 
-	expected := "Plugin: my-plugin, Custom: custom_value"
+	expected := "Package: my-plugin, Custom: custom_value"
 	if result != expected {
 		t.Errorf("Render() = %q, want %q", result, expected)
 	}
@@ -388,20 +388,20 @@ func TestEngine_ComplexTemplate(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create include file (file function includes raw content, not rendered)
-	if err := os.WriteFile(filepath.Join(tmpDir, "header.txt"), []byte("# Header for complex-plugin"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "header.txt"), []byte("# Header for complex-pkg"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	ctx := NewContext("complex-plugin", "3.0.0", "/home/project", "claude-code")
+	ctx := NewContext("complex-pkg", "3.0.0", "/home/project", "claude-code")
 	ctx.WithComponentDir("/home/project/.claude/skills/complex")
 	ctx.Variables["author"] = "Test Author"
 	engine := NewEngine(tmpDir, ctx)
 
 	template := `{{ file "header.txt" }}
 
-## Plugin Info
-- Name: {{ .PluginName }}
-- Version: {{ .PluginVersion }}
+## Package Info
+- Name: {{ .PackageName }}
+- Version: {{ .PackageVersion }}
 - Author: {{ .author }}
 - Installed to: {{ .ComponentDir }}
 - Platform: {{ .Platform }}`
@@ -411,10 +411,10 @@ func TestEngine_ComplexTemplate(t *testing.T) {
 		t.Fatalf("Render() error = %v", err)
 	}
 
-	expected := `# Header for complex-plugin
+	expected := `# Header for complex-pkg
 
-## Plugin Info
-- Name: complex-plugin
+## Package Info
+- Name: complex-pkg
 - Version: 3.0.0
 - Author: Test Author
 - Installed to: /home/project/.claude/skills/complex

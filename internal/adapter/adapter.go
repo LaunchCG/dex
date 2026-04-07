@@ -43,7 +43,7 @@ type Adapter interface {
 	// PlanInstallation creates an installation plan for a resource.
 	// The plan describes what files to create and what configurations to merge.
 	// The ctx parameter provides namespace settings and package information.
-	PlanInstallation(res resource.Resource, pkg *config.PackageConfig, pluginDir, projectRoot string, ctx *InstallContext) (*Plan, error)
+	PlanInstallation(res resource.Resource, pkg *config.PackageConfig, pkgDir, projectRoot string, ctx *InstallContext) (*Plan, error)
 
 	// GenerateFrontmatter generates YAML frontmatter for a resource.
 	// Different resource types have different frontmatter fields.
@@ -51,7 +51,7 @@ type Adapter interface {
 
 	// MergeMCPConfig merges MCP server configurations into existing config.
 	// The existing map is in the format used by the platform's MCP config file.
-	MergeMCPConfig(existing map[string]any, pluginName string, servers []*resource.ClaudeMCPServer) map[string]any
+	MergeMCPConfig(existing map[string]any, pkgName string, servers []*resource.ClaudeMCPServer) map[string]any
 
 	// MergeSettingsConfig merges settings configurations into existing config.
 	// Handles merging of arrays (allow, deny, ask) and maps (env).

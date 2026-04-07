@@ -233,7 +233,7 @@ func createTestPlugin(t *testing.T, name, version string) string {
 	t.Helper()
 
 	dir := t.TempDir()
-	content := `package {
+	content := `meta {
   name    = "` + name + `"
   version = "` + version + `"
 }

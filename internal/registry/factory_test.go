@@ -168,7 +168,7 @@ func TestNewRegistry_ProtocolRouting(t *testing.T) {
 
 		// Create a package.hcl so it's valid
 		err = os.WriteFile(filepath.Join(tmpDir, "package.hcl"), []byte(`
-package {
+meta {
   name = "test-plugin"
   version = "1.0.0"
 }

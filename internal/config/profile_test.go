@@ -22,7 +22,7 @@ registry "default-reg" {
   path = "/default"
 }
 
-plugin "default-plugin" {
+package "default-plugin" {
   registry = "default-reg"
 }
 
@@ -33,11 +33,11 @@ profile "qa" {
     path = "/qa"
   }
 
-  plugin "qa-plugin" {
+  package "qa-plugin" {
     registry = "default-reg"
   }
 
-  claude_rule "qa-rule" {
+  rule "qa-rule" {
     description = "QA rule"
     content     = "QA rule content"
   }
@@ -46,7 +46,7 @@ profile "qa" {
 profile "staging" {
   exclude_defaults = true
 
-  plugin "staging-only" {
+  package "staging-only" {
     registry = "default-reg"
   }
 }
@@ -76,11 +76,11 @@ registry "default-reg" {
   path = "/default"
 }
 
-plugin "default-plugin" {
+package "default-plugin" {
   registry = "default-reg"
 }
 
-claude_rule "default-rule" {
+rule "default-rule" {
   description = "Default rule"
   content     = "Default rule"
 }
@@ -92,11 +92,11 @@ profile "qa" {
     path = "/qa"
   }
 
-  plugin "qa-plugin" {
+  package "qa-plugin" {
     registry = "default-reg"
   }
 
-  claude_rule "qa-rule" {
+  rule "qa-rule" {
     description = "QA rule"
     content     = "QA rule"
   }
@@ -113,10 +113,10 @@ profile "qa" {
 	assert.Equal(t, "default-reg", config.Registries[0].Name)
 	assert.Equal(t, "qa-reg", config.Registries[1].Name)
 
-	// Plugins: default + qa appended
-	assert.Len(t, config.Plugins, 2)
-	assert.Equal(t, "default-plugin", config.Plugins[0].Name)
-	assert.Equal(t, "qa-plugin", config.Plugins[1].Name)
+	// Packages: default + qa appended
+	assert.Len(t, config.Packages, 2)
+	assert.Equal(t, "default-plugin", config.Packages[0].Name)
+	assert.Equal(t, "qa-plugin", config.Packages[1].Name)
 
 	// Agent instructions: replaced by profile
 	assert.Equal(t, "QA instructions", config.Project.AgentInstructions)
@@ -142,12 +142,12 @@ registry "shared-reg" {
   path = "/default-path"
 }
 
-plugin "shared-plugin" {
+package "shared-plugin" {
   registry = "shared-reg"
   version  = "1.0.0"
 }
 
-claude_rule "shared-rule" {
+rule "shared-rule" {
   description = "Shared rule"
   content     = "Default content"
 }
@@ -157,12 +157,12 @@ profile "qa" {
     path = "/qa-path"
   }
 
-  plugin "shared-plugin" {
+  package "shared-plugin" {
     registry = "shared-reg"
     version  = "2.0.0"
   }
 
-  claude_rule "shared-rule" {
+  rule "shared-rule" {
     description = "Shared rule"
     content     = "QA content"
   }
@@ -178,8 +178,8 @@ profile "qa" {
 	assert.Len(t, config.Registries, 1)
 	assert.Equal(t, "/qa-path", config.Registries[0].Path)
 
-	assert.Len(t, config.Plugins, 1)
-	assert.Equal(t, "2.0.0", config.Plugins[0].Version)
+	assert.Len(t, config.Packages, 1)
+	assert.Equal(t, "2.0.0", config.Packages[0].Version)
 
 	assert.Len(t, config.Rules, 1)
 	assert.Equal(t, "QA content", config.Rules[0].Content)
@@ -198,11 +198,11 @@ registry "default-reg" {
   path = "/default"
 }
 
-plugin "default-plugin" {
+package "default-plugin" {
   registry = "default-reg"
 }
 
-claude_rule "default-rule" {
+rule "default-rule" {
   description = "Default rule"
   content     = "Default rule"
 }
@@ -215,7 +215,7 @@ profile "clean" {
     path = "/clean"
   }
 
-  plugin "clean-plugin" {
+  package "clean-plugin" {
     registry = "clean-reg"
   }
 }
@@ -226,12 +226,14 @@ profile "clean" {
 	config, err := LoadProjectWithProfile(tmpDir, "clean")
 	require.NoError(t, err)
 
-	// Only profile items, no defaults
-	assert.Len(t, config.Registries, 1)
-	assert.Equal(t, "clean-reg", config.Registries[0].Name)
+	// Registries are always preserved (never wiped by exclude_defaults)
+	assert.Len(t, config.Registries, 2)
+	assert.Equal(t, "default-reg", config.Registries[0].Name)
+	assert.Equal(t, "clean-reg", config.Registries[1].Name)
 
-	assert.Len(t, config.Plugins, 1)
-	assert.Equal(t, "clean-plugin", config.Plugins[0].Name)
+	// Packages: only profile items
+	assert.Len(t, config.Packages, 1)
+	assert.Equal(t, "clean-plugin", config.Packages[0].Name)
 
 	assert.Equal(t, "Clean instructions", config.Project.AgentInstructions)
 
@@ -252,11 +254,11 @@ registry "default-reg" {
   path = "/default"
 }
 
-plugin "default-plugin" {
+package "default-plugin" {
   registry = "default-reg"
 }
 
-claude_rule "default-rule" {
+rule "default-rule" {
   description = "Default rule"
   content     = "Default rule"
 }
@@ -273,8 +275,8 @@ profile "empty" {
 	// Everything preserved from defaults
 	assert.Len(t, config.Registries, 1)
 	assert.Equal(t, "default-reg", config.Registries[0].Name)
-	assert.Len(t, config.Plugins, 1)
-	assert.Equal(t, "default-plugin", config.Plugins[0].Name)
+	assert.Len(t, config.Packages, 1)
+	assert.Equal(t, "default-plugin", config.Packages[0].Name)
 	assert.Equal(t, "Default instructions", config.Project.AgentInstructions)
 	assert.Len(t, config.Rules, 1)
 	assert.Equal(t, "default-rule", config.Rules[0].Name)
@@ -297,8 +299,7 @@ profile "qa" {
 	config, err := LoadProjectWithProfile(tmpDir, "nonexistent")
 	assert.Nil(t, config)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "nonexistent")
-	assert.Contains(t, err.Error(), "qa")
+	assert.Equal(t, `profile "nonexistent" not found; available profiles: qa`, err.Error())
 }
 
 func TestApplyProfile_NoProfileFlag(t *testing.T) {
@@ -309,12 +310,12 @@ project {
   default_platform = "claude-code"
 }
 
-plugin "default-plugin" {
+package "default-plugin" {
   source = "file:///test"
 }
 
 profile "qa" {
-  plugin "qa-plugin" {
+  package "qa-plugin" {
     source = "file:///qa"
   }
 }
@@ -328,8 +329,8 @@ profile "qa" {
 
 	// Profile blocks are parsed but not applied
 	assert.Len(t, config.Profiles, 1)
-	assert.Len(t, config.Plugins, 1)
-	assert.Equal(t, "default-plugin", config.Plugins[0].Name)
+	assert.Len(t, config.Packages, 1)
+	assert.Equal(t, "default-plugin", config.Packages[0].Name)
 }
 
 func TestValidate_DuplicateProfileNames(t *testing.T) {
@@ -346,7 +347,7 @@ func TestValidate_DuplicateProfileNames(t *testing.T) {
 
 	err := cfg.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "duplicate profile name")
+	assert.Equal(t, "duplicate profile name: qa", err.Error())
 }
 
 func TestApplyProfile_ResourcesRebuilt(t *testing.T) {
@@ -357,13 +358,13 @@ project {
   default_platform = "claude-code"
 }
 
-claude_rule "default-rule" {
+rule "default-rule" {
   description = "Default"
   content     = "Default"
 }
 
 profile "qa" {
-  claude_rule "qa-rule" {
+  rule "qa-rule" {
     description = "QA"
     content     = "QA"
   }
@@ -380,9 +381,9 @@ profile "qa" {
 }
 
 func TestMergeByName(t *testing.T) {
-	getName := func(p PluginBlock) string { return p.Name }
+	getName := func(p PackageBlock) string { return p.Name }
 
-	defaults := []PluginBlock{
+	defaults := []PackageBlock{
 		{Name: "a", Version: "1.0"},
 		{Name: "b", Version: "1.0"},
 		{Name: "c", Version: "1.0"},
@@ -394,14 +395,14 @@ func TestMergeByName(t *testing.T) {
 	})
 
 	t.Run("new items appended", func(t *testing.T) {
-		overrides := []PluginBlock{{Name: "d", Version: "2.0"}}
+		overrides := []PackageBlock{{Name: "d", Version: "2.0"}}
 		result := mergeByName(defaults, overrides, getName)
 		assert.Len(t, result, 4)
 		assert.Equal(t, "d", result[3].Name)
 	})
 
 	t.Run("same name replaced in place", func(t *testing.T) {
-		overrides := []PluginBlock{{Name: "b", Version: "2.0"}}
+		overrides := []PackageBlock{{Name: "b", Version: "2.0"}}
 		result := mergeByName(defaults, overrides, getName)
 		assert.Len(t, result, 3)
 		assert.Equal(t, "a", result[0].Name)
@@ -412,7 +413,7 @@ func TestMergeByName(t *testing.T) {
 	})
 
 	t.Run("mix of replace and append", func(t *testing.T) {
-		overrides := []PluginBlock{
+		overrides := []PackageBlock{
 			{Name: "a", Version: "3.0"},
 			{Name: "e", Version: "1.0"},
 		}
@@ -449,17 +450,17 @@ func TestApplyProfile_MultipleResourceTypes(t *testing.T) {
 			Name:            "test",
 			AgenticPlatform: "claude-code",
 		},
-		Skills: []resource.ClaudeSkill{
-			{Name: "default-skill", Description: "Default"},
+		Skills: []resource.Skill{
+			{Name: "default-skill", Description: "Default", Content: "c"},
 		},
-		Rules: []resource.ClaudeRule{
-			{Name: "default-rule", Content: "Default"},
+		Rules: []resource.Rule{
+			{Name: "default-rule", Description: "d", Content: "Default"},
 		},
 		Profiles: []ProfileBlock{
 			{
 				Name: "qa",
-				Rules: []resource.ClaudeRule{
-					{Name: "qa-rule", Content: "QA"},
+				Rules: []resource.Rule{
+					{Name: "qa-rule", Description: "d", Content: "QA"},
 				},
 			},
 		},

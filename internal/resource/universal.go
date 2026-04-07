@@ -19,7 +19,7 @@ type File struct {
 	// Content is inline file content (optional, mutually exclusive with Src)
 	Content *string `hcl:"content,optional"`
 
-	// Src is the source file path relative to plugin root (optional, mutually exclusive with Content)
+	// Src is the source file path relative to package root (optional, mutually exclusive with Content)
 	Src *string `hcl:"src,optional"`
 
 	// Chmod specifies file permissions as octal string (e.g., "755", "644")

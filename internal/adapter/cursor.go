@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"fmt"
+	"log/slog"
 	"path/filepath"
 
 	"strings"
@@ -51,32 +52,60 @@ func (a *CursorAdapter) RulesDir(root string) string {
 }
 
 // PlanInstallation dispatches to the appropriate planner based on resource type.
-func (a *CursorAdapter) PlanInstallation(res resource.Resource, pkg *config.PackageConfig, pluginDir, projectRoot string, ctx *InstallContext) (*Plan, error) {
+func (a *CursorAdapter) PlanInstallation(res resource.Resource, pkg *config.PackageConfig, pkgDir, projectRoot string, ctx *InstallContext) (*Plan, error) {
 	switch r := res.(type) {
-	// Unified MCP server (translate to Cursor-specific)
+	// Universal resource types (translate to Cursor-specific)
 	case *resource.MCPServer:
-		cursorServer := resource.TranslateToCursorMCPServer(r)
-		if cursorServer == nil {
-			// Server is disabled for Cursor platform
+		translated := resource.TranslateToCursorMCPServer(r)
+		if translated == nil {
+			slog.Warn("resource skipped: disabled for platform", "resource", r.Name, "type", "mcp_server", "platform", "cursor")
 			return &Plan{}, nil
 		}
-		return a.planMCPServer(cursorServer, pkg, pluginDir, projectRoot, ctx)
+		return a.planMCPServer(translated, pkg, pkgDir, projectRoot, ctx)
+	case *resource.Command:
+		translated := resource.TranslateToCursorCommand(r)
+		if translated == nil {
+			slog.Warn("resource skipped: disabled for platform", "resource", r.Name, "type", "command", "platform", "cursor")
+			return &Plan{}, nil
+		}
+		return a.planCommand(translated, pkg, pkgDir, projectRoot, ctx)
+	case *resource.Rule:
+		translated := resource.TranslateToCursorRule(r)
+		if translated == nil {
+			slog.Warn("resource skipped: disabled for platform", "resource", r.Name, "type", "rule", "platform", "cursor")
+			return &Plan{}, nil
+		}
+		return a.planRule(translated, pkg, pkgDir, projectRoot, ctx)
+	case *resource.Rules:
+		translated := resource.TranslateToCursorRules(r)
+		if translated == nil {
+			slog.Warn("resource skipped: disabled for platform", "resource", r.Name, "type", "rules", "platform", "cursor")
+			return &Plan{}, nil
+		}
+		return a.planRules(translated, pkg, pkgDir, projectRoot, ctx)
+	case *resource.Skill:
+		slog.Warn("resource skipped: not supported by platform", "resource", r.Name, "type", "skill", "platform", "cursor")
+		return &Plan{}, nil
+	case *resource.Agent:
+		slog.Warn("resource skipped: not supported by platform", "resource", r.Name, "type", "agent", "platform", "cursor")
+		return &Plan{}, nil
+	case *resource.Settings:
+		slog.Warn("resource skipped: not supported by platform", "resource", r.Name, "type", "settings", "platform", "cursor")
+		return &Plan{}, nil
 
-	// Merged resources
+	// Platform-specific types (used internally by translators)
 	case *resource.CursorRule:
-		return a.planRule(r, pkg, pluginDir, projectRoot, ctx)
+		return a.planRule(r, pkg, pkgDir, projectRoot, ctx)
 	case *resource.CursorMCPServer:
-		return a.planMCPServer(r, pkg, pluginDir, projectRoot, ctx)
-
-	// Standalone resources
+		return a.planMCPServer(r, pkg, pkgDir, projectRoot, ctx)
 	case *resource.CursorRules:
-		return a.planRules(r, pkg, pluginDir, projectRoot, ctx)
+		return a.planRules(r, pkg, pkgDir, projectRoot, ctx)
 	case *resource.CursorCommand:
-		return a.planCommand(r, pkg, pluginDir, projectRoot, ctx)
+		return a.planCommand(r, pkg, pkgDir, projectRoot, ctx)
 
-	// Universal resources
+	// Universal file/directory resources
 	case *resource.File:
-		return PlanUniversalFile(r, pkg, pluginDir, projectRoot, "cursor", ctx)
+		return PlanUniversalFile(r, pkg, pkgDir, projectRoot, "cursor", ctx)
 	case *resource.Directory:
 		return PlanUniversalDirectory(r, pkg, ctx)
 
@@ -101,7 +130,7 @@ func (a *CursorAdapter) GenerateFrontmatter(res resource.Resource, pkg *config.P
 // Format: {"mcpServers": {"name": {"command": "...", "args": [...], "env": {...}}}}
 // Note: This method signature accepts ClaudeMCPServer for interface compatibility,
 // but Cursor resources should use planMCPServer directly.
-func (a *CursorAdapter) MergeMCPConfig(existing map[string]any, pluginName string, servers []*resource.ClaudeMCPServer) map[string]any {
+func (a *CursorAdapter) MergeMCPConfig(existing map[string]any, pkgName string, servers []*resource.ClaudeMCPServer) map[string]any {
 	// This method is kept for interface compatibility but Cursor uses its own server type
 	// See MergeCursorMCPConfig for the actual implementation
 	return existing
@@ -109,7 +138,7 @@ func (a *CursorAdapter) MergeMCPConfig(existing map[string]any, pluginName strin
 
 // MergeCursorMCPConfig merges Cursor MCP servers into .cursor/mcp.json format.
 // Format: {"mcpServers": {"name": {"command": "...", "args": [...], "env": {...}}}}
-func (a *CursorAdapter) MergeCursorMCPConfig(existing map[string]any, pluginName string, servers []*resource.CursorMCPServer) map[string]any {
+func (a *CursorAdapter) MergeCursorMCPConfig(existing map[string]any, pkgName string, servers []*resource.CursorMCPServer) map[string]any {
 	if existing == nil {
 		existing = make(map[string]any)
 	}
@@ -159,8 +188,8 @@ func (a *CursorAdapter) MergeSettingsConfig(existing map[string]any, settings *r
 
 // planRule creates an installation plan for a Cursor rule (singular).
 // Rules are merged into AGENTS.md with markers.
-func (a *CursorAdapter) planRule(rule *resource.CursorRule, pkg *config.PackageConfig, pluginDir, root string, ctx *InstallContext) (*Plan, error) {
-	plan := NewPlan(pkg.Package.Name)
+func (a *CursorAdapter) planRule(rule *resource.CursorRule, pkg *config.PackageConfig, pkgDir, root string, ctx *InstallContext) (*Plan, error) {
+	plan := NewPlan(pkg.Meta.Name)
 
 	// Rules are merged into AGENTS.md via AgentFileContent
 	plan.AgentFileContent = rule.Content
@@ -171,13 +200,13 @@ func (a *CursorAdapter) planRule(rule *resource.CursorRule, pkg *config.PackageC
 
 // planMCPServer creates an installation plan for a Cursor MCP server.
 // MCP servers are merged into .cursor/mcp.json with optional namespacing
-func (a *CursorAdapter) planMCPServer(server *resource.CursorMCPServer, pkg *config.PackageConfig, pluginDir, root string, ctx *InstallContext) (*Plan, error) {
-	plan := NewPlan(pkg.Package.Name)
+func (a *CursorAdapter) planMCPServer(server *resource.CursorMCPServer, pkg *config.PackageConfig, pkgDir, root string, ctx *InstallContext) (*Plan, error) {
+	plan := NewPlan(pkg.Meta.Name)
 
 	// Apply namespacing to server name if requested
 	serverName := server.Name
 	if ctx != nil && ctx.Namespace {
-		serverName = fmt.Sprintf("%s-%s", pkg.Package.Name, server.Name)
+		serverName = fmt.Sprintf("%s-%s", pkg.Meta.Name, server.Name)
 	}
 
 	// Create a copy of the server with the potentially namespaced name
@@ -185,7 +214,7 @@ func (a *CursorAdapter) planMCPServer(server *resource.CursorMCPServer, pkg *con
 	namespacedServer.Name = serverName
 
 	// MCP servers are merged via MCPEntries
-	plan.MCPEntries = a.MergeCursorMCPConfig(nil, pkg.Package.Name, []*resource.CursorMCPServer{&namespacedServer})
+	plan.MCPEntries = a.MergeCursorMCPConfig(nil, pkg.Meta.Name, []*resource.CursorMCPServer{&namespacedServer})
 
 	// Set Cursor-specific MCP config path and key
 	plan.MCPPath = filepath.Join(".cursor", "mcp.json")
@@ -195,9 +224,9 @@ func (a *CursorAdapter) planMCPServer(server *resource.CursorMCPServer, pkg *con
 }
 
 // planRules creates an installation plan for Cursor rules (plural).
-// Rules files are installed to .cursor/rules/{{plugin}-}{name}.mdc (namespaced or not)
-func (a *CursorAdapter) planRules(rules *resource.CursorRules, pkg *config.PackageConfig, pluginDir, root string, ctx *InstallContext) (*Plan, error) {
-	plan := NewPlan(pkg.Package.Name)
+// Rules files are installed to .cursor/rules/{{pkg}-}{name}.mdc (namespaced or not)
+func (a *CursorAdapter) planRules(rules *resource.CursorRules, pkg *config.PackageConfig, pkgDir, root string, ctx *InstallContext) (*Plan, error) {
+	plan := NewPlan(pkg.Meta.Name)
 
 	// Create rules directory
 	rulesDir := filepath.Join(".cursor", "rules")
@@ -215,7 +244,7 @@ func (a *CursorAdapter) planRules(rules *resource.CursorRules, pkg *config.Packa
 	// Add rules file with optional namespacing
 	var fileName string
 	if ctx != nil && ctx.Namespace {
-		fileName = fmt.Sprintf("%s-%s.mdc", pkg.Package.Name, rules.Name)
+		fileName = fmt.Sprintf("%s-%s.mdc", pkg.Meta.Name, rules.Name)
 	} else {
 		fileName = fmt.Sprintf("%s.mdc", rules.Name)
 	}
@@ -226,9 +255,9 @@ func (a *CursorAdapter) planRules(rules *resource.CursorRules, pkg *config.Packa
 }
 
 // planCommand creates an installation plan for a Cursor command.
-// Commands are installed to .cursor/commands/{{plugin}-}{name}.md (namespaced or not)
-func (a *CursorAdapter) planCommand(cmd *resource.CursorCommand, pkg *config.PackageConfig, pluginDir, root string, ctx *InstallContext) (*Plan, error) {
-	plan := NewPlan(pkg.Package.Name)
+// Commands are installed to .cursor/commands/{{pkg}-}{name}.md (namespaced or not)
+func (a *CursorAdapter) planCommand(cmd *resource.CursorCommand, pkg *config.PackageConfig, pkgDir, root string, ctx *InstallContext) (*Plan, error) {
+	plan := NewPlan(pkg.Meta.Name)
 
 	// Create commands directory
 	commandsDir := filepath.Join(".cursor", "commands")
@@ -246,7 +275,7 @@ func (a *CursorAdapter) planCommand(cmd *resource.CursorCommand, pkg *config.Pac
 	// Add command file with optional namespacing
 	var fileName string
 	if ctx != nil && ctx.Namespace {
-		fileName = fmt.Sprintf("%s-%s.md", pkg.Package.Name, cmd.Name)
+		fileName = fmt.Sprintf("%s-%s.md", pkg.Meta.Name, cmd.Name)
 	} else {
 		fileName = fmt.Sprintf("%s.md", cmd.Name)
 	}

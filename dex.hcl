@@ -5,16 +5,18 @@ project {
   git_exclude = true
 }
 
-claude_settings "project_permissions" {
-  enable_all_project_mcp_servers = true
+settings "project_permissions" {
+  claude {
+    enable_all_project_mcp_servers = true
+  }
 }
 
 registry "nexus" {
   url = "https://nexustemplateproduction.z13.web.core.windows.net"
 }
 
-plugin "base-dev" {}
+package "base-dev" {}
 
-plugin "code-review" {}
+package "code-review" {}
 
-plugin "github-workflows" {}
+package "github-workflows" {}

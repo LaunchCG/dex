@@ -14,7 +14,7 @@ import (
 // Helper function to create a valid package.hcl
 func createPackageHCL(t *testing.T, dir, name, version, description string) {
 	t.Helper()
-	content := `package {
+	content := `meta {
   name = "` + name + `"
   version = "` + version + `"
   description = "` + description + `"
@@ -433,7 +433,7 @@ func TestLocalRegistry_IntegrityComputation(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify integrity hash is computed
-	assert.Equal(t, "sha256-uydHqstACv8xna+noaANfpMp67OMqhExI4l/8K0D8dw=", resolved.Integrity)
+	assert.Equal(t, "sha256-YTExC0vMGkCB/lVYGzZlH2EylW287S5fZBZCTDHNpHE=", resolved.Integrity)
 }
 
 func TestLocalRegistry_IntegrityConsistency(t *testing.T) {

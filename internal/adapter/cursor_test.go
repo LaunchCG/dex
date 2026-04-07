@@ -48,7 +48,7 @@ func TestCursorAdapter_PlanRule(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -58,7 +58,7 @@ func TestCursorAdapter_PlanRule(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, plan)
 
-	assert.Equal(t, "my-plugin", plan.PluginName)
+	assert.Equal(t, "my-plugin", plan.PackageName)
 	assert.Equal(t, "Always use TypeScript strict mode.", plan.AgentFileContent)
 	assert.Equal(t, "AGENTS.md", plan.AgentFilePath)
 	assert.Empty(t, plan.Files)
@@ -77,7 +77,7 @@ func TestCursorAdapter_PlanMCPServer_Stdio(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -113,7 +113,7 @@ func TestCursorAdapter_PlanMCPServer_HTTP(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -144,7 +144,7 @@ func TestCursorAdapter_PlanMCPServer_SSE(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -176,7 +176,7 @@ func TestCursorAdapter_PlanMCPServer_EnvFile(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -210,7 +210,7 @@ func TestCursorAdapter_PlanRules(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -247,7 +247,7 @@ func TestCursorAdapter_PlanRules_AlwaysApply(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -275,7 +275,7 @@ func TestCursorAdapter_PlanRules_Minimal(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -302,7 +302,7 @@ func TestCursorAdapter_PlanCommand(t *testing.T) {
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -328,7 +328,7 @@ func TestCursorAdapter_PlanInstallation_UnsupportedType(t *testing.T) {
 
 	unknown := &mockUnknownResource{name: "unknown"}
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -633,7 +633,7 @@ func TestCursorAdapter_MergeMCPConfig_NoOp(t *testing.T) {
 
 func TestMergePlans_WithCursorPaths(t *testing.T) {
 	plan1 := &Plan{
-		PluginName: "plugin1",
+		PackageName: "plugin1",
 		Directories: []DirectoryCreate{
 			{Path: ".cursor/rules", Parents: true},
 		},
@@ -644,7 +644,7 @@ func TestMergePlans_WithCursorPaths(t *testing.T) {
 	}
 
 	plan2 := &Plan{
-		PluginName: "plugin1",
+		PackageName: "plugin1",
 		MCPEntries: map[string]any{
 			"mcpServers": map[string]any{
 				"server1": map[string]any{
@@ -659,7 +659,7 @@ func TestMergePlans_WithCursorPaths(t *testing.T) {
 
 	merged := MergePlans(plan1, plan2)
 
-	assert.Equal(t, "plugin1", merged.PluginName)
+	assert.Equal(t, "plugin1", merged.PackageName)
 	assert.Equal(t, "AGENTS.md", merged.AgentFilePath)
 	assert.Equal(t, ".cursor/mcp.json", merged.MCPPath)
 	assert.Equal(t, "mcpServers", merged.MCPKey)
@@ -687,7 +687,7 @@ Rule body here.`,
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},
@@ -714,7 +714,7 @@ Command body here.`,
 	}
 
 	pkg := &config.PackageConfig{
-		Package: config.PackageBlock{
+		Meta: config.MetaBlock{
 			Name:    "my-plugin",
 			Version: "1.0.0",
 		},

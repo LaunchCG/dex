@@ -5,11 +5,11 @@ package template
 // Context holds all variables available during template rendering.
 type Context struct {
 	// Built-in variables per INITIAL_RESOURCE_SPEC.md
-	ComponentDir  string // Installation directory for the component
-	PluginName    string // Name of the plugin being installed
-	PluginVersion string // Version of the plugin
-	ProjectRoot   string // Root directory of the project
-	Platform      string // Target platform (e.g., "claude-code")
+	ComponentDir   string // Installation directory for the component
+	PackageName    string // Name of the package being installed
+	PackageVersion string // Version of the package
+	ProjectRoot    string // Root directory of the project
+	Platform       string // Target platform (e.g., "claude-code")
 
 	// User-defined variables from package.hcl variable blocks
 	Variables map[string]string
@@ -19,14 +19,14 @@ type Context struct {
 }
 
 // NewContext creates a template context for rendering.
-func NewContext(pluginName, pluginVersion, projectRoot, platform string) *Context {
+func NewContext(pkgName, pkgVersion, projectRoot, platform string) *Context {
 	return &Context{
-		PluginName:    pluginName,
-		PluginVersion: pluginVersion,
-		ProjectRoot:   projectRoot,
-		Platform:      platform,
-		Variables:     make(map[string]string),
-		ExtraVars:     make(map[string]any),
+		PackageName:    pkgName,
+		PackageVersion: pkgVersion,
+		ProjectRoot:    projectRoot,
+		Platform:       platform,
+		Variables:      make(map[string]string),
+		ExtraVars:      make(map[string]any),
 	}
 }
 
@@ -45,11 +45,11 @@ func (c *Context) WithVariables(vars map[string]string) *Context {
 // ToMap converts the context to a map for template execution.
 func (c *Context) ToMap() map[string]any {
 	m := map[string]any{
-		"ComponentDir":  c.ComponentDir,
-		"PluginName":    c.PluginName,
-		"PluginVersion": c.PluginVersion,
-		"ProjectRoot":   c.ProjectRoot,
-		"Platform":      c.Platform,
+		"ComponentDir":   c.ComponentDir,
+		"PackageName":    c.PackageName,
+		"PackageVersion": c.PackageVersion,
+		"ProjectRoot":    c.ProjectRoot,
+		"Platform":       c.Platform,
 	}
 
 	// Add user variables
@@ -68,13 +68,13 @@ func (c *Context) ToMap() map[string]any {
 // Clone creates a copy of the context with independent maps.
 func (c *Context) Clone() *Context {
 	clone := &Context{
-		ComponentDir:  c.ComponentDir,
-		PluginName:    c.PluginName,
-		PluginVersion: c.PluginVersion,
-		ProjectRoot:   c.ProjectRoot,
-		Platform:      c.Platform,
-		Variables:     make(map[string]string),
-		ExtraVars:     make(map[string]any),
+		ComponentDir:   c.ComponentDir,
+		PackageName:    c.PackageName,
+		PackageVersion: c.PackageVersion,
+		ProjectRoot:    c.ProjectRoot,
+		Platform:       c.Platform,
+		Variables:      make(map[string]string),
+		ExtraVars:      make(map[string]any),
 	}
 
 	for k, v := range c.Variables {

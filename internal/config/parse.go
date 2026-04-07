@@ -1,6 +1,6 @@
 // Package config provides HCL configuration parsing for dex project and package files.
 // It handles loading and validating dex.hcl (project configuration) and package.hcl
-// (plugin package configuration) files using the HashiCorp HCL v2 library.
+// (package configuration) files using the HashiCorp HCL v2 library.
 package config
 
 import (

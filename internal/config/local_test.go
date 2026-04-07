@@ -39,8 +39,8 @@ mcp_server "my-server" {
 	result, err := LoadLocalConfigs("my-project")
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	assert.Len(t, result.UniversalMCPServers, 1)
-	assert.Equal(t, "my-server", result.UniversalMCPServers[0].Name)
+	assert.Len(t, result.MCPServers, 1)
+	assert.Equal(t, "my-server", result.MCPServers[0].Name)
 }
 
 func TestLoadLocalConfigs_ProjectOverride(t *testing.T) {
@@ -76,9 +76,9 @@ mcp_server "project-server" {
 	require.NotNil(t, result)
 
 	// Both servers should be present (global first, then project)
-	assert.Len(t, result.UniversalMCPServers, 2)
-	assert.Equal(t, "global-server", result.UniversalMCPServers[0].Name)
-	assert.Equal(t, "project-server", result.UniversalMCPServers[1].Name)
+	assert.Len(t, result.MCPServers, 2)
+	assert.Equal(t, "global-server", result.MCPServers[0].Name)
+	assert.Equal(t, "project-server", result.MCPServers[1].Name)
 }
 
 func TestMergeLocal_AppendsResources(t *testing.T) {
@@ -91,15 +91,15 @@ func TestMergeLocal_AppendsResources(t *testing.T) {
 	project.buildResources()
 
 	local := &LocalConfig{
-		Plugins: []PluginBlock{
+		Packages: []PackageBlock{
 			{Name: "local-plugin", Source: "file:///tmp/plugin"},
 		},
 	}
 
 	project.MergeLocal(local)
 
-	require.Len(t, project.Plugins, 1)
-	assert.Equal(t, "local-plugin", project.Plugins[0].Name)
+	require.Len(t, project.Packages, 1)
+	assert.Equal(t, "local-plugin", project.Packages[0].Name)
 }
 
 // TestMergeLocal_AllResourceFields verifies that every resource field in LocalConfig is
@@ -112,52 +112,30 @@ func TestMergeLocal_AllResourceFields(t *testing.T) {
 	}
 
 	local := &LocalConfig{
-		Registries:          []RegistryBlock{{Name: "r", Path: "/tmp"}},
-		Plugins:             []PluginBlock{{Name: "p", Source: "file:///tmp"}},
-		Skills:              []resource.ClaudeSkill{{Name: "sk"}},
-		Commands:            []resource.ClaudeCommand{{Name: "cmd"}},
-		Subagents:           []resource.ClaudeSubagent{{Name: "sa"}},
-		Rules:               []resource.ClaudeRule{{Name: "rule"}},
-		RulesFiles:          []resource.ClaudeRules{{Name: "rules"}},
-		Settings:            []resource.ClaudeSettings{{Name: "cfg"}},
-		MCPServers:          []resource.ClaudeMCPServer{{Name: "claude-mcp"}},
-		UniversalMCPServers: []resource.MCPServer{{Name: "mcp"}},
-		CopilotInstruction:  []resource.CopilotInstruction{{Name: "ci"}},
-		CopilotMCPServers:   []resource.CopilotMCPServer{{Name: "copilot-mcp"}},
-		CopilotInstructions: []resource.CopilotInstructions{{Name: "cis"}},
-		CopilotPrompts:      []resource.CopilotPrompt{{Name: "cp"}},
-		CopilotAgents:       []resource.CopilotAgent{{Name: "ca"}},
-		CopilotSkills:       []resource.CopilotSkill{{Name: "cs"}},
-		CursorRules_:        []resource.CursorRule{{Name: "cr"}},
-		CursorMCPServers:    []resource.CursorMCPServer{{Name: "cursor-mcp"}},
-		CursorRules:         []resource.CursorRules{{Name: "crs"}},
-		CursorCommands:      []resource.CursorCommand{{Name: "cc"}},
-		Variables:           []ProjectVariableBlock{{Name: "v", Default: "val"}},
-		ResolvedVars:        map[string]string{"v": "val"},
+		Registries:   []RegistryBlock{{Name: "r", Path: "/tmp"}},
+		Packages:     []PackageBlock{{Name: "p", Source: "file:///tmp"}},
+		Skills:       []resource.Skill{{Name: "sk", Description: "d", Content: "c"}},
+		Commands:     []resource.Command{{Name: "cmd", Description: "d", Content: "c"}},
+		Agents:       []resource.Agent{{Name: "ag", Description: "d", Content: "c"}},
+		Rules:        []resource.Rule{{Name: "rule", Description: "d", Content: "c"}},
+		RulesFiles:   []resource.Rules{{Name: "rules", Description: "d", Content: "c"}},
+		Settings:     []resource.Settings{{Name: "cfg"}},
+		MCPServers:   []resource.MCPServer{{Name: "mcp", Command: "test"}},
+		Variables:    []ProjectVariableBlock{{Name: "v", Default: "val"}},
+		ResolvedVars: map[string]string{"v": "val"},
 	}
 
 	project.MergeLocal(local)
 
 	assert.Len(t, project.Registries, 1, "Registries")
-	assert.Len(t, project.Plugins, 1, "Plugins")
+	assert.Len(t, project.Packages, 1, "Packages")
 	assert.Len(t, project.Skills, 1, "Skills")
 	assert.Len(t, project.Commands, 1, "Commands")
-	assert.Len(t, project.Subagents, 1, "Subagents")
+	assert.Len(t, project.Agents, 1, "Agents")
 	assert.Len(t, project.Rules, 1, "Rules")
 	assert.Len(t, project.RulesFiles, 1, "RulesFiles")
 	assert.Len(t, project.Settings, 1, "Settings")
 	assert.Len(t, project.MCPServers, 1, "MCPServers")
-	assert.Len(t, project.UniversalMCPServers, 1, "UniversalMCPServers")
-	assert.Len(t, project.CopilotInstruction, 1, "CopilotInstruction")
-	assert.Len(t, project.CopilotMCPServers, 1, "CopilotMCPServers")
-	assert.Len(t, project.CopilotInstructions, 1, "CopilotInstructions")
-	assert.Len(t, project.CopilotPrompts, 1, "CopilotPrompts")
-	assert.Len(t, project.CopilotAgents, 1, "CopilotAgents")
-	assert.Len(t, project.CopilotSkills, 1, "CopilotSkills")
-	assert.Len(t, project.CursorRules_, 1, "CursorRules_")
-	assert.Len(t, project.CursorMCPServers, 1, "CursorMCPServers")
-	assert.Len(t, project.CursorRules, 1, "CursorRules")
-	assert.Len(t, project.CursorCommands, 1, "CursorCommands")
 	assert.Len(t, project.Variables, 1, "Variables")
 	assert.Equal(t, "val", project.ResolvedVars["v"], "ResolvedVars")
 }
@@ -180,6 +158,6 @@ mcp_server "project-server" {
 	result, err := LoadLocalConfigs("my-project")
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	assert.Len(t, result.UniversalMCPServers, 1)
-	assert.Equal(t, "project-server", result.UniversalMCPServers[0].Name)
+	assert.Len(t, result.MCPServers, 1)
+	assert.Equal(t, "project-server", result.MCPServers[0].Name)
 }

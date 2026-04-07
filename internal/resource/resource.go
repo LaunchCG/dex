@@ -7,7 +7,7 @@ package resource
 // Each resource type (skill, command, rule, etc.) implements this interface
 // to provide consistent handling during installation and management.
 type Resource interface {
-	// ResourceType returns the HCL block type name (e.g., "claude_skill", "claude_command")
+	// ResourceType returns the resource type identifier (e.g., "skill", "command", "rule")
 	ResourceType() string
 
 	// ResourceName returns the unique identifier for this resource instance
@@ -31,9 +31,9 @@ type Resource interface {
 }
 
 // FileBlock represents a static file to copy alongside a resource.
-// Files are copied from the plugin source to the installation directory.
+// Files are copied from the package source to the installation directory.
 type FileBlock struct {
-	// Src is the source path relative to the plugin root
+	// Src is the source path relative to the package root
 	Src string `hcl:"src,attr"`
 
 	// Dest is the destination filename (defaults to basename of Src if not specified)
@@ -46,7 +46,7 @@ type FileBlock struct {
 // TemplateFileBlock represents a template file to render and copy.
 // Templates are processed with template variables before being written.
 type TemplateFileBlock struct {
-	// Src is the source template path relative to the plugin root
+	// Src is the source template path relative to the package root
 	Src string `hcl:"src,attr"`
 
 	// Dest is the destination filename (defaults to basename without .tmpl suffix)

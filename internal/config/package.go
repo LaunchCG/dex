@@ -8,11 +8,11 @@ import (
 	"github.com/launchcg/dex/internal/resource"
 )
 
-// PackageConfig represents a plugin's package.hcl file.
-// This file defines the metadata and resources provided by a plugin.
+// PackageConfig represents a package's package.hcl file.
+// This file defines the metadata and resources provided by a package.
 type PackageConfig struct {
-	// Package contains package metadata
-	Package PackageBlock `hcl:"package,block"`
+	// Meta contains package metadata defined in the meta {} block
+	Meta MetaBlock `hcl:"meta,block"`
 
 	// Variables defines user-configurable variables
 	Variables []VariableBlock `hcl:"variable,block"`
@@ -20,35 +20,14 @@ type PackageConfig struct {
 	// Dependencies defines package dependencies
 	Dependencies []DependencyBlock `hcl:"dependency,block"`
 
-	// Unified MCP servers (work across all platforms)
-	UnifiedMCPServers []resource.MCPServer `hcl:"mcp_server,block"`
-
-	// Claude resources - each type is a separate field for HCL parsing
-	Skills     []resource.ClaudeSkill     `hcl:"claude_skill,block"`
-	Commands   []resource.ClaudeCommand   `hcl:"claude_command,block"`
-	Subagents  []resource.ClaudeSubagent  `hcl:"claude_subagent,block"`
-	Rules      []resource.ClaudeRule      `hcl:"claude_rule,block"`
-	RulesFiles []resource.ClaudeRules     `hcl:"claude_rules,block"`
-	Settings   []resource.ClaudeSettings  `hcl:"claude_settings,block"`
-	MCPServers []resource.ClaudeMCPServer `hcl:"claude_mcp_server,block"`
-
-	// GitHub Copilot resources - merged (multiple plugins contribute to same file)
-	CopilotInstruction []resource.CopilotInstruction `hcl:"copilot_instruction,block"`
-	CopilotMCPServers  []resource.CopilotMCPServer   `hcl:"copilot_mcp_server,block"`
-
-	// GitHub Copilot resources - standalone (one file per resource)
-	CopilotInstructions []resource.CopilotInstructions `hcl:"copilot_instructions,block"`
-	CopilotPrompts      []resource.CopilotPrompt       `hcl:"copilot_prompt,block"`
-	CopilotAgents       []resource.CopilotAgent        `hcl:"copilot_agent,block"`
-	CopilotSkills       []resource.CopilotSkill        `hcl:"copilot_skill,block"`
-
-	// Cursor resources - merged (multiple plugins contribute to same file)
-	CursorRules_     []resource.CursorRule      `hcl:"cursor_rule,block"`
-	CursorMCPServers []resource.CursorMCPServer `hcl:"cursor_mcp_server,block"`
-
-	// Cursor resources - standalone (one file per resource)
-	CursorRules    []resource.CursorRules   `hcl:"cursor_rules,block"`
-	CursorCommands []resource.CursorCommand `hcl:"cursor_command,block"`
+	// Universal resource types
+	Skills     []resource.Skill     `hcl:"skill,block"`
+	Commands   []resource.Command   `hcl:"command,block"`
+	Agents     []resource.Agent     `hcl:"agent,block"`
+	Rules      []resource.Rule      `hcl:"rule,block"`
+	RulesFiles []resource.Rules     `hcl:"rules,block"`
+	Settings   []resource.Settings  `hcl:"settings,block"`
+	MCPServers []resource.MCPServer `hcl:"mcp_server,block"`
 
 	// Universal resources (work across all platforms)
 	Files       []resource.File      `hcl:"file,block"`
@@ -59,8 +38,8 @@ type PackageConfig struct {
 	Resources []resource.Resource
 }
 
-// PackageBlock contains package metadata defined in the package {} block.
-type PackageBlock struct {
+// MetaBlock contains package metadata defined in the meta {} block.
+type MetaBlock struct {
 	// Name is the package name
 	Name string `hcl:"name,attr"`
 
@@ -85,7 +64,7 @@ type PackageBlock struct {
 }
 
 // VariableBlock defines a user-configurable variable.
-// Variables allow users to customize plugin behavior at installation time.
+// Variables allow users to customize package behavior at installation time.
 type VariableBlock struct {
 	// Name is the variable identifier used in templates
 	Name string `hcl:"name,label"`
@@ -108,7 +87,7 @@ type VariableBlock struct {
 //
 // Syntax in package.hcl:
 //
-//	dependency "other-plugin" {
+//	dependency "other-package" {
 //	  version = "^2.0.0"
 //	}
 //
@@ -139,35 +118,14 @@ type PackageResourcesConfig struct {
 	// Dependencies defines package dependencies
 	Dependencies []DependencyBlock `hcl:"dependency,block"`
 
-	// Unified MCP servers (work across all platforms)
-	UnifiedMCPServers []resource.MCPServer `hcl:"mcp_server,block"`
-
-	// Claude resources
-	Skills     []resource.ClaudeSkill     `hcl:"claude_skill,block"`
-	Commands   []resource.ClaudeCommand   `hcl:"claude_command,block"`
-	Subagents  []resource.ClaudeSubagent  `hcl:"claude_subagent,block"`
-	Rules      []resource.ClaudeRule      `hcl:"claude_rule,block"`
-	RulesFiles []resource.ClaudeRules     `hcl:"claude_rules,block"`
-	Settings   []resource.ClaudeSettings  `hcl:"claude_settings,block"`
-	MCPServers []resource.ClaudeMCPServer `hcl:"claude_mcp_server,block"`
-
-	// GitHub Copilot resources - merged
-	CopilotInstruction []resource.CopilotInstruction `hcl:"copilot_instruction,block"`
-	CopilotMCPServers  []resource.CopilotMCPServer   `hcl:"copilot_mcp_server,block"`
-
-	// GitHub Copilot resources - standalone
-	CopilotInstructions []resource.CopilotInstructions `hcl:"copilot_instructions,block"`
-	CopilotPrompts      []resource.CopilotPrompt       `hcl:"copilot_prompt,block"`
-	CopilotAgents       []resource.CopilotAgent        `hcl:"copilot_agent,block"`
-	CopilotSkills       []resource.CopilotSkill        `hcl:"copilot_skill,block"`
-
-	// Cursor resources - merged
-	CursorRules_     []resource.CursorRule      `hcl:"cursor_rule,block"`
-	CursorMCPServers []resource.CursorMCPServer `hcl:"cursor_mcp_server,block"`
-
-	// Cursor resources - standalone
-	CursorRules    []resource.CursorRules   `hcl:"cursor_rules,block"`
-	CursorCommands []resource.CursorCommand `hcl:"cursor_command,block"`
+	// Universal resource types
+	Skills     []resource.Skill     `hcl:"skill,block"`
+	Commands   []resource.Command   `hcl:"command,block"`
+	Agents     []resource.Agent     `hcl:"agent,block"`
+	Rules      []resource.Rule      `hcl:"rule,block"`
+	RulesFiles []resource.Rules     `hcl:"rules,block"`
+	Settings   []resource.Settings  `hcl:"settings,block"`
+	MCPServers []resource.MCPServer `hcl:"mcp_server,block"`
 }
 
 // LoadPackage loads package.hcl and all *.pkg.hcl files from the given directory.
@@ -224,40 +182,14 @@ func LoadPackage(dir string) (*PackageConfig, error) {
 // mergeResourcesFrom merges resources from a PackageResourcesConfig into this config.
 // Used to merge *.pkg.hcl files that contain only resources.
 func (p *PackageConfig) mergeResourcesFrom(other *PackageResourcesConfig) {
-	// Unified MCP servers
-	p.UnifiedMCPServers = append(p.UnifiedMCPServers, other.UnifiedMCPServers...)
-
-	// Claude resources
 	p.Skills = append(p.Skills, other.Skills...)
 	p.Commands = append(p.Commands, other.Commands...)
-	p.Subagents = append(p.Subagents, other.Subagents...)
+	p.Agents = append(p.Agents, other.Agents...)
 	p.Rules = append(p.Rules, other.Rules...)
 	p.RulesFiles = append(p.RulesFiles, other.RulesFiles...)
 	p.Settings = append(p.Settings, other.Settings...)
 	p.MCPServers = append(p.MCPServers, other.MCPServers...)
-
-	// GitHub Copilot resources - merged
-	p.CopilotInstruction = append(p.CopilotInstruction, other.CopilotInstruction...)
-	p.CopilotMCPServers = append(p.CopilotMCPServers, other.CopilotMCPServers...)
-
-	// GitHub Copilot resources - standalone
-	p.CopilotInstructions = append(p.CopilotInstructions, other.CopilotInstructions...)
-	p.CopilotPrompts = append(p.CopilotPrompts, other.CopilotPrompts...)
-	p.CopilotAgents = append(p.CopilotAgents, other.CopilotAgents...)
-	p.CopilotSkills = append(p.CopilotSkills, other.CopilotSkills...)
-
-	// Cursor resources - merged
-	p.CursorRules_ = append(p.CursorRules_, other.CursorRules_...)
-	p.CursorMCPServers = append(p.CursorMCPServers, other.CursorMCPServers...)
-
-	// Cursor resources - standalone
-	p.CursorRules = append(p.CursorRules, other.CursorRules...)
-	p.CursorCommands = append(p.CursorCommands, other.CursorCommands...)
-
-	// Variables can also be merged from additional files
 	p.Variables = append(p.Variables, other.Variables...)
-
-	// Dependencies can also be merged from additional files
 	p.Dependencies = append(p.Dependencies, other.Dependencies...)
 }
 
@@ -265,20 +197,14 @@ func (p *PackageConfig) mergeResourcesFrom(other *PackageResourcesConfig) {
 func (p *PackageConfig) buildResources() {
 	p.Resources = nil
 
-	// Unified MCP servers
-	for i := range p.UnifiedMCPServers {
-		p.Resources = append(p.Resources, &p.UnifiedMCPServers[i])
-	}
-
-	// Claude resources
 	for i := range p.Skills {
 		p.Resources = append(p.Resources, &p.Skills[i])
 	}
 	for i := range p.Commands {
 		p.Resources = append(p.Resources, &p.Commands[i])
 	}
-	for i := range p.Subagents {
-		p.Resources = append(p.Resources, &p.Subagents[i])
+	for i := range p.Agents {
+		p.Resources = append(p.Resources, &p.Agents[i])
 	}
 	for i := range p.Rules {
 		p.Resources = append(p.Resources, &p.Rules[i])
@@ -292,46 +218,6 @@ func (p *PackageConfig) buildResources() {
 	for i := range p.MCPServers {
 		p.Resources = append(p.Resources, &p.MCPServers[i])
 	}
-
-	// GitHub Copilot resources - merged
-	for i := range p.CopilotInstruction {
-		p.Resources = append(p.Resources, &p.CopilotInstruction[i])
-	}
-	for i := range p.CopilotMCPServers {
-		p.Resources = append(p.Resources, &p.CopilotMCPServers[i])
-	}
-
-	// GitHub Copilot resources - standalone
-	for i := range p.CopilotInstructions {
-		p.Resources = append(p.Resources, &p.CopilotInstructions[i])
-	}
-	for i := range p.CopilotPrompts {
-		p.Resources = append(p.Resources, &p.CopilotPrompts[i])
-	}
-	for i := range p.CopilotAgents {
-		p.Resources = append(p.Resources, &p.CopilotAgents[i])
-	}
-	for i := range p.CopilotSkills {
-		p.Resources = append(p.Resources, &p.CopilotSkills[i])
-	}
-
-	// Cursor resources - merged
-	for i := range p.CursorRules_ {
-		p.Resources = append(p.Resources, &p.CursorRules_[i])
-	}
-	for i := range p.CursorMCPServers {
-		p.Resources = append(p.Resources, &p.CursorMCPServers[i])
-	}
-
-	// Cursor resources - standalone
-	for i := range p.CursorRules {
-		p.Resources = append(p.Resources, &p.CursorRules[i])
-	}
-	for i := range p.CursorCommands {
-		p.Resources = append(p.Resources, &p.CursorCommands[i])
-	}
-
-	// Universal resources
 	for i := range p.Files {
 		p.Resources = append(p.Resources, &p.Files[i])
 	}
@@ -343,12 +229,12 @@ func (p *PackageConfig) buildResources() {
 // Validate checks the package config for errors.
 // It ensures required fields are present and values are valid.
 func (p *PackageConfig) Validate() error {
-	// Validate package block
-	if p.Package.Name == "" {
-		return fmt.Errorf("package.name is required")
+	// Validate meta block
+	if p.Meta.Name == "" {
+		return fmt.Errorf("meta.name is required")
 	}
-	if p.Package.Version == "" {
-		return fmt.Errorf("package.version is required")
+	if p.Meta.Version == "" {
+		return fmt.Errorf("meta.version is required")
 	}
 
 	// Validate variables

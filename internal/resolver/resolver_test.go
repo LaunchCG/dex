@@ -18,7 +18,7 @@ func TestNewResolver(t *testing.T) {
 		},
 	}
 	lock := &lockfile.LockFile{
-		Plugins: make(map[string]*lockfile.LockedPlugin),
+		Packages: make(map[string]*lockfile.LockedPackage),
 	}
 
 	r := NewResolver(project, lock)
@@ -33,12 +33,12 @@ func TestResolver_ResolveForUpdate_EmptyNames(t *testing.T) {
 			Name:            "test",
 			AgenticPlatform: "claude-code",
 		},
-		Plugins: []config.PluginBlock{
+		Packages: []config.PackageBlock{
 			{Name: "plugin-a", Source: "file:///tmp/a"},
 		},
 	}
 	lock := &lockfile.LockFile{
-		Plugins: map[string]*lockfile.LockedPlugin{
+		Packages: map[string]*lockfile.LockedPackage{
 			"plugin-a": {Version: "1.0.0"},
 			"plugin-b": {Version: "2.0.0"},
 		},
@@ -97,8 +97,8 @@ func TestResolvedDep_Fields(t *testing.T) {
 	assert.Equal(t, "^1.0.0", dep.Constraint)
 }
 
-func TestPluginSpec_Fields(t *testing.T) {
-	spec := PluginSpec{
+func TestPackageSpec_Fields(t *testing.T) {
+	spec := PackageSpec{
 		Name:     "test-plugin",
 		Version:  "^2.0.0",
 		Source:   "git+https://github.com/test/plugin",
@@ -113,7 +113,7 @@ func TestPluginSpec_Fields(t *testing.T) {
 
 func TestResolver_detectConflicts_NoConflicts(t *testing.T) {
 	project := &config.ProjectConfig{}
-	lock := &lockfile.LockFile{Plugins: make(map[string]*lockfile.LockedPlugin)}
+	lock := &lockfile.LockFile{Packages: make(map[string]*lockfile.LockedPackage)}
 	r := NewResolver(project, lock)
 
 	graph := NewDepGraph()
@@ -131,7 +131,7 @@ func TestResolver_detectConflicts_NoConflicts(t *testing.T) {
 
 func TestResolver_detectConflicts_WithConflict(t *testing.T) {
 	project := &config.ProjectConfig{}
-	lock := &lockfile.LockFile{Plugins: make(map[string]*lockfile.LockedPlugin)}
+	lock := &lockfile.LockFile{Packages: make(map[string]*lockfile.LockedPackage)}
 	r := NewResolver(project, lock)
 
 	graph := NewDepGraph()
@@ -152,7 +152,7 @@ func TestResolver_detectConflicts_WithConflict(t *testing.T) {
 func TestResolver_loadPackageDependencies_FromLock(t *testing.T) {
 	project := &config.ProjectConfig{}
 	lock := &lockfile.LockFile{
-		Plugins: map[string]*lockfile.LockedPlugin{
+		Packages: map[string]*lockfile.LockedPackage{
 			"my-plugin": {
 				Version: "1.0.0",
 				Dependencies: map[string]string{

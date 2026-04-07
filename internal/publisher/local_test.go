@@ -16,7 +16,7 @@ import (
 func TestLocalPublisher(t *testing.T) {
 	t.Run("publishes tarball and creates registry.json", func(t *testing.T) {
 		registryDir := t.TempDir()
-		tarball := createTestTarball(t, "my-plugin", "1.0.0")
+		tarball := createTestTarball(t, "my-pkg", "1.0.0")
 		defer os.Remove(tarball)
 
 		pub, err := NewLocalPublisher(registryDir)
@@ -26,8 +26,8 @@ func TestLocalPublisher(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify result
-		destPath := filepath.Join(registryDir, "my-plugin-1.0.0.tar.gz")
-		assert.Equal(t, "my-plugin", result.Name)
+		destPath := filepath.Join(registryDir, "my-pkg-1.0.0.tar.gz")
+		assert.Equal(t, "my-pkg", result.Name)
 		assert.Equal(t, "1.0.0", result.Version)
 		assert.Equal(t, "file:"+destPath, result.URL)
 		assert.True(t, len(result.Integrity) > 0)
@@ -45,9 +45,9 @@ func TestLocalPublisher(t *testing.T) {
 		require.NoError(t, json.Unmarshal(data, &index))
 
 		assert.Equal(t, "dex-registry", index.Name)
-		require.Contains(t, index.Packages, "my-plugin")
-		assert.Equal(t, []string{"1.0.0"}, index.Packages["my-plugin"].Versions)
-		assert.Equal(t, "1.0.0", index.Packages["my-plugin"].Latest)
+		require.Contains(t, index.Packages, "my-pkg")
+		assert.Equal(t, []string{"1.0.0"}, index.Packages["my-pkg"].Versions)
+		assert.Equal(t, "1.0.0", index.Packages["my-pkg"].Latest)
 	})
 
 	t.Run("updates existing registry.json", func(t *testing.T) {
@@ -58,7 +58,7 @@ func TestLocalPublisher(t *testing.T) {
 			Name:    "existing-registry",
 			Version: "1.0",
 			Packages: map[string]registry.PackageEntry{
-				"existing-plugin": {
+				"existing-pkg": {
 					Versions: []string{"1.0.0"},
 					Latest:   "1.0.0",
 				},
@@ -67,7 +67,7 @@ func TestLocalPublisher(t *testing.T) {
 		data, _ := json.Marshal(initialIndex)
 		require.NoError(t, os.WriteFile(filepath.Join(registryDir, "registry.json"), data, 0644))
 
-		tarball := createTestTarball(t, "new-plugin", "2.0.0")
+		tarball := createTestTarball(t, "new-pkg", "2.0.0")
 		defer os.Remove(tarball)
 
 		pub, err := NewLocalPublisher(registryDir)
@@ -86,11 +86,11 @@ func TestLocalPublisher(t *testing.T) {
 		// Should preserve existing registry name
 		assert.Equal(t, "existing-registry", index.Name)
 		assert.Equal(t, map[string]registry.PackageEntry{
-			"existing-plugin": {
+			"existing-pkg": {
 				Versions: []string{"1.0.0"},
 				Latest:   "1.0.0",
 			},
-			"new-plugin": {
+			"new-pkg": {
 				Versions: []string{"2.0.0"},
 				Latest:   "2.0.0",
 			},
@@ -101,7 +101,7 @@ func TestLocalPublisher(t *testing.T) {
 		registryDir := t.TempDir()
 
 		// Publish v1.0.0
-		tarball1 := createTestTarball(t, "my-plugin", "1.0.0")
+		tarball1 := createTestTarball(t, "my-pkg", "1.0.0")
 		defer os.Remove(tarball1)
 
 		pub, err := NewLocalPublisher(registryDir)
@@ -111,7 +111,7 @@ func TestLocalPublisher(t *testing.T) {
 		require.NoError(t, err)
 
 		// Publish v1.1.0
-		tarball2 := createTestTarball(t, "my-plugin", "1.1.0")
+		tarball2 := createTestTarball(t, "my-pkg", "1.1.0")
 		defer os.Remove(tarball2)
 
 		_, err = pub.Publish(tarball2)
@@ -124,9 +124,9 @@ func TestLocalPublisher(t *testing.T) {
 		var index registry.RegistryIndex
 		require.NoError(t, json.Unmarshal(data, &index))
 
-		require.Contains(t, index.Packages, "my-plugin")
-		assert.Equal(t, []string{"1.0.0", "1.1.0"}, index.Packages["my-plugin"].Versions)
-		assert.Equal(t, "1.1.0", index.Packages["my-plugin"].Latest)
+		require.Contains(t, index.Packages, "my-pkg")
+		assert.Equal(t, []string{"1.0.0", "1.1.0"}, index.Packages["my-pkg"].Versions)
+		assert.Equal(t, "1.1.0", index.Packages["my-pkg"].Latest)
 	})
 
 	t.Run("creates registry directory if it doesn't exist", func(t *testing.T) {
@@ -136,7 +136,7 @@ func TestLocalPublisher(t *testing.T) {
 		pub, err := NewLocalPublisher(registryDir)
 		require.NoError(t, err)
 
-		tarball := createTestTarball(t, "my-plugin", "1.0.0")
+		tarball := createTestTarball(t, "my-pkg", "1.0.0")
 		defer os.Remove(tarball)
 
 		_, err = pub.Publish(tarball)

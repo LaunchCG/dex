@@ -27,7 +27,7 @@ func TestInstaller_FileResource_WithSrc(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create package.hcl with file resource
-	pluginContent := `package {
+	pluginContent := `meta {
   name = "file-test"
   version = "1.0.0"
   description = "Plugin with file resource"
@@ -43,7 +43,7 @@ file "config" {
 
 	// Create project config
 	createTestProject(t, projectDir, `
-plugin "file-test" {
+package "file-test" {
   source = "file:`+pluginDir+`"
 }
 `)
@@ -76,7 +76,7 @@ plugin "file-test" {
 	err = json.Unmarshal(manifestData, &manifest)
 	require.NoError(t, err)
 
-	plugins := manifest["plugins"].(map[string]any)
+	plugins := manifest["packages"].(map[string]any)
 	fileTest := plugins["file-test"].(map[string]any)
 	files := fileTest["files"].([]any)
 
@@ -95,7 +95,7 @@ func TestInstaller_FileResource_WithContent(t *testing.T) {
 
 	// Create package.hcl with file resource containing inline content
 	// Using heredoc for multi-line content
-	pluginContent := `package {
+	pluginContent := `meta {
   name = "file-inline"
   version = "1.0.0"
   description = "Plugin with inline file content"
@@ -114,7 +114,7 @@ EOF
 
 	// Create project config
 	createTestProject(t, projectDir, `
-plugin "file-inline" {
+package "file-inline" {
   source = "file:`+pluginDir+`"
 }
 `)
@@ -159,7 +159,7 @@ tasks:
 
 	// Create package.hcl with file resource AND mcp_server
 	// This mirrors the docker-compose package structure
-	pluginContent := `package {
+	pluginContent := `meta {
   name = "docker-compose"
   version = "0.1.0"
   description = "Docker Compose task automation"
@@ -181,7 +181,7 @@ mcp_server "docker-compose-tasks" {
 
 	// Create project config
 	createTestProject(t, projectDir, `
-plugin "docker-compose" {
+package "docker-compose" {
   source = "file:`+pluginDir+`"
 }
 `)
@@ -240,7 +240,7 @@ plugin "docker-compose" {
 	err = json.Unmarshal(manifestData, &manifest)
 	require.NoError(t, err)
 
-	plugins := manifest["plugins"].(map[string]any)
+	plugins := manifest["packages"].(map[string]any)
 	dockerCompose := plugins["docker-compose"].(map[string]any)
 	files := dockerCompose["files"].([]any)
 
@@ -265,7 +265,7 @@ func TestInstaller_MultipleFileResources(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create package.hcl with multiple file resources
-	pluginContent := `package {
+	pluginContent := `meta {
   name = "multi-files"
   version = "1.0.0"
   description = "Plugin with multiple file resources"
@@ -286,7 +286,7 @@ file "config2" {
 
 	// Create project config
 	createTestProject(t, projectDir, `
-plugin "multi-files" {
+package "multi-files" {
   source = "file:`+pluginDir+`"
 }
 `)
@@ -326,7 +326,7 @@ plugin "multi-files" {
 	err = json.Unmarshal(manifestData, &manifest)
 	require.NoError(t, err)
 
-	plugins := manifest["plugins"].(map[string]any)
+	plugins := manifest["packages"].(map[string]any)
 	multiFiles := plugins["multi-files"].(map[string]any)
 	files := multiFiles["files"].([]any)
 
@@ -346,7 +346,7 @@ func TestInstaller_FileResource_WithChmod(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create package.hcl with file resource with chmod
-	pluginContent := `package {
+	pluginContent := `meta {
   name = "file-chmod"
   version = "1.0.0"
   description = "Plugin with executable file"
@@ -363,7 +363,7 @@ file "script" {
 
 	// Create project config
 	createTestProject(t, projectDir, `
-plugin "file-chmod" {
+package "file-chmod" {
   source = "file:`+pluginDir+`"
 }
 `)

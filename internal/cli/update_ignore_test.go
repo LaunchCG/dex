@@ -211,7 +211,9 @@ func TestUpdateIgnore_MigratesGitignore(t *testing.T) {
 	// And written to .git/info/exclude instead.
 	excludeData, err := os.ReadFile(filepath.Join(dir, ".git", "info", "exclude"))
 	require.NoError(t, err)
-	assert.Contains(t, string(excludeData), dexIgnoreStart)
+	excludeContent := string(excludeData)
+	assert.True(t, len(excludeContent) > 0 && excludeContent[:len(dexIgnoreStart)] == dexIgnoreStart,
+		"exclude file should start with dex ignore marker")
 }
 
 func TestUpdateIgnore_ErrorsInNonGitDir(t *testing.T) {
@@ -219,7 +221,7 @@ func TestUpdateIgnore_ErrorsInNonGitDir(t *testing.T) {
 	// No .git directory — should return an error, not create one.
 	err := updateIgnoreForProject(dir)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not a git repository")
+	assert.Equal(t, "not a git repository: "+dir, err.Error())
 
 	// Confirm .git was NOT created.
 	_, statErr := os.Stat(filepath.Join(dir, ".git"))
@@ -248,11 +250,8 @@ func TestUpdateIgnore_WritesToGitInfoExclude(t *testing.T) {
 	data, err := os.ReadFile(excludePath)
 	require.NoError(t, err)
 
-	content := string(data)
-	assert.Contains(t, content, dexIgnoreStart)
-	assert.Contains(t, content, dexIgnoreEnd)
-	assert.Contains(t, content, ".dex/")
-	assert.Contains(t, content, "dex.lock")
+	expectedContent := dexIgnoreStart + "\n.dex/\ndex.lock\n" + dexIgnoreEnd + "\n"
+	assert.Equal(t, expectedContent, string(data))
 }
 
 // TestBuildDexIgnoreSection_AlwaysCount verifies that dexIgnoreAlwaysCount matches the

@@ -19,8 +19,8 @@ func TestLoad_NonExistent(t *testing.T) {
 	if l.Version != LockFileVersion {
 		t.Errorf("Version = %q, want %q", l.Version, LockFileVersion)
 	}
-	if len(l.Plugins) != 0 {
-		t.Errorf("Plugins = %v, want empty map", l.Plugins)
+	if len(l.Packages) != 0 {
+		t.Errorf("Packages = %v, want empty map", l.Packages)
 	}
 }
 
@@ -30,13 +30,13 @@ func TestLoad_Existing(t *testing.T) {
 	lockData := `{
   "version": "1.0",
   "agent": "claude-code",
-  "plugins": {
-    "test-plugin": {
+  "packages": {
+    "test-pkg": {
       "version": "1.2.0",
-      "resolved": "git+https://github.com/user/plugin.git#v1.2.0",
+      "resolved": "git+https://github.com/user/pkg.git#v1.2.0",
       "integrity": "sha256-abc123",
       "dependencies": {
-        "other-plugin": "^1.0.0"
+        "other-pkg": "^1.0.0"
       }
     }
   }
@@ -58,22 +58,22 @@ func TestLoad_Existing(t *testing.T) {
 		t.Errorf("Agent = %q, want %q", l.Agent, "claude-code")
 	}
 
-	plugin := l.Get("test-plugin")
-	if plugin == nil {
+	pkg := l.Get("test-pkg")
+	if pkg == nil {
 		t.Fatal("Get() returned nil")
 	}
 
-	if plugin.Version != "1.2.0" {
-		t.Errorf("Version = %q, want %q", plugin.Version, "1.2.0")
+	if pkg.Version != "1.2.0" {
+		t.Errorf("Version = %q, want %q", pkg.Version, "1.2.0")
 	}
-	if plugin.Resolved != "git+https://github.com/user/plugin.git#v1.2.0" {
-		t.Errorf("Resolved = %q, want %q", plugin.Resolved, "git+https://github.com/user/plugin.git#v1.2.0")
+	if pkg.Resolved != "git+https://github.com/user/pkg.git#v1.2.0" {
+		t.Errorf("Resolved = %q, want %q", pkg.Resolved, "git+https://github.com/user/pkg.git#v1.2.0")
 	}
-	if plugin.Integrity != "sha256-abc123" {
-		t.Errorf("Integrity = %q, want %q", plugin.Integrity, "sha256-abc123")
+	if pkg.Integrity != "sha256-abc123" {
+		t.Errorf("Integrity = %q, want %q", pkg.Integrity, "sha256-abc123")
 	}
-	if dep, ok := plugin.Dependencies["other-plugin"]; !ok || dep != "^1.0.0" {
-		t.Errorf("Dependencies = %v, want map[other-plugin:^1.0.0]", plugin.Dependencies)
+	if dep, ok := pkg.Dependencies["other-pkg"]; !ok || dep != "^1.0.0" {
+		t.Errorf("Dependencies = %v, want map[other-pkg:^1.0.0]", pkg.Dependencies)
 	}
 }
 
@@ -86,9 +86,9 @@ func TestSave(t *testing.T) {
 	}
 
 	l.Agent = "claude-code"
-	l.Set("test-plugin", &LockedPlugin{
+	l.Set("test-pkg", &LockedPackage{
 		Version:   "1.0.0",
-		Resolved:  "file:./plugins/test",
+		Resolved:  "file:./pkgs/test",
 		Integrity: "sha256-xyz789",
 	})
 
@@ -106,10 +106,10 @@ func TestSave(t *testing.T) {
 	expected := `{
   "version": "1.0",
   "agent": "claude-code",
-  "plugins": {
-    "test-plugin": {
+  "packages": {
+    "test-pkg": {
       "version": "1.0.0",
-      "resolved": "file:./plugins/test",
+      "resolved": "file:./pkgs/test",
       "integrity": "sha256-xyz789",
       "dependencies": {}
     }
@@ -129,7 +129,7 @@ func TestGet_NonExistent(t *testing.T) {
 	}
 
 	if l.Get("nonexistent") != nil {
-		t.Error("Get() returned non-nil for nonexistent plugin")
+		t.Error("Get() returned non-nil for nonexistent pkg")
 	}
 }
 
@@ -141,22 +141,22 @@ func TestSet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	l.Set("plugin-a", &LockedPlugin{
+	l.Set("pkg-a", &LockedPackage{
 		Version:   "1.0.0",
 		Resolved:  "resolved-a",
 		Integrity: "sha256-a",
 	})
 
 	// Update existing
-	l.Set("plugin-a", &LockedPlugin{
+	l.Set("pkg-a", &LockedPackage{
 		Version:   "2.0.0",
 		Resolved:  "resolved-a-v2",
 		Integrity: "sha256-a-v2",
 	})
 
-	plugin := l.Get("plugin-a")
-	if plugin.Version != "2.0.0" {
-		t.Errorf("Version = %q, want %q", plugin.Version, "2.0.0")
+	pkg := l.Get("pkg-a")
+	if pkg.Version != "2.0.0" {
+		t.Errorf("Version = %q, want %q", pkg.Version, "2.0.0")
 	}
 }
 
@@ -168,16 +168,16 @@ func TestRemove(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	l.Set("plugin-a", &LockedPlugin{Version: "1.0.0"})
-	l.Set("plugin-b", &LockedPlugin{Version: "1.0.0"})
+	l.Set("pkg-a", &LockedPackage{Version: "1.0.0"})
+	l.Set("pkg-b", &LockedPackage{Version: "1.0.0"})
 
-	l.Remove("plugin-a")
+	l.Remove("pkg-a")
 
-	if l.Has("plugin-a") {
-		t.Error("plugin-a still exists after Remove")
+	if l.Has("pkg-a") {
+		t.Error("pkg-a still exists after Remove")
 	}
-	if !l.Has("plugin-b") {
-		t.Error("plugin-b should still exist")
+	if !l.Has("pkg-b") {
+		t.Error("pkg-b should still exist")
 	}
 }
 
@@ -189,17 +189,17 @@ func TestHas(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	l.Set("plugin-a", &LockedPlugin{Version: "1.0.0"})
+	l.Set("pkg-a", &LockedPackage{Version: "1.0.0"})
 
-	if !l.Has("plugin-a") {
-		t.Error("Has() = false for existing plugin")
+	if !l.Has("pkg-a") {
+		t.Error("Has() = false for existing pkg")
 	}
-	if l.Has("plugin-b") {
-		t.Error("Has() = true for non-existing plugin")
+	if l.Has("pkg-b") {
+		t.Error("Has() = true for non-existing pkg")
 	}
 }
 
-func TestLockedPlugins(t *testing.T) {
+func TestLockedPackages(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	l, err := Load(tmpDir)
@@ -207,19 +207,19 @@ func TestLockedPlugins(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	l.Set("zebra", &LockedPlugin{Version: "1.0.0"})
-	l.Set("alpha", &LockedPlugin{Version: "1.0.0"})
-	l.Set("beta", &LockedPlugin{Version: "1.0.0"})
+	l.Set("zebra", &LockedPackage{Version: "1.0.0"})
+	l.Set("alpha", &LockedPackage{Version: "1.0.0"})
+	l.Set("beta", &LockedPackage{Version: "1.0.0"})
 
-	plugins := l.LockedPlugins()
+	pkgs := l.LockedPackages()
 
 	expected := []string{"alpha", "beta", "zebra"}
-	if len(plugins) != len(expected) {
-		t.Fatalf("LockedPlugins() = %v, want %v", plugins, expected)
+	if len(pkgs) != len(expected) {
+		t.Fatalf("LockedPackages() = %v, want %v", pkgs, expected)
 	}
 	for i, name := range expected {
-		if plugins[i] != name {
-			t.Errorf("plugins[%d] = %q, want %q", i, plugins[i], name)
+		if pkgs[i] != name {
+			t.Errorf("pkgs[%d] = %q, want %q", i, pkgs[i], name)
 		}
 	}
 }
@@ -233,13 +233,13 @@ func TestSet_InitializesDependencies(t *testing.T) {
 	}
 
 	// Set with nil Dependencies
-	l.Set("plugin-a", &LockedPlugin{
+	l.Set("pkg-a", &LockedPackage{
 		Version:      "1.0.0",
 		Dependencies: nil,
 	})
 
-	plugin := l.Get("plugin-a")
-	if plugin.Dependencies == nil {
+	pkg := l.Get("pkg-a")
+	if pkg.Dependencies == nil {
 		t.Error("Dependencies should be initialized to empty map")
 	}
 }
@@ -253,12 +253,12 @@ func TestLockFileFormat(t *testing.T) {
 	}
 
 	l.Agent = "claude-code"
-	l.Set("plugin-name", &LockedPlugin{
+	l.Set("pkg-name", &LockedPackage{
 		Version:   "1.2.0",
-		Resolved:  "git+https://github.com/user/plugin.git#v1.2.0",
+		Resolved:  "git+https://github.com/user/pkg.git#v1.2.0",
 		Integrity: "sha256-abc123",
 		Dependencies: map[string]string{
-			"dep-plugin": "^1.0.0",
+			"dep-pkg": "^1.0.0",
 		},
 	})
 
@@ -282,13 +282,13 @@ func TestLockFileFormat(t *testing.T) {
 	expected := `{
   "version": "1.0",
   "agent": "claude-code",
-  "plugins": {
-    "plugin-name": {
+  "packages": {
+    "pkg-name": {
       "version": "1.2.0",
-      "resolved": "git+https://github.com/user/plugin.git#v1.2.0",
+      "resolved": "git+https://github.com/user/pkg.git#v1.2.0",
       "integrity": "sha256-abc123",
       "dependencies": {
-        "dep-plugin": "^1.0.0"
+        "dep-pkg": "^1.0.0"
       }
     }
   }
@@ -307,7 +307,7 @@ func TestSave_VersionConstraintsNotHTMLEscaped(t *testing.T) {
 	}
 
 	l.Agent = "claude-code"
-	l.Set("my-plugin", &LockedPlugin{
+	l.Set("my-plugin", &LockedPackage{
 		Version:   "2.0.0",
 		Resolved:  "https://example.com/my-plugin/2.0.0.tar.gz",
 		Integrity: "sha256-abc",

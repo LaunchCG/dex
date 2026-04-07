@@ -14,37 +14,20 @@ import (
 // It mirrors ProjectConfig but without the required project {} block.
 // Files are loaded from ~/.dex/local.hcl and ~/.dex/projects/<name>/project.hcl.
 type LocalConfig struct {
-	// Registries defines additional plugin registry sources
+	// Registries defines additional package registry sources
 	Registries []RegistryBlock `hcl:"registry,block"`
 
-	// Plugins defines additional plugin dependencies
-	Plugins []PluginBlock `hcl:"plugin,block"`
+	// Packages defines additional package dependencies
+	Packages []PackageBlock `hcl:"package,block"`
 
-	// Claude resources
-	Skills     []resource.ClaudeSkill     `hcl:"claude_skill,block"`
-	Commands   []resource.ClaudeCommand   `hcl:"claude_command,block"`
-	Subagents  []resource.ClaudeSubagent  `hcl:"claude_subagent,block"`
-	Rules      []resource.ClaudeRule      `hcl:"claude_rule,block"`
-	RulesFiles []resource.ClaudeRules     `hcl:"claude_rules,block"`
-	Settings   []resource.ClaudeSettings  `hcl:"claude_settings,block"`
-	MCPServers []resource.ClaudeMCPServer `hcl:"claude_mcp_server,block"`
-
-	// Universal MCP servers
-	UniversalMCPServers []resource.MCPServer `hcl:"mcp_server,block"`
-
-	// GitHub Copilot resources
-	CopilotInstruction  []resource.CopilotInstruction  `hcl:"copilot_instruction,block"`
-	CopilotMCPServers   []resource.CopilotMCPServer    `hcl:"copilot_mcp_server,block"`
-	CopilotInstructions []resource.CopilotInstructions `hcl:"copilot_instructions,block"`
-	CopilotPrompts      []resource.CopilotPrompt       `hcl:"copilot_prompt,block"`
-	CopilotAgents       []resource.CopilotAgent        `hcl:"copilot_agent,block"`
-	CopilotSkills       []resource.CopilotSkill        `hcl:"copilot_skill,block"`
-
-	// Cursor resources
-	CursorRules_     []resource.CursorRule      `hcl:"cursor_rule,block"`
-	CursorMCPServers []resource.CursorMCPServer `hcl:"cursor_mcp_server,block"`
-	CursorRules      []resource.CursorRules     `hcl:"cursor_rules,block"`
-	CursorCommands   []resource.CursorCommand   `hcl:"cursor_command,block"`
+	// Universal resource types
+	Skills     []resource.Skill     `hcl:"skill,block"`
+	Commands   []resource.Command   `hcl:"command,block"`
+	Agents     []resource.Agent     `hcl:"agent,block"`
+	Rules      []resource.Rule      `hcl:"rule,block"`
+	RulesFiles []resource.Rules     `hcl:"rules,block"`
+	Settings   []resource.Settings  `hcl:"settings,block"`
+	MCPServers []resource.MCPServer `hcl:"mcp_server,block"`
 
 	// Variables defines user-configurable variables
 	Variables    []ProjectVariableBlock
@@ -54,14 +37,9 @@ type LocalConfig struct {
 // toResourceSet extracts the resource fields into a ResourceSet.
 func (l *LocalConfig) toResourceSet() ResourceSet {
 	return ResourceSet{
-		Skills: l.Skills, Commands: l.Commands, Subagents: l.Subagents,
+		Skills: l.Skills, Commands: l.Commands, Agents: l.Agents,
 		Rules: l.Rules, RulesFiles: l.RulesFiles, Settings: l.Settings,
-		MCPServers: l.MCPServers, UniversalMCPServers: l.UniversalMCPServers,
-		CopilotInstruction: l.CopilotInstruction, CopilotMCPServers: l.CopilotMCPServers,
-		CopilotInstructions: l.CopilotInstructions, CopilotPrompts: l.CopilotPrompts,
-		CopilotAgents: l.CopilotAgents, CopilotSkills: l.CopilotSkills,
-		CursorRules_: l.CursorRules_, CursorMCPServers: l.CursorMCPServers,
-		CursorRules: l.CursorRules, CursorCommands: l.CursorCommands,
+		MCPServers: l.MCPServers,
 	}
 }
 
@@ -69,22 +47,11 @@ func (l *LocalConfig) toResourceSet() ResourceSet {
 func (l *LocalConfig) applyResourceSet(r *ResourceSet) {
 	l.Skills = r.Skills
 	l.Commands = r.Commands
-	l.Subagents = r.Subagents
+	l.Agents = r.Agents
 	l.Rules = r.Rules
 	l.RulesFiles = r.RulesFiles
 	l.Settings = r.Settings
 	l.MCPServers = r.MCPServers
-	l.UniversalMCPServers = r.UniversalMCPServers
-	l.CopilotInstruction = r.CopilotInstruction
-	l.CopilotMCPServers = r.CopilotMCPServers
-	l.CopilotInstructions = r.CopilotInstructions
-	l.CopilotPrompts = r.CopilotPrompts
-	l.CopilotAgents = r.CopilotAgents
-	l.CopilotSkills = r.CopilotSkills
-	l.CursorRules_ = r.CursorRules_
-	l.CursorMCPServers = r.CursorMCPServers
-	l.CursorRules = r.CursorRules
-	l.CursorCommands = r.CursorCommands
 }
 
 // merge appends all slices from src into dst.
@@ -93,7 +60,7 @@ func (l *LocalConfig) applyResourceSet(r *ResourceSet) {
 // applyResourceSet mappings. Run TestMergeLocal_AllResourceFields to verify.
 func (dst *LocalConfig) merge(src *LocalConfig) {
 	dst.Registries = append(dst.Registries, src.Registries...)
-	dst.Plugins = append(dst.Plugins, src.Plugins...)
+	dst.Packages = append(dst.Packages, src.Packages...)
 	dstRS := dst.toResourceSet()
 	srcRS := src.toResourceSet()
 	dstRS.appendFrom(&srcRS)

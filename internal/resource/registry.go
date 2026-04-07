@@ -9,38 +9,18 @@ import (
 // Used by the registry to instantiate resources during HCL parsing.
 type ResourceFactory func() Resource
 
-// resourceTypes maps HCL block type names to their factory functions.
+// resourceTypes maps resource type names to their factory functions.
 var resourceTypes = map[string]ResourceFactory{
-	// Claude Code resources
-	"claude_skill":      func() Resource { return &ClaudeSkill{} },
-	"claude_command":    func() Resource { return &ClaudeCommand{} },
-	"claude_subagent":   func() Resource { return &ClaudeSubagent{} },
-	"claude_rule":       func() Resource { return &ClaudeRule{} },
-	"claude_rules":      func() Resource { return &ClaudeRules{} },
-	"claude_settings":   func() Resource { return &ClaudeSettings{} },
-	"claude_mcp_server": func() Resource { return &ClaudeMCPServer{} },
-
-	// GitHub Copilot resources - merged (multiple plugins contribute to same file)
-	"copilot_instruction": func() Resource { return &CopilotInstruction{} },
-	"copilot_mcp_server":  func() Resource { return &CopilotMCPServer{} },
-
-	// GitHub Copilot resources - standalone (one file per resource)
-	"copilot_instructions": func() Resource { return &CopilotInstructions{} },
-	"copilot_prompt":       func() Resource { return &CopilotPrompt{} },
-	"copilot_agent":        func() Resource { return &CopilotAgent{} },
-	"copilot_skill":        func() Resource { return &CopilotSkill{} },
-
-	// Cursor resources - merged (multiple plugins contribute to same file)
-	"cursor_rule":       func() Resource { return &CursorRule{} },
-	"cursor_mcp_server": func() Resource { return &CursorMCPServer{} },
-
-	// Cursor resources - standalone (one file per resource)
-	"cursor_rules":   func() Resource { return &CursorRules{} },
-	"cursor_command": func() Resource { return &CursorCommand{} },
-
-	// Universal resources (work across all platforms)
-	"file":      func() Resource { return &File{} },
-	"directory": func() Resource { return &Directory{} },
+	// Universal resource types
+	"skill":      func() Resource { return &Skill{} },
+	"command":    func() Resource { return &Command{} },
+	"agent":      func() Resource { return &Agent{} },
+	"rule":       func() Resource { return &Rule{} },
+	"rules":      func() Resource { return &Rules{} },
+	"settings":   func() Resource { return &Settings{} },
+	"mcp_server": func() Resource { return &MCPServer{} },
+	"file":       func() Resource { return &File{} },
+	"directory":  func() Resource { return &Directory{} },
 }
 
 // NewResource creates a new resource instance by type name.

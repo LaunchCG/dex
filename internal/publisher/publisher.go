@@ -1,4 +1,4 @@
-// Package publisher provides functionality for publishing plugin tarballs to registries.
+// Package publisher provides functionality for publishing package tarballs to registries.
 package publisher
 
 import (

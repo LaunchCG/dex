@@ -13,9 +13,9 @@ import (
 )
 
 var infoCmd = &cobra.Command{
-	Use:   "info <plugin>",
-	Short: "Show plugin information",
-	Long:  "Display detailed information about an installed plugin.",
+	Use:   "info <package>",
+	Short: "Show package information",
+	Long:  "Display detailed information about an installed package.",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runInfo,
 }
@@ -26,7 +26,7 @@ func init() {
 }
 
 func runInfo(cmd *cobra.Command, args []string) error {
-	pluginName := args[0]
+	pkgName := args[0]
 
 	// Get flags
 	projectPath, _ := cmd.Flags().GetString("path")
@@ -49,21 +49,21 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load manifest: %w", err)
 	}
 
-	// Get locked plugin info
-	locked := lf.Get(pluginName)
+	// Get locked package info
+	locked := lf.Get(pkgName)
 	if locked == nil {
-		return fmt.Errorf("plugin %q is not installed", pluginName)
+		return fmt.Errorf("package %q is not installed", pkgName)
 	}
 
-	// Get plugin manifest
-	pluginManifest := mf.GetPlugin(pluginName)
+	// Get package manifest
+	pkgManifest := mf.GetPackage(pkgName)
 
-	// Print plugin info
+	// Print package info
 	cyan := color.New(color.FgCyan).SprintFunc()
 	green := color.New(color.FgGreen).SprintFunc()
 	bold := color.New(color.Bold).SprintFunc()
 
-	fmt.Printf("%s\n\n", bold(pluginName))
+	fmt.Printf("%s\n\n", bold(pkgName))
 
 	fmt.Printf("  %s: %s\n", cyan("Version"), green(locked.Version))
 	fmt.Printf("  %s: %s\n", cyan("Resolved"), locked.Resolved)
@@ -71,34 +71,34 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  %s: %s\n", cyan("Integrity"), locked.Integrity)
 	}
 
-	if pluginManifest != nil {
+	if pkgManifest != nil {
 		fmt.Println()
 		fmt.Printf("  %s:\n", cyan("Files"))
-		if len(pluginManifest.Files) == 0 {
+		if len(pkgManifest.Files) == 0 {
 			fmt.Println("    (none)")
 		} else {
-			for _, file := range pluginManifest.Files {
+			for _, file := range pkgManifest.Files {
 				fmt.Printf("    - %s\n", file)
 			}
 		}
 
-		if len(pluginManifest.Directories) > 0 {
+		if len(pkgManifest.Directories) > 0 {
 			fmt.Println()
 			fmt.Printf("  %s:\n", cyan("Directories"))
-			for _, dir := range pluginManifest.Directories {
+			for _, dir := range pkgManifest.Directories {
 				fmt.Printf("    - %s\n", dir)
 			}
 		}
 
-		if len(pluginManifest.MCPServers) > 0 {
+		if len(pkgManifest.MCPServers) > 0 {
 			fmt.Println()
 			fmt.Printf("  %s:\n", cyan("MCP Servers"))
-			for _, server := range pluginManifest.MCPServers {
+			for _, server := range pkgManifest.MCPServers {
 				fmt.Printf("    - %s\n", server)
 			}
 		}
 
-		if pluginManifest.HasAgentContent {
+		if pkgManifest.HasAgentContent {
 			fmt.Println()
 			fmt.Printf("  %s: yes\n", cyan("Agent Content"))
 		}
