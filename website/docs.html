@@ -503,46 +503,28 @@
         <span class="sidebar-group-label">Project Config</span>
         <a href="#project-block">project block</a>
         <a href="#registry-block">registry block</a>
-        <a href="#plugin-block">plugin block</a>
+        <a href="#package-block-project">package block</a>
         <a href="#version-constraints">version constraints</a>
         <a href="#lock-file">lock file</a>
       </div>
 
       <div class="sidebar-group">
         <span class="sidebar-group-label">Package Config</span>
-        <a href="#package-block">package block</a>
+        <a href="#meta-block">meta block</a>
         <a href="#variables">variables</a>
         <a href="#hcl-functions">HCL functions</a>
         <a href="#template-variables">template variables</a>
       </div>
 
       <div class="sidebar-group">
-        <span class="sidebar-group-label">Resources / Claude Code</span>
-        <a href="#claude-skill">claude_skill</a>
-        <a href="#claude-command">claude_command</a>
-        <a href="#claude-subagent">claude_subagent</a>
-        <a href="#claude-rule">claude_rule</a>
-        <a href="#claude-rules">claude_rules</a>
-        <a href="#claude-settings">claude_settings</a>
-        <a href="#claude-mcp-server">claude_mcp_server</a>
-      </div>
-
-      <div class="sidebar-group">
-        <span class="sidebar-group-label">Resources / Cursor</span>
-        <a href="#cursor-rule">cursor_rule</a>
-        <a href="#cursor-rules">cursor_rules</a>
-        <a href="#cursor-command">cursor_command</a>
-        <a href="#cursor-mcp-server">cursor_mcp_server</a>
-      </div>
-
-      <div class="sidebar-group">
-        <span class="sidebar-group-label">Resources / GitHub Copilot</span>
-        <a href="#copilot-instruction">copilot_instruction</a>
-        <a href="#copilot-instructions">copilot_instructions</a>
-        <a href="#copilot-prompt">copilot_prompt</a>
-        <a href="#copilot-agent">copilot_agent</a>
-        <a href="#copilot-skill">copilot_skill</a>
-        <a href="#copilot-mcp-server">copilot_mcp_server</a>
+        <span class="sidebar-group-label">Resources</span>
+        <a href="#res-skill">skill</a>
+        <a href="#res-command">command</a>
+        <a href="#res-agent">agent</a>
+        <a href="#res-rule">rule</a>
+        <a href="#res-rules">rules</a>
+        <a href="#res-settings">settings</a>
+        <a href="#res-mcp-server">mcp_server</a>
       </div>
 
       <div class="sidebar-group">
@@ -555,9 +537,9 @@
 
       <div class="sidebar-group">
         <span class="sidebar-group-label">Publishing</span>
-        <a href="#plugin-structure">plugin structure</a>
+        <a href="#package-structure">package structure</a>
         <a href="#file-blocks">file blocks</a>
-        <a href="#cross-platform">cross-platform plugins</a>
+        <a href="#cross-platform">cross-platform packages</a>
         <a href="#publishing-guide">publishing guide</a>
       </div>
 
@@ -598,12 +580,12 @@
 dex init --platform cursor         <span class="hc"># Cursor</span>
 dex init --platform github-copilot <span class="hc"># GitHub Copilot</span></code></pre>
 
-        <p><strong>2. Edit <code>dex.hcl</code> to add plugins:</strong></p>
+        <p><strong>2. Edit <code>dex.hcl</code> to add packages:</strong></p>
 <pre><code><span class="hk">project</span> {
   <span class="hk">default_platform</span> = <span class="hs">"claude-code"</span>
 }
 
-<span class="hk">plugin</span> <span class="hs">"my-tools"</span> {
+<span class="hk">package</span> <span class="hs">"my-tools"</span> {
   <span class="hk">source</span>  = <span class="hs">"git+https://github.com/example/my-tools.git"</span>
   <span class="hk">version</span> = <span class="hs">"^1.0.0"</span>
 }</code></pre>
@@ -632,8 +614,8 @@ dex init --platform github-copilot <span class="hc"># GitHub Copilot</span></cod
 
       <div class="doc-section" id="cmd-sync">
         <h3>dex sync</h3>
-        <p>Synchronize plugins to match <code>dex.hcl</code>. Without arguments, installs missing, updates outdated, and prunes orphaned plugins.</p>
-        <div class="cmd-header">dex sync [PLUGINS...] [OPTIONS]</div>
+        <p>Synchronize packages to match <code>dex.hcl</code>. Without arguments, installs missing, updates outdated, and prunes orphaned packages.</p>
+        <div class="cmd-header">dex sync [PACKAGES...] [OPTIONS]</div>
         <table class="options-table">
           <thead><tr><th>Option</th><th>Short</th><th>Description</th><th>Default</th></tr></thead>
           <tbody>
@@ -646,33 +628,34 @@ dex init --platform github-copilot <span class="hc"># GitHub Copilot</span></cod
             <tr><td>--namespace</td><td></td><td>Namespace resources with package name</td><td>false</td></tr>
             <tr><td>--dry-run</td><td>-n</td><td>Show what would change without making changes</td><td>false</td></tr>
             <tr><td>--git-exclude</td><td></td><td>Update .git/info/exclude to hide dex-managed files</td><td>false</td></tr>
+            <tr><td>--profile</td><td></td><td>Activate a named profile for conditional resources</td><td></td></tr>
           </tbody>
         </table>
         <h4>Version specifiers</h4>
         <table class="options-table">
           <thead><tr><th>Format</th><th>Example</th><th>Description</th></tr></thead>
           <tbody>
-            <tr><td>Exact</td><td>plugin@1.2.0</td><td>Exact version</td></tr>
-            <tr><td>Caret</td><td>plugin@^1.0.0</td><td>Compatible with 1.x.x</td></tr>
-            <tr><td>Tilde</td><td>plugin@~1.2.0</td><td>Compatible with 1.2.x</td></tr>
-            <tr><td>Range</td><td>plugin@&gt;=1.0.0</td><td>1.0.0 or higher</td></tr>
-            <tr><td>Latest</td><td>plugin</td><td>Latest version</td></tr>
+            <tr><td>Exact</td><td>package@1.2.0</td><td>Exact version</td></tr>
+            <tr><td>Caret</td><td>package@^1.0.0</td><td>Compatible with 1.x.x</td></tr>
+            <tr><td>Tilde</td><td>package@~1.2.0</td><td>Compatible with 1.2.x</td></tr>
+            <tr><td>Range</td><td>package@&gt;=1.0.0</td><td>1.0.0 or higher</td></tr>
+            <tr><td>Latest</td><td>package</td><td>Latest version</td></tr>
           </tbody>
         </table>
         <div class="callout">
           <p><span class="callout-icon">ℹ</span> By default, dex refuses to overwrite files that exist but aren't tracked in the manifest. Use <code>--force</code> to override.</p>
         </div>
-<pre><code><span class="hc"># Sync all plugins</span>
+<pre><code><span class="hc"># Sync all packages</span>
 dex sync
 
 <span class="hc"># Preview changes without applying</span>
 dex sync --dry-run
 
-<span class="hc"># Install a specific plugin with version</span>
-dex sync my-plugin@^1.0.0
+<span class="hc"># Install a specific package with version</span>
+dex sync my-package@^1.0.0
 
 <span class="hc"># Install from local source</span>
-dex sync --source file:./local-plugin
+dex sync --source file:./local-package
 
 <span class="hc"># Hide managed files from git status</span>
 dex sync --git-exclude</code></pre>
@@ -680,7 +663,7 @@ dex sync --git-exclude</code></pre>
 
       <div class="doc-section" id="cmd-list">
         <h3>dex list</h3>
-        <p>List installed plugins.</p>
+        <p>List installed packages.</p>
         <div class="cmd-header">dex list [OPTIONS]</div>
         <table class="options-table">
           <thead><tr><th>Option</th><th>Short</th><th>Description</th></tr></thead>
@@ -693,8 +676,8 @@ dex sync --git-exclude</code></pre>
 
       <div class="doc-section" id="cmd-uninstall">
         <h3>dex uninstall</h3>
-        <p>Uninstall plugins from the project.</p>
-        <div class="cmd-header">dex uninstall PLUGINS... [OPTIONS]</div>
+        <p>Uninstall packages from the project.</p>
+        <div class="cmd-header">dex uninstall PACKAGES... [OPTIONS]</div>
         <table class="options-table">
           <thead><tr><th>Option</th><th>Short</th><th>Description</th></tr></thead>
           <tbody>
@@ -702,13 +685,13 @@ dex sync --git-exclude</code></pre>
             <tr><td>--path</td><td>-p</td><td>Project directory</td></tr>
           </tbody>
         </table>
-        <p>Without <code>--remove</code>: deletes installed files but keeps the plugin in <code>dex.hcl</code>. With <code>--remove</code>: also drops the plugin from <code>dex.hcl</code>.</p>
+        <p>Without <code>--remove</code>: deletes installed files but keeps the package in <code>dex.hcl</code>. With <code>--remove</code>: also drops the package from <code>dex.hcl</code>.</p>
       </div>
 
       <div class="doc-section" id="cmd-info">
         <h3>dex info</h3>
-        <p>Show information about an installed plugin: version, source, lock file entry, and dependencies.</p>
-        <div class="cmd-header">dex info PLUGIN [OPTIONS]</div>
+        <p>Show information about an installed package: version, source, lock file entry, and dependencies.</p>
+        <div class="cmd-header">dex info PACKAGE [OPTIONS]</div>
         <table class="options-table">
           <thead><tr><th>Option</th><th>Short</th><th>Description</th></tr></thead>
           <tbody><tr><td>--path</td><td>-p</td><td>Project directory</td></tr></tbody>
@@ -717,8 +700,8 @@ dex sync --git-exclude</code></pre>
 
       <div class="doc-section" id="cmd-manifest">
         <h3>dex manifest</h3>
-        <p>Show files managed by dex. Optionally filter by plugin name.</p>
-        <div class="cmd-header">dex manifest [PLUGIN] [OPTIONS]</div>
+        <p>Show files managed by dex. Optionally filter by package name.</p>
+        <div class="cmd-header">dex manifest [PACKAGE] [OPTIONS]</div>
         <table class="options-table">
           <thead><tr><th>Option</th><th>Short</th><th>Description</th></tr></thead>
           <tbody><tr><td>--path</td><td>-p</td><td>Project directory</td></tr></tbody>
@@ -750,7 +733,7 @@ dex 0.1.0</code></pre>
 
       <div class="doc-section" id="registry-block">
         <h3>registry block</h3>
-        <p>Registries define where to fetch plugins from.</p>
+        <p>Registries define where to fetch packages from.</p>
         <table class="attr-table">
           <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
           <tbody>
@@ -761,16 +744,16 @@ dex 0.1.0</code></pre>
         </table>
       </div>
 
-      <div class="doc-section" id="plugin-block">
-        <h3>plugin block</h3>
+      <div class="doc-section" id="package-block-project">
+        <h3>package block</h3>
         <table class="attr-table">
           <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
           <tbody>
-            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Plugin identifier (block label)</td></tr>
+            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Package identifier (block label)</td></tr>
             <tr><td>source</td><td class="type-col">string</td><td>conditional</td><td>Direct source URL (git+https://, file://)</td></tr>
             <tr><td>registry</td><td class="type-col">string</td><td>conditional</td><td>Registry name to fetch from</td></tr>
             <tr><td>version</td><td class="type-col">string</td><td></td><td>Version constraint</td></tr>
-            <tr><td>config</td><td class="type-col">map(string)</td><td></td><td>Plugin-specific configuration values</td></tr>
+            <tr><td>config</td><td class="type-col">map(string)</td><td></td><td>Package-specific configuration values</td></tr>
           </tbody>
         </table>
 <pre><code><span class="hk">project</span> {
@@ -778,17 +761,17 @@ dex 0.1.0</code></pre>
 }
 
 <span class="hk">registry</span> <span class="hs">"community"</span> {
-  <span class="hk">url</span> = <span class="hs">"https://plugins.example.com"</span>
+  <span class="hk">url</span> = <span class="hs">"https://packages.example.com"</span>
 }
 
-<span class="hk">plugin</span> <span class="hs">"python-tools"</span> {
+<span class="hk">package</span> <span class="hs">"python-tools"</span> {
   <span class="hk">registry</span> = <span class="hs">"community"</span>
   <span class="hk">version</span>  = <span class="hs">"^1.0.0"</span>
   <span class="hk">config</span> = { <span class="hk">python_version</span> = <span class="hs">"3.12"</span> }
 }
 
-<span class="hk">plugin</span> <span class="hs">"custom-plugin"</span> {
-  <span class="hk">source</span>  = <span class="hs">"git+https://github.com/user/custom-plugin.git"</span>
+<span class="hk">package</span> <span class="hs">"custom-package"</span> {
+  <span class="hk">source</span>  = <span class="hs">"git+https://github.com/user/custom-package.git"</span>
   <span class="hk">version</span> = <span class="hs">"v2.0.0"</span>
 }</code></pre>
       </div>
@@ -813,7 +796,7 @@ dex 0.1.0</code></pre>
 <pre><code>{
   "version": "1.0",
   "platform": "claude-code",
-  "plugins": {
+  "packages": {
     "python-tools": {
       "version": "1.2.0",
       "resolved": "https://registry.example.com/python-tools-1.2.0.tar.gz",
@@ -824,10 +807,10 @@ dex 0.1.0</code></pre>
       </div>
 
       <!-- ── PACKAGE CONFIG ── -->
-      <div class="doc-section" id="package-block">
+      <div class="doc-section" id="meta-block">
         <h2>Package Configuration</h2>
-        <p>A <code>package.hcl</code> file defines a plugin's metadata and resources.</p>
-        <h3>package block</h3>
+        <p>A <code>package.hcl</code> file defines a package's metadata and resources.</p>
+        <h3>meta block</h3>
         <table class="attr-table">
           <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
           <tbody>
@@ -844,7 +827,7 @@ dex 0.1.0</code></pre>
 
       <div class="doc-section" id="variables">
         <h3>Variables</h3>
-        <p>Variables allow users to customize plugin behavior at installation time via the <code>config</code> map in the plugin block.</p>
+        <p>Variables allow users to customize package behavior at installation time via the <code>config</code> map in the package block.</p>
         <table class="attr-table">
           <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
           <tbody>
@@ -885,21 +868,23 @@ dex 0.1.0</code></pre>
           <thead><tr><th>Variable</th><th>Description</th></tr></thead>
           <tbody>
             <tr><td>{{ .ComponentDir }}</td><td>Absolute path to the installed component directory</td></tr>
-            <tr><td>{{ .PluginName }}</td><td>Name of the plugin being installed</td></tr>
-            <tr><td>{{ .PluginVersion }}</td><td>Version of the plugin</td></tr>
+            <tr><td>{{ .PackageName }}</td><td>Name of the package being installed</td></tr>
+            <tr><td>{{ .PackageVersion }}</td><td>Version of the package</td></tr>
             <tr><td>{{ .ProjectRoot }}</td><td>Absolute path to the project root</td></tr>
             <tr><td>{{ .Platform }}</td><td>Target platform (e.g., claude-code)</td></tr>
           </tbody>
         </table>
       </div>
 
-      <!-- ── CLAUDE CODE RESOURCES ── -->
-      <div class="doc-section" id="claude-skill">
-        <h2>Resources: Claude Code</h2>
-        <span class="badge badge-claude">Claude Code</span>
+      <!-- ── UNIVERSAL RESOURCES ── -->
+      <div class="doc-section" id="res-skill">
+        <h2>Resources</h2>
+        <p>Universal resource types that dex maps to each platform's native format. Define once, deploy everywhere.</p>
 
-        <h3>claude_skill</h3>
-        <p>Skills provide specialized knowledge or capabilities to Claude. Installed to <code>.claude/skills/{plugin}-{name}/SKILL.md</code>.</p>
+        <h3>skill</h3>
+        <span class="badge badge-claude">Claude Code</span>
+        <span class="badge badge-copilot">GitHub Copilot</span>
+        <p>Skills provide specialized knowledge or capabilities. Installed to <code>.claude/skills/</code> and <code>.github/skills/</code>. Cursor skips this resource type.</p>
         <table class="attr-table">
           <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
           <tbody>
@@ -907,16 +892,16 @@ dex 0.1.0</code></pre>
             <tr><td>description</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Explains when and how to use this skill</td></tr>
             <tr><td>content</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>The skill's instructions/knowledge</td></tr>
             <tr><td>argument_hint</td><td class="type-col">string</td><td></td><td>Hint shown during autocomplete (e.g., "[filename]")</td></tr>
-            <tr><td>disable_model_invocation</td><td class="type-col">bool</td><td></td><td>Prevent Claude from auto-loading; user must invoke manually</td></tr>
+            <tr><td>disable_model_invocation</td><td class="type-col">bool</td><td></td><td>Prevent auto-loading; user must invoke manually</td></tr>
             <tr><td>user_invocable</td><td class="type-col">bool</td><td></td><td>Set to false to hide from / menu (default: true)</td></tr>
-            <tr><td>allowed_tools</td><td class="type-col">list(string)</td><td></td><td>Tools Claude can use without asking</td></tr>
+            <tr><td>allowed_tools</td><td class="type-col">list(string)</td><td></td><td>Tools the agent can use without asking</td></tr>
             <tr><td>model</td><td class="type-col">string</td><td></td><td>Model to use: sonnet, haiku, or opus</td></tr>
             <tr><td>context</td><td class="type-col">string</td><td></td><td>Set to "fork" to run in isolated subagent</td></tr>
             <tr><td>agent</td><td class="type-col">string</td><td></td><td>Subagent type when context = "fork"</td></tr>
             <tr><td>metadata</td><td class="type-col">map(string)</td><td></td><td>Additional frontmatter fields</td></tr>
           </tbody>
         </table>
-<pre><code><span class="hk">claude_skill</span> <span class="hs">"code-review"</span> {
+<pre><code><span class="hk">skill</span> <span class="hs">"code-review"</span> {
   <span class="hk">description</span>   = <span class="hs">"Performs thorough code reviews"</span>
   <span class="hk">content</span>       = <span class="hf">file</span>(<span class="hs">"skills/code-review.md"</span>)
   <span class="hk">allowed_tools</span> = [<span class="hs">"Read"</span>, <span class="hs">"Grep"</span>, <span class="hs">"Glob"</span>]
@@ -924,9 +909,12 @@ dex 0.1.0</code></pre>
 }</code></pre>
       </div>
 
-      <div class="doc-section" id="claude-command">
-        <h3>claude_command</h3>
-        <p>User-invokable actions accessible via <code>/{name}</code>. Installed to <code>.claude/commands/{plugin}-{name}.md</code>.</p>
+      <div class="doc-section" id="res-command">
+        <h3>command</h3>
+        <span class="badge badge-claude">Claude Code</span>
+        <span class="badge badge-cursor">Cursor</span>
+        <span class="badge badge-copilot">GitHub Copilot</span>
+        <p>User-invokable actions. Translates to Claude commands (<code>.claude/commands/</code>), Copilot prompts (<code>.github/prompts/</code>), and Cursor commands (<code>.cursor/commands/</code>).</p>
         <table class="attr-table">
           <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
           <tbody>
@@ -940,9 +928,11 @@ dex 0.1.0</code></pre>
         </table>
       </div>
 
-      <div class="doc-section" id="claude-subagent">
-        <h3>claude_subagent</h3>
-        <p>Specialized agents spawnable by Claude. Installed to <code>.claude/agents/{plugin}-{name}.md</code>.</p>
+      <div class="doc-section" id="res-agent">
+        <h3>agent</h3>
+        <span class="badge badge-claude">Claude Code</span>
+        <span class="badge badge-copilot">GitHub Copilot</span>
+        <p>Specialized agents. Installed to <code>.claude/agents/</code> and <code>.github/agents/</code>. Cursor skips this resource type.</p>
         <table class="attr-table">
           <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
           <tbody>
@@ -952,13 +942,19 @@ dex 0.1.0</code></pre>
             <tr><td>model</td><td class="type-col">string</td><td></td><td>Model: inherit, sonnet, haiku, or opus</td></tr>
             <tr><td>color</td><td class="type-col">string</td><td></td><td>Display color: blue, green, yellow, red, purple</td></tr>
             <tr><td>tools</td><td class="type-col">list(string)</td><td></td><td>Allowed tools for this agent</td></tr>
+            <tr><td>handoffs</td><td class="type-col">list(string)</td><td></td><td>Sequential workflow transitions to other agents</td></tr>
+            <tr><td>infer</td><td class="type-col">bool</td><td></td><td>Enable subagent usage (default: true)</td></tr>
+            <tr><td>target</td><td class="type-col">string</td><td></td><td>Target environment: vscode or github-copilot</td></tr>
           </tbody>
         </table>
       </div>
 
-      <div class="doc-section" id="claude-rule">
-        <h3>claude_rule</h3>
-        <p>Rules merged into <code>CLAUDE.md</code>. Multiple plugins can contribute rules which are combined together.</p>
+      <div class="doc-section" id="res-rule">
+        <h3>rule</h3>
+        <span class="badge badge-claude">Claude Code</span>
+        <span class="badge badge-cursor">Cursor</span>
+        <span class="badge badge-copilot">GitHub Copilot</span>
+        <p>Rules merged into the platform's agent file: <code>CLAUDE.md</code>, <code>AGENTS.md</code>, or <code>copilot-instructions.md</code>. Multiple packages can contribute rules which are combined together.</p>
         <table class="attr-table">
           <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
           <tbody>
@@ -970,9 +966,12 @@ dex 0.1.0</code></pre>
         </table>
       </div>
 
-      <div class="doc-section" id="claude-rules">
-        <h3>claude_rules</h3>
-        <p>Standalone rules file installed to <code>.claude/rules/{plugin}-{name}.md</code>.</p>
+      <div class="doc-section" id="res-rules">
+        <h3>rules</h3>
+        <span class="badge badge-claude">Claude Code</span>
+        <span class="badge badge-cursor">Cursor</span>
+        <span class="badge badge-copilot">GitHub Copilot</span>
+        <p>Standalone rules files. Installed to <code>.claude/rules/</code>, <code>.cursor/rules/</code>, or <code>.github/instructions/</code>.</p>
         <table class="attr-table">
           <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
           <tbody>
@@ -980,14 +979,18 @@ dex 0.1.0</code></pre>
             <tr><td>description</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Rules description</td></tr>
             <tr><td>content</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Rules content</td></tr>
             <tr><td>paths</td><td class="type-col">list(string)</td><td></td><td>File patterns to scope when these rules apply</td></tr>
+            <tr><td>globs</td><td class="type-col">list(string)</td><td></td><td>File patterns for selective application (Cursor)</td></tr>
+            <tr><td>always_apply</td><td class="type-col">bool</td><td></td><td>Whether the rule should always be applied (Cursor)</td></tr>
+            <tr><td>apply_to</td><td class="type-col">string</td><td></td><td>Glob pattern for selective application (Copilot)</td></tr>
           </tbody>
         </table>
       </div>
 
-      <div class="doc-section" id="claude-settings">
-        <h3>claude_settings</h3>
-        <p>Settings merged into <code>.claude/settings.json</code>. Multiple plugins can contribute permissions and environment variables.</p>
-        <h4>Permissions (mergeable)</h4>
+      <div class="doc-section" id="res-settings">
+        <h3>settings</h3>
+        <span class="badge badge-claude">Claude Code</span>
+        <p>Settings merged into <code>.claude/settings.json</code>. Claude Code only. Fields are placed inside a <code>claude {}</code> sub-block.</p>
+        <h4>claude {} sub-block</h4>
         <table class="attr-table">
           <thead><tr><th>Attribute</th><th>Type</th><th>Description</th></tr></thead>
           <tbody>
@@ -995,12 +998,6 @@ dex 0.1.0</code></pre>
             <tr><td>ask</td><td class="type-col">list(string)</td><td>Tool patterns requiring confirmation</td></tr>
             <tr><td>deny</td><td class="type-col">list(string)</td><td>Tool patterns to block</td></tr>
             <tr><td>env</td><td class="type-col">map(string)</td><td>Environment variables to set</td></tr>
-          </tbody>
-        </table>
-        <h4>Global settings (project-level only)</h4>
-        <table class="attr-table">
-          <thead><tr><th>Attribute</th><th>Type</th><th>Description</th></tr></thead>
-          <tbody>
             <tr><td>enable_all_project_mcp_servers</td><td class="type-col">bool</td><td>Auto-approve project MCP servers</td></tr>
             <tr><td>enabled_mcp_servers</td><td class="type-col">list(string)</td><td>Specific approved MCP servers</td></tr>
             <tr><td>disabled_mcp_servers</td><td class="type-col">list(string)</td><td>Rejected MCP servers</td></tr>
@@ -1011,193 +1008,44 @@ dex 0.1.0</code></pre>
             <tr><td>plans_directory</td><td class="type-col">string</td><td>Custom plan files location</td></tr>
           </tbody>
         </table>
+<pre><code><span class="hk">settings</span> <span class="hs">"permissions"</span> {
+  <span class="hk">claude</span> {
+    <span class="hk">allow</span> = [<span class="hs">"Bash(npm:*)"</span>, <span class="hs">"Read"</span>]
+    <span class="hk">env</span> = {
+      <span class="hk">NODE_ENV</span> = <span class="hs">"development"</span>
+    }
+  }
+}</code></pre>
       </div>
 
-      <div class="doc-section" id="claude-mcp-server">
-        <h3>claude_mcp_server</h3>
-        <p>MCP server configurations merged into <code>.mcp.json</code>.</p>
+      <div class="doc-section" id="res-mcp-server">
+        <h3>mcp_server</h3>
+        <span class="badge badge-claude">Claude Code</span>
+        <span class="badge badge-cursor">Cursor</span>
+        <span class="badge badge-copilot">GitHub Copilot</span>
+        <p>MCP server configurations. Merged into <code>.mcp.json</code>, <code>.cursor/mcp.json</code>, or <code>.vscode/mcp.json</code> depending on platform.</p>
         <table class="attr-table">
           <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
           <tbody>
             <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Server identifier</td></tr>
             <tr><td>description</td><td class="type-col">string</td><td></td><td>Server description</td></tr>
-            <tr><td>type</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Server type: command or http</td></tr>
-            <tr><td>command</td><td class="type-col">string</td><td>conditional</td><td>Command to run (required for type = "command")</td></tr>
+            <tr><td>command</td><td class="type-col">string</td><td>conditional</td><td>Command to run</td></tr>
             <tr><td>args</td><td class="type-col">list(string)</td><td></td><td>Command-line arguments</td></tr>
             <tr><td>env</td><td class="type-col">map(string)</td><td></td><td>Environment variables</td></tr>
+            <tr><td>env_file</td><td class="type-col">string</td><td></td><td>Path to an env file to load</td></tr>
             <tr><td>source</td><td class="type-col">string</td><td>conditional</td><td>Package manager shortcut: npm:, uvx:, pip:</td></tr>
-            <tr><td>url</td><td class="type-col">string</td><td>conditional</td><td>HTTP endpoint (required for type = "http")</td></tr>
+            <tr><td>url</td><td class="type-col">string</td><td>conditional</td><td>HTTP/SSE endpoint</td></tr>
+            <tr><td>headers</td><td class="type-col">map(string)</td><td></td><td>HTTP headers for http/sse servers</td></tr>
           </tbody>
         </table>
-<pre><code><span class="hk">claude_mcp_server</span> <span class="hs">"postgres"</span> {
-  <span class="hk">type</span>   = <span class="hs">"command"</span>
+<pre><code><span class="hk">mcp_server</span> <span class="hs">"postgres"</span> {
   <span class="hk">source</span> = <span class="hs">"uvx:mcp-postgres"</span>
   <span class="hk">env</span>    = { <span class="hk">DATABASE_URL</span> = <span class="hf">env</span>(<span class="hs">"DATABASE_URL"</span>) }
 }
 
-<span class="hk">claude_mcp_server</span> <span class="hs">"remote-api"</span> {
-  <span class="hk">type</span> = <span class="hs">"http"</span>
-  <span class="hk">url</span>  = <span class="hs">"https://mcp.example.com/api"</span>
+<span class="hk">mcp_server</span> <span class="hs">"remote-api"</span> {
+  <span class="hk">url</span> = <span class="hs">"https://mcp.example.com/api"</span>
 }</code></pre>
-      </div>
-
-      <!-- ── CURSOR RESOURCES ── -->
-      <div class="doc-section" id="cursor-rule">
-        <h2>Resources: Cursor</h2>
-        <span class="badge badge-cursor">Cursor</span>
-
-        <h3>cursor_rule</h3>
-        <p>Rules merged into <code>AGENTS.md</code> using marker comments.</p>
-        <table class="attr-table">
-          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
-          <tbody>
-            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Rule identifier</td></tr>
-            <tr><td>description</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Explains what this rule provides</td></tr>
-            <tr><td>content</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>The rule content</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="doc-section" id="cursor-rules">
-        <h3>cursor_rules</h3>
-        <p>Standalone rules file installed to <code>.cursor/rules/{plugin}-{name}.mdc</code>.</p>
-        <table class="attr-table">
-          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
-          <tbody>
-            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Rules file identifier</td></tr>
-            <tr><td>description</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Rules description</td></tr>
-            <tr><td>content</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Rules content</td></tr>
-            <tr><td>globs</td><td class="type-col">list(string)</td><td></td><td>File patterns for selective application</td></tr>
-            <tr><td>always_apply</td><td class="type-col">bool</td><td></td><td>Whether the rule should always be applied</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="doc-section" id="cursor-command">
-        <h3>cursor_command</h3>
-        <p>User-invokable commands installed to <code>.cursor/commands/{plugin}-{name}.md</code>.</p>
-        <table class="attr-table">
-          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
-          <tbody>
-            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Command name</td></tr>
-            <tr><td>description</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Brief description</td></tr>
-            <tr><td>content</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Command instructions</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="doc-section" id="cursor-mcp-server">
-        <h3>cursor_mcp_server</h3>
-        <p>MCP server configurations merged into <code>.cursor/mcp.json</code>.</p>
-        <table class="attr-table">
-          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
-          <tbody>
-            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Server identifier</td></tr>
-            <tr><td>type</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Server type: stdio, http, or sse</td></tr>
-            <tr><td>command</td><td class="type-col">string</td><td>conditional</td><td>Command to run (required for type = "stdio")</td></tr>
-            <tr><td>args</td><td class="type-col">list(string)</td><td></td><td>Command-line arguments</td></tr>
-            <tr><td>env</td><td class="type-col">map(string)</td><td></td><td>Environment variables</td></tr>
-            <tr><td>env_file</td><td class="type-col">string</td><td></td><td>Path to an env file to load</td></tr>
-            <tr><td>url</td><td class="type-col">string</td><td>conditional</td><td>HTTP/SSE endpoint</td></tr>
-            <tr><td>headers</td><td class="type-col">map(string)</td><td></td><td>HTTP headers for http/sse servers</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- ── COPILOT RESOURCES ── -->
-      <div class="doc-section" id="copilot-instruction">
-        <h2>Resources: GitHub Copilot</h2>
-        <span class="badge badge-copilot">GitHub Copilot</span>
-
-        <h3>copilot_instruction</h3>
-        <p>Instructions merged into <code>.github/copilot-instructions.md</code> using marker comments.</p>
-        <table class="attr-table">
-          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
-          <tbody>
-            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Instruction identifier</td></tr>
-            <tr><td>description</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Explains what this instruction provides</td></tr>
-            <tr><td>content</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>The instruction content</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="doc-section" id="copilot-instructions">
-        <h3>copilot_instructions</h3>
-        <p>Standalone instruction files installed to <code>.github/instructions/{plugin}-{name}.instructions.md</code>.</p>
-        <table class="attr-table">
-          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
-          <tbody>
-            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Instructions file identifier</td></tr>
-            <tr><td>description</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Instructions description</td></tr>
-            <tr><td>content</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Instructions content</td></tr>
-            <tr><td>apply_to</td><td class="type-col">string</td><td></td><td>Glob pattern for selective application</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="doc-section" id="copilot-prompt">
-        <h3>copilot_prompt</h3>
-        <p>User-invokable prompts installed to <code>.github/prompts/{plugin}-{name}.prompt.md</code>.</p>
-        <table class="attr-table">
-          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
-          <tbody>
-            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Prompt name</td></tr>
-            <tr><td>description</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Brief description</td></tr>
-            <tr><td>content</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Prompt instructions</td></tr>
-            <tr><td>argument_hint</td><td class="type-col">string</td><td></td><td>Hint for arguments</td></tr>
-            <tr><td>agent</td><td class="type-col">string</td><td></td><td>Agent mode: ask, edit, agent, or custom</td></tr>
-            <tr><td>model</td><td class="type-col">string</td><td></td><td>Model selection</td></tr>
-            <tr><td>tools</td><td class="type-col">list(string)</td><td></td><td>Tools to enable</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="doc-section" id="copilot-agent">
-        <h3>copilot_agent</h3>
-        <p>Specialized agents installed to <code>.github/agents/{plugin}-{name}.agent.md</code>.</p>
-        <table class="attr-table">
-          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
-          <tbody>
-            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Agent identifier</td></tr>
-            <tr><td>description</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>When to use this agent</td></tr>
-            <tr><td>content</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Agent instructions</td></tr>
-            <tr><td>model</td><td class="type-col">string</td><td></td><td>Model selection</td></tr>
-            <tr><td>tools</td><td class="type-col">list(string)</td><td></td><td>Available tools</td></tr>
-            <tr><td>handoffs</td><td class="type-col">list(string)</td><td></td><td>Sequential workflow transitions to other agents</td></tr>
-            <tr><td>infer</td><td class="type-col">bool</td><td></td><td>Enable subagent usage (default: true)</td></tr>
-            <tr><td>target</td><td class="type-col">string</td><td></td><td>Target environment: vscode or github-copilot</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="doc-section" id="copilot-skill">
-        <h3>copilot_skill</h3>
-        <p>Skills installed to <code>.github/skills/{plugin}-{name}/SKILL.md</code>.</p>
-        <table class="attr-table">
-          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
-          <tbody>
-            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Skill name (max 64 characters)</td></tr>
-            <tr><td>description</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>When and how to use this skill (max 1024 characters)</td></tr>
-            <tr><td>content</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>The skill's instructions/knowledge</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="doc-section" id="copilot-mcp-server">
-        <h3>copilot_mcp_server</h3>
-        <p>MCP server configurations merged into <code>.vscode/mcp.json</code>.</p>
-        <table class="attr-table">
-          <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
-          <tbody>
-            <tr><td>name</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Server identifier</td></tr>
-            <tr><td>type</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Server type: stdio, http, or sse</td></tr>
-            <tr><td>command</td><td class="type-col">string</td><td>conditional</td><td>Command to run (required for type = "stdio")</td></tr>
-            <tr><td>args</td><td class="type-col">list(string)</td><td></td><td>Command-line arguments</td></tr>
-            <tr><td>env</td><td class="type-col">map(string)</td><td></td><td>Environment variables</td></tr>
-            <tr><td>url</td><td class="type-col">string</td><td>conditional</td><td>HTTP/SSE endpoint</td></tr>
-            <tr><td>headers</td><td class="type-col">map(string)</td><td></td><td>HTTP headers for http/sse servers</td></tr>
-          </tbody>
-        </table>
       </div>
 
       <!-- ── PERSONAL CONFIG ── -->
@@ -1209,13 +1057,15 @@ dex 0.1.0</code></pre>
         <p>Place a <code>local.hcl</code> at <code>~/.dex/local.hcl</code> to define global personal resources. Supports the same resource types as <code>dex.hcl</code> without the required <code>project</code> block.</p>
 <pre><code><span class="hc"># ~/.dex/local.hcl - applied to every dex project on this machine</span>
 
-<span class="hk">plugin</span> <span class="hs">"my-personal-tools"</span> {
+<span class="hk">package</span> <span class="hs">"my-personal-tools"</span> {
   <span class="hk">source</span>  = <span class="hs">"git+https://github.com/me/my-tools.git"</span>
   <span class="hk">version</span> = <span class="hs">"latest"</span>
 }
 
-<span class="hk">claude_settings</span> <span class="hs">"personal"</span> {
-  <span class="hk">allow</span> = [<span class="hs">"Bash(gh:*)"</span>]
+<span class="hk">settings</span> <span class="hs">"personal"</span> {
+  <span class="hk">claude</span> {
+    <span class="hk">allow</span> = [<span class="hs">"Bash(gh:*)"</span>]
+  }
 }</code></pre>
       </div>
 
@@ -1224,9 +1074,11 @@ dex 0.1.0</code></pre>
         <p>For project-specific personal config, create <code>~/.dex/projects/&lt;project-name&gt;/project.hcl</code>. The project name matches the <code>name</code> field in <code>dex.hcl</code>.</p>
 <pre><code><span class="hc"># ~/.dex/projects/my-webapp/project.hcl</span>
 
-<span class="hk">claude_settings</span> <span class="hs">"local-dev"</span> {
-  <span class="hk">env</span> = {
-    <span class="hk">DATABASE_URL</span> = <span class="hs">"postgres://localhost/myapp_dev"</span>
+<span class="hk">settings</span> <span class="hs">"local-dev"</span> {
+  <span class="hk">claude</span> {
+    <span class="hk">env</span> = {
+      <span class="hk">DATABASE_URL</span> = <span class="hs">"postgres://localhost/myapp_dev"</span>
+    }
   }
 }</code></pre>
       </div>
@@ -1253,11 +1105,11 @@ dex 0.1.0</code></pre>
       </div>
 
       <!-- ── PUBLISHING ── -->
-      <div class="doc-section" id="plugin-structure">
-        <h2>Publishing Plugins</h2>
-        <h3>Plugin Structure</h3>
-<pre><code>my-plugin/
-├── package.hcl           <span class="hc"># Plugin manifest (required)</span>
+      <div class="doc-section" id="package-structure">
+        <h2>Publishing Packages</h2>
+        <h3>Package Structure</h3>
+<pre><code>my-package/
+├── package.hcl           <span class="hc"># Package manifest (required)</span>
 ├── content/              <span class="hc"># Shared content files</span>
 │   └── code-review.md
 ├── skills/               <span class="hc"># Skill content</span>
@@ -1277,7 +1129,7 @@ dex 0.1.0</code></pre>
         <table class="attr-table">
           <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
           <tbody>
-            <tr><td>src</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Source path relative to plugin root</td></tr>
+            <tr><td>src</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Source path relative to package root</td></tr>
             <tr><td>dest</td><td class="type-col">string</td><td></td><td>Destination filename (defaults to basename of src)</td></tr>
             <tr><td>chmod</td><td class="type-col">string</td><td></td><td>File permissions (e.g., "755")</td></tr>
           </tbody>
@@ -1286,7 +1138,7 @@ dex 0.1.0</code></pre>
         <table class="attr-table">
           <thead><tr><th>Attribute</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
           <tbody>
-            <tr><td>src</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Source template path relative to plugin root</td></tr>
+            <tr><td>src</td><td class="type-col">string</td><td><span class="required-badge">required</span></td><td>Source template path relative to package root</td></tr>
             <tr><td>dest</td><td class="type-col">string</td><td></td><td>Destination filename (defaults to basename without .tmpl)</td></tr>
             <tr><td>chmod</td><td class="type-col">string</td><td></td><td>File permissions</td></tr>
             <tr><td>vars</td><td class="type-col">map</td><td></td><td>Additional variables for this template</td></tr>
@@ -1295,22 +1147,23 @@ dex 0.1.0</code></pre>
       </div>
 
       <div class="doc-section" id="cross-platform">
-        <h3>Cross-Platform Plugins</h3>
-        <p>Share content files across platforms. Write once, deploy to all:</p>
-<pre><code><span class="hk">package</span> {
+        <h3>Cross-Platform Packages</h3>
+        <p>With universal types, define once and deploy to all platforms automatically:</p>
+<pre><code><span class="hk">meta</span> {
   <span class="hk">name</span>      = <span class="hs">"code-review-tools"</span>
   <span class="hk">version</span>   = <span class="hs">"1.0.0"</span>
   <span class="hk">platforms</span> = [<span class="hs">"claude-code"</span>, <span class="hs">"github-copilot"</span>, <span class="hs">"cursor"</span>]
 }
 
-<span class="hk">claude_skill</span> <span class="hs">"code-review"</span> {
+<span class="hc"># Define once - dex maps to each platform's native format</span>
+<span class="hk">skill</span> <span class="hs">"code-review"</span> {
   <span class="hk">description</span> = <span class="hs">"Thorough code review capability"</span>
   <span class="hk">content</span>     = <span class="hf">file</span>(<span class="hs">"content/code-review.md"</span>)
 }
 
-<span class="hk">copilot_skill</span> <span class="hs">"code-review"</span> {
-  <span class="hk">description</span> = <span class="hs">"Thorough code review capability"</span>
-  <span class="hk">content</span>     = <span class="hf">file</span>(<span class="hs">"content/code-review.md"</span>)  <span class="hc"># Same file!</span>
+<span class="hk">rule</span> <span class="hs">"standards"</span> {
+  <span class="hk">description</span> = <span class="hs">"Team coding standards"</span>
+  <span class="hk">content</span>     = <span class="hf">file</span>(<span class="hs">"content/standards.md"</span>)
 }</code></pre>
       </div>
 
@@ -1319,8 +1172,8 @@ dex 0.1.0</code></pre>
         <h4>Publish to Git</h4>
 <pre><code>git tag v1.0.0
 git push origin v1.0.0</code></pre>
-<pre><code><span class="hk">plugin</span> <span class="hs">"my-plugin"</span> {
-  <span class="hk">source</span>  = <span class="hs">"git+https://github.com/owner/my-plugin.git"</span>
+<pre><code><span class="hk">package</span> <span class="hs">"my-package"</span> {
+  <span class="hk">source</span>  = <span class="hs">"git+https://github.com/owner/my-package.git"</span>
   <span class="hk">version</span> = <span class="hs">"v1.0.0"</span>
 }</code></pre>
 
@@ -1331,7 +1184,7 @@ git push origin v1.0.0</code></pre>
           <li>Share content. Use <code>file()</code> to share content across platforms.</li>
           <li>Use templates. Use <code>templatefile()</code> for platform-specific variations.</li>
           <li>Pin dependencies. Use specific version ranges for stability.</li>
-          <li>Test on all platforms. Verify your plugin works on each target platform.</li>
+          <li>Test on all platforms. Verify your package works on each target platform.</li>
         </ul>
       </div>
 

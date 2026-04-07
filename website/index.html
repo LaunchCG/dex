@@ -784,12 +784,12 @@
   <span class="hk">default_platform</span> = <span class="hs">"claude-code"</span>
 }
 
-<span class="hk">plugin</span> <span class="hs">"python-tools"</span> {
+<span class="hk">package</span> <span class="hs">"python-tools"</span> {
   <span class="hk">source</span>  = <span class="hs">"git+https://github.com/example/python-tools.git"</span>
   <span class="hk">version</span> = <span class="hs">"^1.0.0"</span>
 }
 
-<span class="hk">plugin</span> <span class="hs">"team-standards"</span> {
+<span class="hk">package</span> <span class="hs">"team-standards"</span> {
   <span class="hk">source</span>  = <span class="hs">"az://myregistry/packages/"</span>
   <span class="hk">version</span> = <span class="hs">"~2.3.0"</span>
 }</code></pre>
@@ -820,8 +820,8 @@
           <p>dex tracks which files it manages via a manifest. It refuses to overwrite files it didn't create. <code>dex sync --dry-run</code> previews all changes. <code>dex clean</code> removes only managed files. Use <code>--force</code> to override when needed.</p>
         </div>
         <div class="capability-card">
-          <h3>Personal plugins</h3>
-          <p>Add resources locally via <code>~/.dex/local.hcl</code> without touching the project config. Personal plugins install alongside team packages but never land in version control. Use <code>--git-exclude</code> to hide managed files from git status.</p>
+          <h3>Personal packages</h3>
+          <p>Add resources locally via <code>~/.dex/local.hcl</code> without touching the project config. Personal packages install alongside team packages but never land in version control. Use <code>--git-exclude</code> to hide managed files from git status.</p>
         </div>
       </div>
     </section>
@@ -884,9 +884,9 @@ dex init --platform cursor</code></pre>
           </div>
           <div class="step-content">
             <div class="step-label">Configure</div>
-            <h3>Add plugins from any source</h3>
+            <h3>Add packages from any source</h3>
             <span class="fi">dex.hcl</span>
-<pre><code><span class="hk">plugin</span> <span class="hs">"python-tools"</span> {
+<pre><code><span class="hk">package</span> <span class="hs">"python-tools"</span> {
   <span class="hk">source</span>  = <span class="hs">"git+https://github.com/example/python-tools.git"</span>
   <span class="hk">version</span> = <span class="hs">"^1.0.0"</span>
   <span class="hk">config</span> = {
@@ -904,7 +904,7 @@ dex init --platform cursor</code></pre>
           <div class="step-content">
             <div class="step-label">Sync</div>
             <h3>Resolve and install everything</h3>
-<pre><code><span class="hc"># Install all plugins</span>
+<pre><code><span class="hc"># Install all packages</span>
 dex sync
 
 <span class="hc"># Preview changes first</span>

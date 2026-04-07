@@ -105,6 +105,8 @@ dex sync [PACKAGES...] [OPTIONS]
 | `--namespace` | - | Namespace resources with package name | `false` |
 | `--dry-run` | `-n` | Show what would change without making changes | `false` |
 | `--git-exclude` | - | Update `.git/info/exclude` to locally hide dex-managed files from git | `false` |
+| `--platform` | `-P` | Override the target AI agent platform | Config value |
+| `--profile` | - | Use a named configuration profile | - |
 
 **File Conflict Protection:**
 
@@ -139,6 +141,12 @@ dex sync --no-lock
 
 # Force overwrite existing files
 dex sync my-package --force
+
+# Sync with a named profile
+dex sync --profile qa
+
+# Override target platform
+dex sync --platform cursor
 ```
 
 **Exit Codes:**

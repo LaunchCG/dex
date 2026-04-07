@@ -281,36 +281,36 @@ rules "code-review-standards" {
 
 ### settings
 
-Platform settings (permissions, environment variables, model preferences). Currently only supported by Claude Code.
+Platform settings (permissions, environment variables, model preferences). All platform-specific fields go inside the corresponding platform override block.
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `name` | string | yes | Settings identifier (block label) |
 | `platforms` | list(string) | no | Limit to specific platforms |
-| `allow` | list(string) | no | Tool patterns to auto-approve |
-| `ask` | list(string) | no | Tool patterns requiring confirmation |
-| `deny` | list(string) | no | Tool patterns to block |
-| `env` | map(string) | no | Environment variables |
-| `enable_all_project_mcp_servers` | bool | no | Auto-approve all project MCP servers |
-| `enabled_mcp_servers` | list(string) | no | Specific approved MCP servers |
-| `disabled_mcp_servers` | list(string) | no | Specific rejected MCP servers |
-| `model` | string | no | Default model override |
+| `claude` | block | no | Claude Code settings (see Claude Code Overrides) |
+| `copilot` | block | no | Copilot settings (disabled only, for now) |
+| `cursor` | block | no | Cursor settings (disabled only, for now) |
+
+**Claude settings fields** (inside `claude {}` block):
+`allow`, `ask`, `deny`, `env`, `enable_all_project_mcp_servers`, `enabled_mcp_servers`, `disabled_mcp_servers`, `respect_gitignore`, `include_co_authored_by`, `model`, `output_style`, `always_thinking_enabled`, `plans_directory`
 
 **Supported platforms:** Claude Code. Other platforms skip with warning.
 
 ```hcl
 settings "python" {
-  allow = [
-    "Bash(python:*)",
-    "Bash(pip:*)",
-    "Bash(pytest:*)",
-  ]
+  claude {
+    allow = [
+      "Bash(python:*)",
+      "Bash(pip:*)",
+      "Bash(pytest:*)",
+    ]
 
-  env = {
-    PYTHONDONTWRITEBYTECODE = "1"
+    env = {
+      PYTHONDONTWRITEBYTECODE = "1"
+    }
+
+    enable_all_project_mcp_servers = true
   }
-
-  enable_all_project_mcp_servers = true
 }
 ```
 
@@ -505,14 +505,16 @@ command "test" {
 }
 
 settings "python" {
-  allow = [
-    "Bash(python:*)",
-    "Bash(pip:*)",
-    "Bash(pytest:*)",
-  ]
+  claude {
+    allow = [
+      "Bash(python:*)",
+      "Bash(pip:*)",
+      "Bash(pytest:*)",
+    ]
 
-  env = {
-    PYTHONDONTWRITEBYTECODE = "1"
+    env = {
+      PYTHONDONTWRITEBYTECODE = "1"
+    }
   }
 }
 
@@ -591,7 +593,9 @@ rule "project-standards" {
 }
 
 settings "permissions" {
-  enable_all_project_mcp_servers = true
+  claude {
+    enable_all_project_mcp_servers = true
+  }
 }
 
 profile "qa" {

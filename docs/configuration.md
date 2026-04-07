@@ -45,6 +45,9 @@ package "custom-package" {
 |-----------|----------|-------------|
 | `name` | no | Project name (defaults to directory name) |
 | `default_platform` | yes | Target AI platform |
+| `agent_instructions` | no | Project-level instructions added to agent file (CLAUDE.md, etc.) |
+| `git_exclude` | no | Auto-update .git/info/exclude to hide managed files |
+| `namespace_all` | no | Namespace all package resources with package name |
 
 ### Supported Platforms
 
@@ -103,6 +106,46 @@ package "my-package" {
 package "my-package" {
   source = "file:///path/to/package"
 }
+```
+
+### Profile Block
+
+Profiles define named configuration variants activated with `dex sync --profile <name>`.
+
+| Attribute | Required | Description |
+|-----------|----------|-------------|
+| `name` | yes | Profile identifier (block label) |
+| `exclude_defaults` | no | If true, only profile-defined items are used (registries always inherited) |
+| `agent_instructions` | no | Override project agent instructions |
+
+Profiles can contain `package`, `registry`, and any resource blocks (`skill`, `command`, `rule`, `rules`, `agent`, `settings`, `mcp_server`). By default, profile contents merge additively with defaults — same-name items are replaced. With `exclude_defaults = true`, only profile-defined packages and resources are used (registries are always preserved).
+
+```hcl
+profile "qa" {
+  agent_instructions = "QA environment — focus on testing"
+
+  package "qa-tools" {
+    registry = "internal"
+  }
+
+  rule "qa-standards" {
+    description = "QA-specific standards"
+    content     = "Run all tests before merging."
+  }
+}
+
+profile "minimal" {
+  exclude_defaults = true
+
+  package "core-only" {
+    source = "file:///path/to/core"
+  }
+}
+```
+
+```bash
+dex sync              # Default configuration
+dex sync --profile qa # QA configuration
 ```
 
 ## Lock File (dex.lock)
