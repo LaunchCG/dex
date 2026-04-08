@@ -48,17 +48,10 @@ clean:
 
 ## install: Install binary to ~/.bin
 install: build
-	@mkdir -p $(HOME)/.bin
+	@mkdir -p $(HOME)/.local/bin
 	cp $(BIN_DIR)/$(BINARY_NAME) $(HOME)/.bin/
-	@echo "Installed to $(HOME)/.bin/$(BINARY_NAME)"
-	@echo "Make sure $(HOME)/.bin is in your PATH"
-
-## install-user: Install binary to ~/.bin
-install-user: build
-	@mkdir -p $(HOME)/.bin
-	cp $(BIN_DIR)/$(BINARY_NAME) $(HOME)/.bin/
-	@echo "Installed to $(HOME)/.bin/$(BINARY_NAME)"
-	@echo "Make sure $(HOME)/.bin is in your PATH"
+	@echo "Installed to $(HOME)/.local/bin/$(BINARY_NAME)"
+	@echo "Make sure $(HOME)/.local/bin is in your PATH"
 
 ## help: Show this help message
 help:
