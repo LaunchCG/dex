@@ -84,8 +84,12 @@ func (a *CursorAdapter) PlanInstallation(res resource.Resource, pkg *config.Pack
 		}
 		return a.planRules(translated, pkg, pkgDir, projectRoot, ctx)
 	case *resource.Skill:
-		slog.Warn("resource skipped: not supported by platform", "resource", r.Name, "type", "skill", "platform", "cursor")
-		return &Plan{}, nil
+		translated := resource.TranslateToCursorSkill(r)
+		if translated == nil {
+			slog.Warn("resource skipped: disabled for platform", "resource", r.Name, "type", "skill", "platform", "cursor")
+			return &Plan{}, nil
+		}
+		return a.planSkill(translated, pkg, pkgDir, projectRoot, ctx)
 	case *resource.Agent:
 		slog.Warn("resource skipped: not supported by platform", "resource", r.Name, "type", "agent", "platform", "cursor")
 		return &Plan{}, nil
@@ -94,6 +98,8 @@ func (a *CursorAdapter) PlanInstallation(res resource.Resource, pkg *config.Pack
 		return &Plan{}, nil
 
 	// Platform-specific types (used internally by translators)
+	case *resource.CursorSkill:
+		return a.planSkill(r, pkg, pkgDir, projectRoot, ctx)
 	case *resource.CursorRule:
 		return a.planRule(r, pkg, pkgDir, projectRoot, ctx)
 	case *resource.CursorMCPServer:
@@ -117,10 +123,10 @@ func (a *CursorAdapter) PlanInstallation(res resource.Resource, pkg *config.Pack
 // GenerateFrontmatter generates YAML frontmatter for a resource.
 func (a *CursorAdapter) GenerateFrontmatter(res resource.Resource, pkg *config.PackageConfig) string {
 	switch r := res.(type) {
+	case *resource.CursorSkill:
+		return a.generateSkillFrontmatter(r, pkg)
 	case *resource.CursorRules:
 		return a.generateRulesFrontmatter(r, pkg)
-	case *resource.CursorCommand:
-		return a.generateCommandFrontmatter(r, pkg)
 	default:
 		return ""
 	}
@@ -153,6 +159,10 @@ func (a *CursorAdapter) MergeCursorMCPConfig(existing map[string]any, pkgName st
 	for _, server := range servers {
 		serverConfig := make(map[string]any)
 
+		if server.Type != "" {
+			serverConfig["type"] = server.Type
+		}
+
 		if server.Type == "stdio" {
 			if server.Command != "" {
 				serverConfig["command"] = server.Command
@@ -171,6 +181,18 @@ func (a *CursorAdapter) MergeCursorMCPConfig(existing map[string]any, pkgName st
 			if len(server.Headers) > 0 {
 				serverConfig["headers"] = server.Headers
 			}
+			if server.Auth != nil {
+				auth := map[string]any{
+					"CLIENT_ID": server.Auth.ClientID,
+				}
+				if server.Auth.ClientSecret != "" {
+					auth["CLIENT_SECRET"] = server.Auth.ClientSecret
+				}
+				if len(server.Auth.Scopes) > 0 {
+					auth["scopes"] = server.Auth.Scopes
+				}
+				serverConfig["auth"] = auth
+			}
 		}
 
 		mcpServers[server.Name] = serverConfig
@@ -184,6 +206,34 @@ func (a *CursorAdapter) MergeCursorMCPConfig(existing map[string]any, pkgName st
 // This method is kept for interface compatibility.
 func (a *CursorAdapter) MergeSettingsConfig(existing map[string]any, settings *resource.ClaudeSettings) map[string]any {
 	return existing
+}
+
+// planSkill creates an installation plan for a Cursor skill.
+// Skills are installed to .cursor/skills/{{pkg}-}{name}/SKILL.md (namespaced or not).
+func (a *CursorAdapter) planSkill(skill *resource.CursorSkill, pkg *config.PackageConfig, pkgDir, root string, ctx *InstallContext) (*Plan, error) {
+	plan := NewPlan(pkg.Meta.Name)
+
+	var skillDirName string
+	if ctx != nil && ctx.Namespace {
+		skillDirName = fmt.Sprintf("%s-%s", pkg.Meta.Name, skill.Name)
+	} else {
+		skillDirName = skill.Name
+	}
+	skillDir := filepath.Join(".cursor", "skills", skillDirName)
+	plan.AddDirectory(skillDir, true)
+
+	var content string
+	if hasFrontmatter(skill.Content) {
+		content = skill.Content
+	} else {
+		frontmatter := a.generateSkillFrontmatter(skill, pkg)
+		content = frontmatter + skill.Content
+	}
+
+	skillFile := filepath.Join(skillDir, "SKILL.md")
+	plan.AddFile(skillFile, content, "")
+
+	return plan, nil
 }
 
 // planRule creates an installation plan for a Cursor rule (singular).
@@ -255,22 +305,14 @@ func (a *CursorAdapter) planRules(rules *resource.CursorRules, pkg *config.Packa
 }
 
 // planCommand creates an installation plan for a Cursor command.
-// Commands are installed to .cursor/commands/{{pkg}-}{name}.md (namespaced or not)
+// Commands are installed to .cursor/commands/{{pkg}-}{name}.md (namespaced or not).
+// Cursor commands have no documented frontmatter — the file is plain markdown.
 func (a *CursorAdapter) planCommand(cmd *resource.CursorCommand, pkg *config.PackageConfig, pkgDir, root string, ctx *InstallContext) (*Plan, error) {
 	plan := NewPlan(pkg.Meta.Name)
 
 	// Create commands directory
 	commandsDir := filepath.Join(".cursor", "commands")
 	plan.AddDirectory(commandsDir, true)
-
-	// Generate frontmatter and content
-	var content string
-	if hasFrontmatter(cmd.Content) {
-		content = cmd.Content
-	} else {
-		frontmatter := a.generateCommandFrontmatter(cmd, pkg)
-		content = frontmatter + cmd.Content
-	}
 
 	// Add command file with optional namespacing
 	var fileName string
@@ -280,7 +322,7 @@ func (a *CursorAdapter) planCommand(cmd *resource.CursorCommand, pkg *config.Pac
 		fileName = fmt.Sprintf("%s.md", cmd.Name)
 	}
 	commandFile := filepath.Join(commandsDir, fileName)
-	plan.AddFile(commandFile, content, "")
+	plan.AddFile(commandFile, cmd.Content, "")
 
 	return plan, nil
 }
@@ -307,12 +349,28 @@ func (a *CursorAdapter) generateRulesFrontmatter(rules *resource.CursorRules, pk
 	return b.String()
 }
 
-// generateCommandFrontmatter generates YAML frontmatter for a command.
-// Commands in Cursor use plain markdown, but we add description in frontmatter.
-func (a *CursorAdapter) generateCommandFrontmatter(cmd *resource.CursorCommand, pkg *config.PackageConfig) string {
+// generateSkillFrontmatter generates YAML frontmatter for a Cursor skill.
+// Per Cursor docs: name/description/license/compatibility/metadata are plain lowercase;
+// disable-model-invocation is kebab-case.
+func (a *CursorAdapter) generateSkillFrontmatter(skill *resource.CursorSkill, pkg *config.PackageConfig) string {
 	var b strings.Builder
 	b.WriteString("---\n")
-	b.WriteString(fmt.Sprintf("description: %s\n", cmd.Description))
+	b.WriteString(fmt.Sprintf("name: %s\n", skill.Name))
+	b.WriteString(fmt.Sprintf("description: %s\n", skill.Description))
+
+	if skill.License != "" {
+		b.WriteString(fmt.Sprintf("license: %s\n", skill.License))
+	}
+	if skill.Compatibility != "" {
+		b.WriteString(fmt.Sprintf("compatibility: %s\n", skill.Compatibility))
+	}
+	if skill.DisableModelInvocation {
+		b.WriteString("disable-model-invocation: true\n")
+	}
+	for k, v := range skill.Metadata {
+		b.WriteString(fmt.Sprintf("%s: %s\n", k, v))
+	}
+
 	b.WriteString("---\n")
 	return b.String()
 }

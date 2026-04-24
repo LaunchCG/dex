@@ -62,6 +62,15 @@ type MCPServerPlatformOverride struct {
 	Headers  map[string]string `hcl:"headers,optional"`
 	Disabled bool              `hcl:"disabled,optional"`
 	Inputs   []MCPInput        `hcl:"input,block"`
+	Auth     *MCPAuth          `hcl:"auth,block"`
+}
+
+// MCPAuth configures OAuth for an MCP server. Currently used by Cursor remote servers.
+// The emitted JSON keys use Cursor's documented casing: CLIENT_ID / CLIENT_SECRET / scopes.
+type MCPAuth struct {
+	ClientID     string   `hcl:"client_id,attr"`
+	ClientSecret string   `hcl:"client_secret,optional"`
+	Scopes       []string `hcl:"scopes,optional"`
 }
 
 // ResourceType returns the HCL block type for unified MCP servers.

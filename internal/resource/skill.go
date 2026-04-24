@@ -15,7 +15,18 @@ type Skill struct {
 
 	Claude  *SkillClaudeOverride `hcl:"claude,block"`
 	Copilot *PlatformOverride    `hcl:"copilot,block"`
-	Cursor  *PlatformOverride    `hcl:"cursor,block"`
+	Cursor  *SkillCursorOverride `hcl:"cursor,block"`
+}
+
+// SkillCursorOverride contains Cursor-specific fields for skills.
+// Cursor skills have a minimal frontmatter — no allowed-tools, model, or context fields.
+type SkillCursorOverride struct {
+	Disabled               bool              `hcl:"disabled,optional"`
+	Content                string            `hcl:"content,optional"`
+	License                string            `hcl:"license,optional"`
+	Compatibility          string            `hcl:"compatibility,optional"`
+	DisableModelInvocation bool              `hcl:"disable_model_invocation,optional"`
+	Metadata               map[string]string `hcl:"metadata,optional"`
 }
 
 // SkillClaudeOverride contains Claude-specific fields for skills.

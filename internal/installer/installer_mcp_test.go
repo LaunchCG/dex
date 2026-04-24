@@ -199,10 +199,11 @@ package "mcp-test" {
 	err = json.Unmarshal(mcpData, &mcpConfig)
 	require.NoError(t, err)
 
-	// Verify full MCP config for Cursor
+	// Verify full MCP config for Cursor — `type` is emitted per modern Cursor schema.
 	assert.Equal(t, map[string]any{
 		"mcpServers": map[string]any{
 			"context7": map[string]any{
+				"type":    "http",
 				"url":     "https://mcp.context7.com/mcp",
 				"headers": map[string]any{"Authorization": "Bearer test-token"},
 			},

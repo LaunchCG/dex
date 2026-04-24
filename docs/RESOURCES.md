@@ -138,9 +138,9 @@ Skills provide specialized knowledge or capabilities to the AI assistant. Instal
 | `platforms` | list(string) | no | Limit to specific platforms (empty = all) |
 | `claude` | block | no | Claude-specific overrides |
 | `copilot` | block | no | Copilot-specific overrides |
-| `cursor` | block | no | Cursor-specific overrides (disabled = true only) |
+| `cursor` | block | no | Cursor-specific overrides |
 
-**Supported platforms:** Claude Code, GitHub Copilot. Cursor does not support skills (skipped with warning).
+**Supported platforms:** Claude Code, GitHub Copilot, Cursor.
 
 ```hcl
 skill "python-best-practices" {
@@ -150,6 +150,11 @@ skill "python-best-practices" {
   claude {
     allowed_tools = ["Bash", "Read"]
     model         = "sonnet"
+  }
+
+  cursor {
+    license       = "MIT"
+    compatibility = "requires python 3.11"
   }
 }
 ```
@@ -427,8 +432,33 @@ Claude overrides vary by resource type:
 
 ### Cursor Overrides
 
+**skill:**
+`license`, `compatibility`, `disable_model_invocation`, `metadata`
+
+Cursor skills deliberately have a smaller frontmatter than Claude's — no `allowed_tools`, `model`, `argument_hint`, or `context` fields are supported by Cursor.
+
+**command:**
+Cursor commands are plain markdown with no documented frontmatter. Only the generic `disabled` / `content` override fields apply.
+
 **rules:**
-`globs`, `always_apply`
+`globs`, `always_apply` (emitted as `alwaysApply` in the `.mdc` frontmatter)
+
+**mcp_server:**
+`auth` block (for HTTP/SSE servers): `client_id` (required), `client_secret`, `scopes`. Emitted as `CLIENT_ID` / `CLIENT_SECRET` / `scopes` per Cursor's documented casing.
+
+```hcl
+mcp_server "oauth-api" {
+  url = "https://api.example.com/mcp"
+
+  cursor {
+    auth {
+      client_id     = "my-client-id"
+      client_secret = env("CLIENT_SECRET")
+      scopes        = ["read", "write"]
+    }
+  }
+}
+```
 
 ---
 
@@ -436,7 +466,7 @@ Claude overrides vary by resource type:
 
 | Resource Type | Claude Code | GitHub Copilot | Cursor |
 |---------------|:-----------:|:--------------:|:------:|
-| `skill` | Skill | Skill | -- |
+| `skill` | Skill | Skill | Skill |
 | `command` | Command | Prompt | Command |
 | `agent` | Subagent | Agent | -- |
 | `rule` | Rule (CLAUDE.md) | Instruction (copilot-instructions.md) | Rule (AGENTS.md) |

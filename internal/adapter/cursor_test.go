@@ -65,6 +65,43 @@ func TestCursorAdapter_PlanRule(t *testing.T) {
 	assert.Empty(t, plan.Directories)
 }
 
+func TestCursorAdapter_PlanSkill(t *testing.T) {
+	adapter := &CursorAdapter{}
+
+	skill := &resource.CursorSkill{
+		Name:                   "deploy",
+		Description:            "Deploy the application",
+		Content:                "Deployment instructions",
+		License:                "MIT",
+		Compatibility:          "requires node 20",
+		DisableModelInvocation: true,
+	}
+
+	pkg := &config.PackageConfig{
+		Meta: config.MetaBlock{
+			Name:    "my-plugin",
+			Version: "1.0.0",
+		},
+	}
+
+	plan, err := adapter.PlanInstallation(skill, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: true})
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{filepath.Join(".cursor", "skills", "my-plugin-deploy")}, getDirPaths(plan))
+	require.Len(t, plan.Files, 1)
+	assert.Equal(t, filepath.Join(".cursor", "skills", "my-plugin-deploy", "SKILL.md"), plan.Files[0].Path)
+
+	expectedContent := `---
+name: deploy
+description: Deploy the application
+license: MIT
+compatibility: requires node 20
+disable-model-invocation: true
+---
+Deployment instructions`
+	assert.Equal(t, expectedContent, plan.Files[0].Content)
+}
+
 func TestCursorAdapter_PlanMCPServer_Stdio(t *testing.T) {
 	adapter := &CursorAdapter{}
 
@@ -93,6 +130,7 @@ func TestCursorAdapter_PlanMCPServer_Stdio(t *testing.T) {
 	expectedMCPEntries := map[string]any{
 		"mcpServers": map[string]any{
 			"filesystem": map[string]any{
+				"type":    "stdio",
 				"command": "npx",
 				"args":    []string{"-y", "@anthropic/mcp-filesystem"},
 				"env":     map[string]string{"HOME": "/home/user"},
@@ -125,6 +163,7 @@ func TestCursorAdapter_PlanMCPServer_HTTP(t *testing.T) {
 	expectedMCPEntries := map[string]any{
 		"mcpServers": map[string]any{
 			"context7": map[string]any{
+				"type":    "http",
 				"url":     "https://mcp.context7.com/mcp",
 				"headers": map[string]string{"Authorization": "Bearer token"},
 			},
@@ -156,8 +195,49 @@ func TestCursorAdapter_PlanMCPServer_SSE(t *testing.T) {
 	expectedMCPEntries := map[string]any{
 		"mcpServers": map[string]any{
 			"sse-server": map[string]any{
+				"type":    "sse",
 				"url":     "https://api.example.com/sse",
 				"headers": map[string]string{"X-API-Key": "secret"},
+			},
+		},
+	}
+	assert.Equal(t, expectedMCPEntries, plan.MCPEntries)
+}
+
+func TestCursorAdapter_PlanMCPServer_HTTPWithAuth(t *testing.T) {
+	adapter := &CursorAdapter{}
+
+	server := &resource.CursorMCPServer{
+		Name: "oauth-server",
+		Type: "http",
+		URL:  "https://api.example.com/mcp",
+		Auth: &resource.MCPAuth{
+			ClientID:     "my-client-id",
+			ClientSecret: "my-client-secret",
+			Scopes:       []string{"read", "write"},
+		},
+	}
+
+	pkg := &config.PackageConfig{
+		Meta: config.MetaBlock{
+			Name:    "my-plugin",
+			Version: "1.0.0",
+		},
+	}
+
+	plan, err := adapter.PlanInstallation(server, pkg, "/plugin", "/project", &InstallContext{PackageName: "my-plugin", Namespace: false})
+	require.NoError(t, err)
+
+	expectedMCPEntries := map[string]any{
+		"mcpServers": map[string]any{
+			"oauth-server": map[string]any{
+				"type": "http",
+				"url":  "https://api.example.com/mcp",
+				"auth": map[string]any{
+					"CLIENT_ID":     "my-client-id",
+					"CLIENT_SECRET": "my-client-secret",
+					"scopes":        []string{"read", "write"},
+				},
 			},
 		},
 	}
@@ -188,6 +268,7 @@ func TestCursorAdapter_PlanMCPServer_EnvFile(t *testing.T) {
 	expectedMCPEntries := map[string]any{
 		"mcpServers": map[string]any{
 			"env-server": map[string]any{
+				"type":    "stdio",
 				"command": "node",
 				"args":    []string{"server.js"},
 				"envFile": ".env.local",
@@ -316,11 +397,8 @@ func TestCursorAdapter_PlanCommand(t *testing.T) {
 	require.Len(t, plan.Files, 1)
 	assert.Equal(t, filepath.Join(".cursor", "commands", "my-plugin-deploy.md"), plan.Files[0].Path)
 
-	expectedContent := `---
-description: Deploy the application
----
-Deploy this app to production.`
-	assert.Equal(t, expectedContent, plan.Files[0].Content)
+	// Cursor commands are plain markdown — no frontmatter.
+	assert.Equal(t, "Deploy this app to production.", plan.Files[0].Content)
 }
 
 func TestCursorAdapter_PlanInstallation_UnsupportedType(t *testing.T) {
@@ -387,19 +465,45 @@ description: Simple rules
 	assert.Equal(t, expected, frontmatter)
 }
 
-func TestCursorAdapter_GenerateFrontmatter_Command(t *testing.T) {
+func TestCursorAdapter_GenerateFrontmatter_Skill_Minimal(t *testing.T) {
 	adapter := &CursorAdapter{}
 
-	cmd := &resource.CursorCommand{
+	skill := &resource.CursorSkill{
 		Name:        "deploy",
 		Description: "Deploy the app",
 	}
 
 	pkg := &config.PackageConfig{}
 
-	frontmatter := adapter.GenerateFrontmatter(cmd, pkg)
+	frontmatter := adapter.GenerateFrontmatter(skill, pkg)
 	expected := `---
+name: deploy
 description: Deploy the app
+---
+`
+	assert.Equal(t, expected, frontmatter)
+}
+
+func TestCursorAdapter_GenerateFrontmatter_Skill_Full(t *testing.T) {
+	adapter := &CursorAdapter{}
+
+	skill := &resource.CursorSkill{
+		Name:                   "deploy",
+		Description:            "Deploy the app",
+		License:                "MIT",
+		Compatibility:          "requires node 20",
+		DisableModelInvocation: true,
+	}
+
+	pkg := &config.PackageConfig{}
+
+	frontmatter := adapter.GenerateFrontmatter(skill, pkg)
+	expected := `---
+name: deploy
+description: Deploy the app
+license: MIT
+compatibility: requires node 20
+disable-model-invocation: true
 ---
 `
 	assert.Equal(t, expected, frontmatter)
@@ -408,11 +512,15 @@ description: Deploy the app
 func TestCursorAdapter_GenerateFrontmatter_UnknownType(t *testing.T) {
 	adapter := &CursorAdapter{}
 
+	// CursorCommand returns "" — Cursor commands are plain markdown.
+	cmd := &resource.CursorCommand{Name: "test", Description: "test", Content: "content"}
+	pkg := &config.PackageConfig{}
+	frontmatter := adapter.GenerateFrontmatter(cmd, pkg)
+	assert.Equal(t, "", frontmatter)
+
 	// CursorRule doesn't generate frontmatter (it's merged content)
 	rule := &resource.CursorRule{Name: "test", Description: "test", Content: "content"}
-	pkg := &config.PackageConfig{}
-
-	frontmatter := adapter.GenerateFrontmatter(rule, pkg)
+	frontmatter = adapter.GenerateFrontmatter(rule, pkg)
 	assert.Equal(t, "", frontmatter)
 
 	// CursorMCPServer doesn't generate frontmatter
@@ -442,6 +550,7 @@ func TestCursorAdapter_MergeCursorMCPConfig_NewConfig(t *testing.T) {
 	expected := map[string]any{
 		"mcpServers": map[string]any{
 			"server1": map[string]any{
+				"type":    "stdio",
 				"command": "npx",
 				"args":    []string{"-y", "@mcp/server"},
 			},
@@ -481,6 +590,7 @@ func TestCursorAdapter_MergeCursorMCPConfig_MergeExisting(t *testing.T) {
 				"args":    []string{"server.js"},
 			},
 			"new-server": map[string]any{
+				"type":    "stdio",
 				"command": "npx",
 				"args":    []string{"-y", "@mcp/new"},
 				"env":     map[string]string{"KEY": "value"},
@@ -516,6 +626,7 @@ func TestCursorAdapter_MergeCursorMCPConfig_OverwriteExisting(t *testing.T) {
 	expected := map[string]any{
 		"mcpServers": map[string]any{
 			"server": map[string]any{
+				"type":    "stdio",
 				"command": "new-command",
 				"args":    []string{"new-arg"},
 			},
@@ -552,13 +663,16 @@ func TestCursorAdapter_MergeCursorMCPConfig_MultipleServers(t *testing.T) {
 	expected := map[string]any{
 		"mcpServers": map[string]any{
 			"stdio-server": map[string]any{
+				"type":    "stdio",
 				"command": "npx",
 				"args":    []string{"-y", "@mcp/stdio"},
 			},
 			"http-server": map[string]any{
-				"url": "https://api.example.com/mcp",
+				"type": "http",
+				"url":  "https://api.example.com/mcp",
 			},
 			"sse-server": map[string]any{
+				"type":    "sse",
 				"url":     "https://api.example.com/sse",
 				"headers": map[string]string{"Auth": "token"},
 			},
@@ -588,6 +702,7 @@ func TestCursorAdapter_MergeCursorMCPConfig_EmptyExistingNoServers(t *testing.T)
 		"otherKey": "otherValue",
 		"mcpServers": map[string]any{
 			"server": map[string]any{
+				"type":    "stdio",
 				"command": "cmd",
 			},
 		},

@@ -93,6 +93,9 @@ type CursorMCPServer struct {
 
 	// Headers contains HTTP headers for http/sse type servers
 	Headers map[string]string
+
+	// Auth is an optional OAuth configuration for remote servers
+	Auth *MCPAuth
 }
 
 // ResourceType returns the HCL block type for Cursor MCP servers.
@@ -220,6 +223,82 @@ func (r *CursorRules) Validate() error {
 	}
 	if r.Content == "" {
 		return fmt.Errorf("cursor_rules %q: content is required", r.Name)
+	}
+	return nil
+}
+
+// CursorSkill represents a skill for Cursor.
+// Skills are installed to .cursor/skills/{name}/SKILL.md and have a minimal
+// frontmatter (no allowed-tools, model, argument-hint, or context fields).
+type CursorSkill struct {
+	// Name is the block label identifying this skill; must match the parent folder
+	Name string
+
+	// Description explains when and how to use this skill
+	Description string
+
+	// Content is the main body/instructions of the skill
+	Content string
+
+	// Files lists static files to copy alongside the skill
+	Files []FileBlock
+
+	// TemplateFiles lists template files to render and copy
+	TemplateFiles []TemplateFileBlock
+
+	// License is an optional license name or reference to a bundled file
+	License string
+
+	// Compatibility is free-form text describing environment requirements
+	Compatibility string
+
+	// DisableModelInvocation prevents Cursor from auto-loading the skill
+	DisableModelInvocation bool
+
+	// Metadata contains arbitrary additional frontmatter key/value pairs
+	Metadata map[string]string
+}
+
+// ResourceType returns the HCL block type for Cursor skills.
+func (s *CursorSkill) ResourceType() string {
+	return "cursor_skill"
+}
+
+// ResourceName returns the skill's name identifier.
+func (s *CursorSkill) ResourceName() string {
+	return s.Name
+}
+
+// Platform returns the target platform for Cursor skills.
+func (s *CursorSkill) Platform() string {
+	return "cursor"
+}
+
+// GetContent returns the skill's content.
+func (s *CursorSkill) GetContent() string {
+	return s.Content
+}
+
+// GetFiles returns the skill's file blocks.
+func (s *CursorSkill) GetFiles() []FileBlock {
+	return s.Files
+}
+
+// GetTemplateFiles returns the skill's template file blocks.
+func (s *CursorSkill) GetTemplateFiles() []TemplateFileBlock {
+	return s.TemplateFiles
+}
+
+// Validate checks that the skill has all required fields.
+func (s *CursorSkill) Validate() error {
+	if s.Name == "" {
+		return fmt.Errorf("cursor_skill: name is required")
+	}
+	if s.Description == "" {
+		return fmt.Errorf("cursor_skill %q: description is required", s.Name)
+	}
+	if s.Content == "" {
+		return fmt.Errorf("cursor_skill %q: content is required", s.Name)
 	}
 	return nil
 }
