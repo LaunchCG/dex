@@ -139,7 +139,7 @@ func (a *ClaudeAdapter) GenerateFrontmatter(res resource.Resource, pkg *config.P
 	case *resource.ClaudeSkill:
 		return a.generateSkillFrontmatter(r, pkg)
 	case *resource.ClaudeCommand:
-		return a.generateCommandFrontmatter(r, pkg)
+		return a.generateSkillFrontmatter((*resource.ClaudeSkill)(r), pkg)
 	case *resource.ClaudeSubagent:
 		return a.generateSubagentFrontmatter(r, pkg)
 	case *resource.ClaudeRules:
@@ -223,6 +223,7 @@ func (a *ClaudeAdapter) MergeSettingsConfig(existing map[string]any, settings *r
 	mergeSlice("deny", settings.Deny)
 	mergeSlice("enabledMcpServers", settings.EnabledMCPServers)
 	mergeSlice("disabledMcpServers", settings.DisabledMCPServers)
+	mergeSlice("additionalDirectories", settings.AdditionalDirectories)
 
 	// Merge env map
 	if len(settings.Env) > 0 {
@@ -257,6 +258,15 @@ func (a *ClaudeAdapter) MergeSettingsConfig(existing map[string]any, settings *r
 	}
 	if settings.PlansDirectory != "" {
 		existing["plansDirectory"] = settings.PlansDirectory
+	}
+	if settings.AutoMemoryDirectory != "" {
+		existing["autoMemoryDirectory"] = settings.AutoMemoryDirectory
+	}
+	if settings.IncludeGitInstructions != nil {
+		existing["includeGitInstructions"] = *settings.IncludeGitInstructions
+	}
+	if settings.Agent != "" {
+		existing["agent"] = settings.Agent
 	}
 
 	return existing
@@ -322,7 +332,7 @@ func (a *ClaudeAdapter) planCommand(cmd *resource.ClaudeCommand, pkg *config.Pac
 	if hasFrontmatter(cmd.Content) {
 		content = cmd.Content
 	} else {
-		frontmatter := a.generateCommandFrontmatter(cmd, pkg)
+		frontmatter := a.generateSkillFrontmatter((*resource.ClaudeSkill)(cmd), pkg)
 		content = frontmatter + cmd.Content
 	}
 
@@ -528,8 +538,17 @@ func (a *ClaudeAdapter) generateSkillFrontmatter(skill *resource.ClaudeSkill, pk
 	b.WriteString(fmt.Sprintf("name: %s\n", skill.Name))
 	b.WriteString(fmt.Sprintf("description: %s\n", skill.Description))
 
+	if skill.WhenToUse != "" {
+		b.WriteString(fmt.Sprintf("when_to_use: %s\n", skill.WhenToUse))
+	}
 	if skill.ArgumentHint != "" {
 		b.WriteString(fmt.Sprintf("argument-hint: %s\n", skill.ArgumentHint))
+	}
+	if len(skill.Arguments) > 0 {
+		b.WriteString("arguments:\n")
+		for _, arg := range skill.Arguments {
+			b.WriteString(fmt.Sprintf("- %s\n", arg))
+		}
 	}
 	if skill.DisableModelInvocation {
 		b.WriteString("disable-model-invocation: true\n")
@@ -546,11 +565,23 @@ func (a *ClaudeAdapter) generateSkillFrontmatter(skill *resource.ClaudeSkill, pk
 	if skill.Model != "" {
 		b.WriteString(fmt.Sprintf("model: %s\n", skill.Model))
 	}
+	if skill.Effort != "" {
+		b.WriteString(fmt.Sprintf("effort: %s\n", skill.Effort))
+	}
 	if skill.Context != "" {
 		b.WriteString(fmt.Sprintf("context: %s\n", skill.Context))
 	}
 	if skill.Agent != "" {
 		b.WriteString(fmt.Sprintf("agent: %s\n", skill.Agent))
+	}
+	if len(skill.Paths) > 0 {
+		b.WriteString("paths:\n")
+		for _, p := range skill.Paths {
+			b.WriteString(fmt.Sprintf("- %s\n", p))
+		}
+	}
+	if skill.Shell != "" {
+		b.WriteString(fmt.Sprintf("shell: %s\n", skill.Shell))
 	}
 
 	// Add any additional metadata
@@ -570,32 +601,6 @@ func (a *ClaudeAdapter) generateSkillFrontmatter(skill *resource.ClaudeSkill, pk
 				}
 			}
 		}
-	}
-
-	b.WriteString("---\n")
-	return b.String()
-}
-
-// generateCommandFrontmatter generates YAML frontmatter for a command.
-func (a *ClaudeAdapter) generateCommandFrontmatter(cmd *resource.ClaudeCommand, pkg *config.PackageConfig) string {
-	var b strings.Builder
-	b.WriteString("---\n")
-	b.WriteString(fmt.Sprintf("name: %s\n", cmd.Name))
-	b.WriteString(fmt.Sprintf("description: %s\n", cmd.Description))
-
-	if cmd.ArgumentHint != "" {
-		b.WriteString(fmt.Sprintf("argument_hint: %s\n", cmd.ArgumentHint))
-	}
-
-	if len(cmd.AllowedTools) > 0 {
-		b.WriteString("allowed_tools:\n")
-		for _, tool := range cmd.AllowedTools {
-			b.WriteString(fmt.Sprintf("- %s\n", tool))
-		}
-	}
-
-	if cmd.Model != "" {
-		b.WriteString(fmt.Sprintf("model: %s\n", cmd.Model))
 	}
 
 	b.WriteString("---\n")
@@ -622,6 +627,55 @@ func (a *ClaudeAdapter) generateSubagentFrontmatter(agent *resource.ClaudeSubage
 		for _, tool := range agent.Tools {
 			b.WriteString(fmt.Sprintf("- %s\n", tool))
 		}
+	}
+
+	if len(agent.DisallowedTools) > 0 {
+		b.WriteString("disallowedTools:\n")
+		for _, tool := range agent.DisallowedTools {
+			b.WriteString(fmt.Sprintf("- %s\n", tool))
+		}
+	}
+
+	if agent.PermissionMode != "" {
+		b.WriteString(fmt.Sprintf("permissionMode: %s\n", agent.PermissionMode))
+	}
+
+	if agent.MaxTurns != nil {
+		b.WriteString(fmt.Sprintf("maxTurns: %d\n", *agent.MaxTurns))
+	}
+
+	if len(agent.Skills) > 0 {
+		b.WriteString("skills:\n")
+		for _, s := range agent.Skills {
+			b.WriteString(fmt.Sprintf("- %s\n", s))
+		}
+	}
+
+	if len(agent.MCPServers) > 0 {
+		b.WriteString("mcpServers:\n")
+		for _, s := range agent.MCPServers {
+			b.WriteString(fmt.Sprintf("- %s\n", s))
+		}
+	}
+
+	if agent.Memory != "" {
+		b.WriteString(fmt.Sprintf("memory: %s\n", agent.Memory))
+	}
+
+	if agent.Background {
+		b.WriteString("background: true\n")
+	}
+
+	if agent.Effort != "" {
+		b.WriteString(fmt.Sprintf("effort: %s\n", agent.Effort))
+	}
+
+	if agent.Isolation != "" {
+		b.WriteString(fmt.Sprintf("isolation: %s\n", agent.Isolation))
+	}
+
+	if agent.InitialPrompt != "" {
+		b.WriteString(fmt.Sprintf("initialPrompt: %s\n", agent.InitialPrompt))
 	}
 
 	// Add hooks if present

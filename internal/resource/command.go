@@ -18,13 +18,11 @@ type Command struct {
 }
 
 // CommandClaudeOverride contains Claude-specific fields for commands.
-type CommandClaudeOverride struct {
-	Disabled     bool     `hcl:"disabled,optional"`
-	Content      string   `hcl:"content,optional"`
-	ArgumentHint string   `hcl:"argument_hint,optional"`
-	AllowedTools []string `hcl:"allowed_tools,optional"`
-	Model        string   `hcl:"model,optional"`
-}
+//
+// Claude Code merged custom commands into the skills system, so a command and a
+// skill accept the same frontmatter. This is a type alias — the two names refer
+// to the same Go type so HCL parsing and Go usage stay in lockstep automatically.
+type CommandClaudeOverride = SkillClaudeOverride
 
 // CommandCopilotOverride contains Copilot-specific fields for commands (maps to CopilotPrompt).
 type CommandCopilotOverride struct {

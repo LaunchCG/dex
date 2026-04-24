@@ -24,6 +24,12 @@ type ClaudeSkill struct {
 	// ArgumentHint provides a hint shown during autocomplete (e.g., "[filename]")
 	ArgumentHint string
 
+	// Arguments lists named positional arguments for $name substitution in the skill body
+	Arguments []string
+
+	// WhenToUse provides additional context (trigger phrases, example requests) for auto-invocation
+	WhenToUse string
+
 	// DisableModelInvocation prevents Claude from auto-loading this skill; user must invoke manually
 	DisableModelInvocation bool
 
@@ -36,11 +42,20 @@ type ClaudeSkill struct {
 	// Model specifies the model to use when skill is active: "sonnet", "haiku", or "opus"
 	Model string
 
+	// Effort sets the effort level: "low", "medium", "high", "xhigh", or "max"
+	Effort string
+
 	// Context controls execution context; set to "fork" to run in isolated subagent
 	Context string
 
 	// Agent specifies which subagent type to use when Context is "fork" (e.g., "Explore", "Plan")
 	Agent string
+
+	// Paths limits auto-activation to files matching these glob patterns
+	Paths []string
+
+	// Shell selects the shell for embedded commands: "bash" (default) or "powershell"
+	Shell string
 
 	// Metadata contains additional frontmatter fields for the skill
 	Metadata map[string]string
@@ -96,31 +111,12 @@ func (s *ClaudeSkill) Validate() error {
 // ClaudeCommand represents a command for Claude Code.
 // Commands are installed to .claude/commands/{package}-{name}.md
 // and can be invoked by users with /{name} syntax.
-type ClaudeCommand struct {
-	// Name is the block label identifying this command
-	Name string
-
-	// Description explains when and how to use this command
-	Description string
-
-	// Content is the main body/instructions of the command
-	Content string
-
-	// Files lists static files to copy alongside the command
-	Files []FileBlock
-
-	// TemplateFiles lists template files to render and copy
-	TemplateFiles []TemplateFileBlock
-
-	// ArgumentHint provides a hint for command arguments (e.g., "[environment]")
-	ArgumentHint string
-
-	// AllowedTools restricts which tools this command can use
-	AllowedTools []string
-
-	// Model specifies the model to use: "sonnet", "haiku", or "opus"
-	Model string
-}
+//
+// Claude Code merged custom commands into the skills system, so commands and
+// skills share the same frontmatter. This is a named type of ClaudeSkill —
+// distinct for adapter dispatch (different output location) but sharing the
+// full field set and frontmatter emitter.
+type ClaudeCommand ClaudeSkill
 
 // ResourceType returns the HCL block type for Claude commands.
 func (c *ClaudeCommand) ResourceType() string {
@@ -188,11 +184,41 @@ type ClaudeSubagent struct {
 	// Model specifies the model: "inherit", "sonnet", "haiku", or "opus"
 	Model string
 
-	// Color sets the agent's display color: "blue", "green", "yellow", "red", "purple"
+	// Color sets the agent's display color: "blue", "green", "yellow", "red", "purple", "orange", "pink", "cyan"
 	Color string
 
-	// Tools lists the tools this subagent is allowed to use
+	// Tools lists the tools this subagent is allowed to use (inherits all if empty)
 	Tools []string
+
+	// DisallowedTools denies tools (applied before Tools is resolved)
+	DisallowedTools []string
+
+	// PermissionMode controls permission handling: "default", "acceptEdits", "auto", "dontAsk", "bypassPermissions", "plan"
+	PermissionMode string
+
+	// MaxTurns caps the number of agentic turns before stopping
+	MaxTurns *int
+
+	// Skills lists skill names to preload into the subagent's context
+	Skills []string
+
+	// MCPServers lists MCP server names available to this subagent
+	MCPServers []string
+
+	// Memory sets the persistent memory scope: "user", "project", or "local"
+	Memory string
+
+	// Background makes the subagent always run as a background task
+	Background bool
+
+	// Effort sets the effort level: "low", "medium", "high", "xhigh", or "max"
+	Effort string
+
+	// Isolation runs the subagent in an isolated git worktree when set to "worktree"
+	Isolation string
+
+	// InitialPrompt is auto-submitted as the first turn when the subagent runs as main session
+	InitialPrompt string
 
 	// Hooks defines lifecycle hooks scoped to this subagent
 	Hooks map[string]interface{}
@@ -421,6 +447,18 @@ type ClaudeSettings struct {
 
 	// PlansDirectory sets a custom location for plan files
 	PlansDirectory string
+
+	// AdditionalDirectories grants file access beyond the project root
+	AdditionalDirectories []string
+
+	// AutoMemoryDirectory overrides the default auto-memory storage location
+	AutoMemoryDirectory string
+
+	// IncludeGitInstructions controls whether built-in git workflow instructions are included (default: true)
+	IncludeGitInstructions *bool
+
+	// Agent is the name of a custom subagent to run as the default for the session
+	Agent string
 }
 
 // ResourceType returns the HCL block type for Claude settings.
