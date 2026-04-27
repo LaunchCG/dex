@@ -122,7 +122,7 @@ func TestClaudeAdapter_PlanCommand(t *testing.T) {
 	expectedContent := `---
 name: deploy
 description: Deploy the application
-argument_hint: [environment]
+argument-hint: [environment]
 model: sonnet
 ---
 Deployment instructions`
@@ -450,8 +450,8 @@ func TestClaudeAdapter_GenerateFrontmatter_Command(t *testing.T) {
 	expected := `---
 name: deploy
 description: Deploy app
-argument_hint: [env]
-allowed_tools:
+argument-hint: [env]
+allowed-tools:
 - Bash
 - Read
 model: opus

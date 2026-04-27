@@ -29,6 +29,10 @@ type SettingsClaudeOverride struct {
 	OutputStyle                string            `hcl:"output_style,optional"`
 	AlwaysThinkingEnabled      bool              `hcl:"always_thinking_enabled,optional"`
 	PlansDirectory             string            `hcl:"plans_directory,optional"`
+	AdditionalDirectories      []string          `hcl:"additional_directories,optional"`
+	AutoMemoryDirectory        string            `hcl:"auto_memory_directory,optional"`
+	IncludeGitInstructions     *bool             `hcl:"include_git_instructions,optional"`
+	Agent                      string            `hcl:"agent,optional"`
 }
 
 func (s *Settings) ResourceType() string                  { return "settings" }

@@ -20,12 +20,22 @@ type Agent struct {
 
 // AgentClaudeOverride contains Claude-specific fields for agents (maps to ClaudeSubagent).
 type AgentClaudeOverride struct {
-	Disabled bool                   `hcl:"disabled,optional"`
-	Content  string                 `hcl:"content,optional"`
-	Model    string                 `hcl:"model,optional"`
-	Color    string                 `hcl:"color,optional"`
-	Tools    []string               `hcl:"tools,optional"`
-	Hooks    map[string]interface{} `hcl:"hooks,optional"`
+	Disabled        bool                   `hcl:"disabled,optional"`
+	Content         string                 `hcl:"content,optional"`
+	Model           string                 `hcl:"model,optional"`
+	Color           string                 `hcl:"color,optional"`
+	Tools           []string               `hcl:"tools,optional"`
+	DisallowedTools []string               `hcl:"disallowed_tools,optional"`
+	PermissionMode  string                 `hcl:"permission_mode,optional"`
+	MaxTurns        *int                   `hcl:"max_turns,optional"`
+	Skills          []string               `hcl:"skills,optional"`
+	MCPServers      []string               `hcl:"mcp_servers,optional"`
+	Memory          string                 `hcl:"memory,optional"`
+	Background      bool                   `hcl:"background,optional"`
+	Effort          string                 `hcl:"effort,optional"`
+	Isolation       string                 `hcl:"isolation,optional"`
+	InitialPrompt   string                 `hcl:"initial_prompt,optional"`
+	Hooks           map[string]interface{} `hcl:"hooks,optional"`
 }
 
 // AgentCopilotOverride contains Copilot-specific fields for agents.

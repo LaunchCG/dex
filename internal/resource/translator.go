@@ -212,12 +212,17 @@ func TranslateToClaudeSkill(s *Skill) *ClaudeSkill {
 			cs.Content = s.Claude.Content
 		}
 		cs.ArgumentHint = s.Claude.ArgumentHint
+		cs.Arguments = s.Claude.Arguments
+		cs.WhenToUse = s.Claude.WhenToUse
 		cs.DisableModelInvocation = s.Claude.DisableModelInvocation
 		cs.UserInvocable = s.Claude.UserInvocable
 		cs.AllowedTools = s.Claude.AllowedTools
 		cs.Model = s.Claude.Model
+		cs.Effort = s.Claude.Effort
 		cs.Context = s.Claude.Context
 		cs.Agent = s.Claude.Agent
+		cs.Paths = s.Claude.Paths
+		cs.Shell = s.Claude.Shell
 		cs.Metadata = s.Claude.Metadata
 		cs.Hooks = s.Claude.Hooks
 	}
@@ -289,32 +294,24 @@ func TranslateToCopilotSkill(s *Skill) *CopilotSkill {
 
 // TranslateToClaudeCommand converts a universal Command to a Claude-specific command.
 // Returns nil if disabled for Claude.
+//
+// Claude Code merged custom commands into skills, so a Command translates
+// using the same field set as a Skill. We reuse the skill translator and
+// convert to ClaudeCommand (which is a named type of ClaudeSkill).
 func TranslateToClaudeCommand(c *Command) *ClaudeCommand {
-	if !c.IsEnabledForPlatform("claude-code") {
-		return nil
-	}
-
-	cc := &ClaudeCommand{
+	skill := TranslateToClaudeSkill(&Skill{
 		Name:          c.Name,
 		Description:   c.Description,
 		Content:       c.Content,
 		Files:         c.Files,
 		TemplateFiles: c.TemplateFiles,
+		Platforms:     c.Platforms,
+		Claude:        c.Claude, // CommandClaudeOverride is a type alias for SkillClaudeOverride
+	})
+	if skill == nil {
+		return nil
 	}
-
-	if c.Claude != nil {
-		if c.Claude.Disabled {
-			return nil
-		}
-		if c.Claude.Content != "" {
-			cc.Content = c.Claude.Content
-		}
-		cc.ArgumentHint = c.Claude.ArgumentHint
-		cc.AllowedTools = c.Claude.AllowedTools
-		cc.Model = c.Claude.Model
-	}
-
-	return cc
+	return (*ClaudeCommand)(skill)
 }
 
 // TranslateToCopilotPrompt converts a universal Command to a Copilot prompt.
@@ -577,6 +574,16 @@ func TranslateToClaudeSubagent(a *Agent) *ClaudeSubagent {
 		cs.Model = a.Claude.Model
 		cs.Color = a.Claude.Color
 		cs.Tools = a.Claude.Tools
+		cs.DisallowedTools = a.Claude.DisallowedTools
+		cs.PermissionMode = a.Claude.PermissionMode
+		cs.MaxTurns = a.Claude.MaxTurns
+		cs.Skills = a.Claude.Skills
+		cs.MCPServers = a.Claude.MCPServers
+		cs.Memory = a.Claude.Memory
+		cs.Background = a.Claude.Background
+		cs.Effort = a.Claude.Effort
+		cs.Isolation = a.Claude.Isolation
+		cs.InitialPrompt = a.Claude.InitialPrompt
 		cs.Hooks = a.Claude.Hooks
 	}
 
@@ -650,5 +657,9 @@ func TranslateToClaudeSettings(s *Settings) *ClaudeSettings {
 		OutputStyle:                s.Claude.OutputStyle,
 		AlwaysThinkingEnabled:      s.Claude.AlwaysThinkingEnabled,
 		PlansDirectory:             s.Claude.PlansDirectory,
+		AdditionalDirectories:      s.Claude.AdditionalDirectories,
+		AutoMemoryDirectory:        s.Claude.AutoMemoryDirectory,
+		IncludeGitInstructions:     s.Claude.IncludeGitInstructions,
+		Agent:                      s.Claude.Agent,
 	}
 }

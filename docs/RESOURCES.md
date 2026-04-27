@@ -402,22 +402,22 @@ All platform overrides support:
 
 ### Claude Code Overrides
 
-Claude overrides vary by resource type:
+Claude overrides vary by resource type. Field names are HCL attributes; the emitted YAML/JSON key is in parentheses when it differs.
 
 **skill:**
-`argument_hint`, `disable_model_invocation`, `user_invocable`, `allowed_tools`, `model`, `context`, `agent`, `metadata`, `hooks`
+`argument_hint` (`argument-hint`), `arguments`, `when_to_use`, `disable_model_invocation` (`disable-model-invocation`), `user_invocable` (`user-invocable`), `allowed_tools` (`allowed-tools`), `model`, `effort`, `context` (`fork` runs the skill in an isolated subagent), `agent` (subagent type when `context = "fork"`), `paths` (glob patterns for auto-activation), `shell` (`bash` or `powershell`), `metadata`, `hooks`
 
 **command:**
-`argument_hint`, `allowed_tools`, `model`
+Claude Code merged custom commands into the skills system, so commands accept **the same fields as `skill`** above. `CommandClaudeOverride` is a Go type alias for `SkillClaudeOverride` — the two always stay in sync.
 
 **agent:**
-`model`, `color`, `tools`, `hooks`
+`model`, `color`, `tools`, `disallowed_tools` (`disallowedTools`), `permission_mode` (`permissionMode`), `max_turns` (`maxTurns`), `skills` (names of skills to preload), `mcp_servers` (`mcpServers`), `memory` (`user`/`project`/`local`), `background`, `effort`, `isolation` (`worktree` to run in an isolated git worktree), `initial_prompt` (`initialPrompt`), `hooks`
 
 **rule / rules:**
 `paths`
 
 **settings:**
-`allow`, `ask`, `deny`, `env`, `enable_all_project_mcp_servers`, `enabled_mcp_servers`, `disabled_mcp_servers`
+`allow`, `ask`, `deny`, `env`, `enable_all_project_mcp_servers`, `enabled_mcp_servers`, `disabled_mcp_servers`, `respect_gitignore`, `include_co_authored_by`, `model`, `output_style`, `always_thinking_enabled`, `plans_directory`, `additional_directories` (`additionalDirectories` — extra file-access directories), `auto_memory_directory` (`autoMemoryDirectory`), `include_git_instructions` (`includeGitInstructions` — default `true`), `agent` (default subagent for sessions)
 
 ### GitHub Copilot Overrides
 

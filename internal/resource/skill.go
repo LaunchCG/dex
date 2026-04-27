@@ -30,16 +30,24 @@ type SkillCursorOverride struct {
 }
 
 // SkillClaudeOverride contains Claude-specific fields for skills.
+// These fields also apply to commands on Claude Code — custom commands were
+// merged into the skills system, so .claude/commands/*.md accepts the same
+// frontmatter as .claude/skills/*/SKILL.md.
 type SkillClaudeOverride struct {
 	Disabled               bool                   `hcl:"disabled,optional"`
 	Content                string                 `hcl:"content,optional"`
 	ArgumentHint           string                 `hcl:"argument_hint,optional"`
+	Arguments              []string               `hcl:"arguments,optional"`
+	WhenToUse              string                 `hcl:"when_to_use,optional"`
 	DisableModelInvocation bool                   `hcl:"disable_model_invocation,optional"`
 	UserInvocable          *bool                  `hcl:"user_invocable,optional"`
 	AllowedTools           []string               `hcl:"allowed_tools,optional"`
 	Model                  string                 `hcl:"model,optional"`
+	Effort                 string                 `hcl:"effort,optional"`
 	Context                string                 `hcl:"context,optional"`
 	Agent                  string                 `hcl:"agent,optional"`
+	Paths                  []string               `hcl:"paths,optional"`
+	Shell                  string                 `hcl:"shell,optional"`
 	Metadata               map[string]string      `hcl:"metadata,optional"`
 	Hooks                  map[string]interface{} `hcl:"hooks,optional"`
 }
