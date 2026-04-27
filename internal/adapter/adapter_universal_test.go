@@ -72,8 +72,7 @@ func emptyPkg() *config.PackageConfig {
 // Cursor Adapter: Unsupported Types Are Logged and Skipped
 // =============================================================================
 
-func TestCursorAdapter_SkillSkippedAndLogged(t *testing.T) {
-	h := withCapturedLogs(t)
+func TestCursorAdapter_SkillProducesPlan(t *testing.T) {
 	adapter, err := Get("cursor")
 	require.NoError(t, err)
 
@@ -85,14 +84,10 @@ func TestCursorAdapter_SkillSkippedAndLogged(t *testing.T) {
 
 	plan, err := adapter.PlanInstallation(skill, emptyPkg(), "/tmp", "/tmp", &InstallContext{})
 	require.NoError(t, err)
-	assert.Empty(t, plan.Files, "skill should produce no files on cursor")
-	assert.Empty(t, plan.MCPEntries, "skill should produce no MCP servers on cursor")
-
-	rec := h.findRecord("resource skipped: not supported by platform")
-	require.NotNil(t, rec, "expected warning log for unsupported skill on cursor")
-	assert.Equal(t, "my-skill", getAttr(rec, "resource"))
-	assert.Equal(t, "skill", getAttr(rec, "type"))
-	assert.Equal(t, "cursor", getAttr(rec, "platform"))
+	require.Len(t, plan.Files, 1)
+	assert.Equal(t, ".cursor/skills/my-skill/SKILL.md", plan.Files[0].Path)
+	expected := "---\nname: my-skill\ndescription: A skill\n---\nSkill content"
+	assert.Equal(t, expected, plan.Files[0].Content)
 }
 
 func TestCursorAdapter_AgentSkippedAndLogged(t *testing.T) {
@@ -213,7 +208,8 @@ func TestCursorAdapter_CommandProducesPlan(t *testing.T) {
 	require.Len(t, plan.Files, 1)
 
 	assert.Equal(t, ".cursor/commands/test-cmd.md", plan.Files[0].Path)
-	assert.Equal(t, "---\ndescription: A command\n---\nCommand content", plan.Files[0].Content)
+	// Cursor commands are plain markdown — no frontmatter is emitted.
+	assert.Equal(t, "Command content", plan.Files[0].Content)
 }
 
 func TestCursorAdapter_RuleProducesPlan(t *testing.T) {

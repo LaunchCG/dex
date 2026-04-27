@@ -8,7 +8,7 @@ Resources are defined once using universal types and automatically translate to 
 
 | Resource Type | Claude Code | GitHub Copilot | Cursor |
 |---------------|:-----------:|:--------------:|:------:|
-| `skill` | Skill | Skill | — |
+| `skill` | Skill | Skill | Skill |
 | `command` | Command | Prompt | Command |
 | `agent` | Subagent | Agent | — |
 | `rule` (merged) | Rule → CLAUDE.md | Instruction → copilot-instructions.md | Rule → AGENTS.md |

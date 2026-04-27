@@ -114,6 +114,9 @@ func applyCursorOverride(server *CursorMCPServer, override *MCPServerPlatformOve
 	if len(override.Headers) > 0 {
 		server.Headers = override.Headers
 	}
+	if override.Auth != nil {
+		server.Auth = override.Auth
+	}
 }
 
 // TranslateToCopilotMCPServer converts a unified MCPServer to a Copilot-specific MCP server.
@@ -217,6 +220,37 @@ func TranslateToClaudeSkill(s *Skill) *ClaudeSkill {
 		cs.Agent = s.Claude.Agent
 		cs.Metadata = s.Claude.Metadata
 		cs.Hooks = s.Claude.Hooks
+	}
+
+	return cs
+}
+
+// TranslateToCursorSkill converts a universal Skill to a Cursor-specific skill.
+// Returns nil if disabled for Cursor.
+func TranslateToCursorSkill(s *Skill) *CursorSkill {
+	if !s.IsEnabledForPlatform("cursor") {
+		return nil
+	}
+
+	cs := &CursorSkill{
+		Name:          s.Name,
+		Description:   s.Description,
+		Content:       s.Content,
+		Files:         s.Files,
+		TemplateFiles: s.TemplateFiles,
+	}
+
+	if s.Cursor != nil {
+		if s.Cursor.Disabled {
+			return nil
+		}
+		if s.Cursor.Content != "" {
+			cs.Content = s.Cursor.Content
+		}
+		cs.License = s.Cursor.License
+		cs.Compatibility = s.Cursor.Compatibility
+		cs.DisableModelInvocation = s.Cursor.DisableModelInvocation
+		cs.Metadata = s.Cursor.Metadata
 	}
 
 	return cs
