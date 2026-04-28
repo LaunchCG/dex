@@ -11,12 +11,10 @@ settings "project_permissions" {
   }
 }
 
-registry "nexus" {
-  url = "https://nexustemplateproduction.z13.web.core.windows.net"
-}
-
 package "base-dev" {}
 
 package "code-review" {}
 
-package "github-workflows" {}
+registry "nexus" {
+  url = "https://regproduction.z13.web.core.windows.net"
+}
