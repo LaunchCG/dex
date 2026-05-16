@@ -152,6 +152,10 @@ type RegistryBlock struct {
 
 	// URL is the remote URL for https:// registries
 	URL string `hcl:"url,optional"`
+
+	// Config holds backend-specific settings (e.g. S3 region) declared in
+	// the file so they win over local SDK defaults / env vars.
+	Config map[string]string `hcl:"config,optional"`
 }
 
 // PackageBlock defines a package dependency.

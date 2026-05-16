@@ -45,6 +45,30 @@ package "my-plugin" {
 	assert.Equal(t, "1.0.0", config.Packages[0].Version)
 }
 
+func TestLoadProject_RegistryConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	hclContent := `
+project {
+  name = "test-project"
+  default_platform = "claude-code"
+}
+
+registry "my-s3" {
+  url = "s3://my-bucket/registry"
+  config = {
+    region = "us-west-2"
+  }
+}
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "dex.hcl"), []byte(hclContent), 0644)
+	require.NoError(t, err)
+
+	config, err := LoadProject(tmpDir)
+	require.NoError(t, err)
+	require.Len(t, config.Registries, 1)
+	assert.Equal(t, "us-west-2", config.Registries[0].Config["region"])
+}
+
 func TestLoadProject_NotFound(t *testing.T) {
 	tmpDir := t.TempDir()
 	// Don't create dex.hcl

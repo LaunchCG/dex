@@ -47,7 +47,12 @@ type S3Registry struct {
 // Direct tarball: s3://bucket/path/to/package-1.0.0.tar.gz
 //
 // Authentication uses AWS SDK default credential chain.
-func NewS3Registry(url string, mode SourceMode) (*S3Registry, error) {
+//
+// settings carries backend-specific config from the project's registry block.
+// Recognized keys:
+//   - "region": forces a specific AWS region, taking precedence over
+//     AWS_REGION env / ~/.aws/config. Pass nil when no overrides apply.
+func NewS3Registry(url string, mode SourceMode, settings map[string]string) (*S3Registry, error) {
 	// Parse the S3 URL
 	bucket, prefix, err := parseS3URL(url)
 	if err != nil {
@@ -64,7 +69,12 @@ func NewS3Registry(url string, mode SourceMode) (*S3Registry, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	cfg, err := config.LoadDefaultConfig(ctx)
+	var loadOpts []func(*config.LoadOptions) error
+	if region := settings["region"]; region != "" {
+		loadOpts = append(loadOpts, config.WithRegion(region))
+	}
+
+	cfg, err := config.LoadDefaultConfig(ctx, loadOpts...)
 	if err != nil {
 		return nil, errors.NewRegistryError(url, "connect",
 			fmt.Errorf("failed to load AWS config: %w", err))

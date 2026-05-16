@@ -47,7 +47,11 @@ type AzureRegistry struct {
 // Direct tarball: az://account/container/path/to/package-1.0.0.tar.gz
 //
 // Authentication uses Azure SDK default credential chain.
-func NewAzureRegistry(url string, mode SourceMode) (*AzureRegistry, error) {
+//
+// settings carries backend-specific config from the project's registry block.
+// No keys are recognized yet (endpoint_suffix is planned). Pass nil today.
+func NewAzureRegistry(url string, mode SourceMode, settings map[string]string) (*AzureRegistry, error) {
+	_ = settings // reserved for future use (endpoint_suffix, etc.)
 	// Parse the Azure URL
 	account, container, prefix, err := parseAzureURL(url)
 	if err != nil {

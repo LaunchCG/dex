@@ -103,6 +103,27 @@ func TestS3Registry_Protocol(t *testing.T) {
 	})
 }
 
+func TestNewS3Registry_RegionFromSettings(t *testing.T) {
+	// settings["region"] should be the resolved S3 client region,
+	// taking precedence over AWS_REGION env / ~/.aws/config.
+	t.Setenv("AWS_REGION", "eu-west-1")
+
+	reg, err := NewS3Registry("s3://my-bucket/registry", ModeRegistry, map[string]string{
+		"region": "us-west-2",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "us-west-2", reg.client.Options().Region)
+}
+
+func TestNewS3Registry_NoRegionSettingFallsBackToEnv(t *testing.T) {
+	// Sanity check: without a region setting, the SDK chain picks up AWS_REGION.
+	t.Setenv("AWS_REGION", "ap-southeast-2")
+
+	reg, err := NewS3Registry("s3://my-bucket/registry", ModeRegistry, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "ap-southeast-2", reg.client.Options().Region)
+}
+
 func TestS3Registry_getCacheKey(t *testing.T) {
 	// Test that cache keys are deterministic and unique
 	t.Run("same URL produces same cache key", func(t *testing.T) {

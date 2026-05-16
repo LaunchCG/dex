@@ -19,7 +19,16 @@ import (
 //   - ModeAuto: Auto-detect based on presence of registry.json
 //   - ModeRegistry: Expect registry.json index
 //   - ModePackage: Expect single package with package.hcl
+//
+// For backend-specific overrides (e.g. S3 region), use NewRegistryWithConfig.
 func NewRegistry(url string, mode SourceMode) (Registry, error) {
+	return NewRegistryWithConfig(url, mode, nil)
+}
+
+// NewRegistryWithConfig is like NewRegistry but accepts backend-specific
+// settings declared in the project's registry block (e.g. {"region":
+// "us-west-2"} for S3). Only the S3 and Azure backends consult cfg.
+func NewRegistryWithConfig(url string, mode SourceMode, cfg map[string]string) (Registry, error) {
 	protocol, path, err := ParseSource(url)
 	if err != nil {
 		return nil, err
@@ -39,11 +48,11 @@ func NewRegistry(url string, mode SourceMode) (Registry, error) {
 
 	case "s3":
 		// Reconstruct the full s3:// URL
-		return NewS3Registry("s3://"+path, mode)
+		return NewS3Registry("s3://"+path, mode, cfg)
 
 	case "az":
 		// Reconstruct the full az:// URL
-		return NewAzureRegistry("az://"+path, mode)
+		return NewAzureRegistry("az://"+path, mode, cfg)
 
 	default:
 		return nil, fmt.Errorf("unsupported protocol: %s", protocol)
